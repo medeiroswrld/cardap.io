@@ -1,0 +1,412 @@
+import { PGlite } from "@electric-sql/pglite";
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+const db = new PGlite();
+let count = 0;
+// Supabase-owned schemas/roles are represented locally; business SQL is unchanged.
+await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
+ create schema auth;create schema storage;create schema extensions;
+ create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+ create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;
+ create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;
+ -- Test-only digest stand-in: PGlite lacks pgcrypto. Cryptography is not tested here.
+ create function extensions.digest(text,text) returns bytea language sql immutable as $$select convert_to(md5($1),'UTF8')$$;
+ grant usage on schema public,auth,storage to anon,authenticated,service_role;
+`);
+for (const file of [
+  "001_foundation.sql",
+  "002_connected_management.sql",
+  "003_video_observations.sql",
+  "004_cart_associations.sql",
+]) {
+  const sql = readFileSync(
+    new URL("../supabase/migrations/" + file, import.meta.url),
+    "utf8",
+  )
+    .replace("create extension if not exists pgcrypto;", "")
+    .replace(
+      "alter publication supabase_realtime add table public.orders;",
+      "",
+    );
+  await db.exec(sql);
+}
+const a = "10000000-0000-4000-8000-000000000001",
+  b = "10000000-0000-4000-8000-000000000002",
+  ownerA = "20000000-0000-4000-8000-000000000001",
+  ownerB = "20000000-0000-4000-8000-000000000002",
+  staff = "20000000-0000-4000-8000-000000000003",
+  ca = "30000000-0000-4000-8000-000000000001",
+  cb = "30000000-0000-4000-8000-000000000002",
+  pa = "40000000-0000-4000-8000-000000000001",
+  pb = "40000000-0000-4000-8000-000000000002",
+  ga = "50000000-0000-4000-8000-000000000001",
+  table = "60000000-0000-4000-8000-000000000001",
+  media = "70000000-0000-4000-8000-000000000001",
+  version = "80000000-0000-4000-8000-000000000001";
+await db.query("insert into auth.users values($1),($2),($3)", [
+  ownerA,
+  ownerB,
+  staff,
+]);
+await db.query(
+  "insert into restaurants(id,name,slug,accepting_orders,opening_hours) values($1,'Casa A','casa-a',true,$3),($2,'Casa B','casa-b',true,$3)",
+  [
+    a,
+    b,
+    JSON.stringify(
+      Array.from({ length: 7 }, (_, day) => ({
+        day,
+        open: "00:00",
+        close: "23:59:59",
+      })),
+    ),
+  ],
+);
+await db.query(
+  "insert into restaurant_members values($1,$2,'owner'),($3,$4,'owner'),($1,$5,'operations')",
+  [a, ownerA, b, ownerB, staff],
+);
+await db.query(
+  "insert into categories(id,restaurant_id,name) values($1,$2,'Categoria A'),($3,$4,'Categoria B')",
+  [ca, a, cb, b],
+);
+await db.query(
+  "insert into products(id,restaurant_id,category_id,name,price_cents,published) values($1,$2,$3,'Prato A',2500,true),($4,$5,$6,'Prato B',3000,false)",
+  [pa, a, ca, pb, b, cb],
+);
+await db.query(
+  "insert into dining_tables(id,restaurant_id,number) values($1,$2,1)",
+  [table, a],
+);
+await db.query(
+  "insert into guest_sessions(id,restaurant_id,token_hash,expires_at) values($1,$2,$3,now()+interval '1 hour')",
+  [ga, a, "a".repeat(64)],
+);
+async function ok(name, fn) {
+  await fn();
+  console.log("PASS " + name);
+  count++;
+}
+async function login(user) {
+  await db.exec("reset role");
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+  await db.exec("set role authenticated");
+}
+async function root() {
+  await db.exec("reset role");
+}
+async function rejected(fn, pattern) {
+  await assert.rejects(fn, pattern);
+}
+const payload = {
+  table_id: table,
+  name: "Pessoa de teste",
+  phone: "11999990001",
+  marketing_consent: false,
+  items: [
+    { product_id: pa, quantity: 2, expected_price: 2500, note: "Sem cebola" },
+  ],
+};
+const place = async (key, body = payload) => {
+  const result = await db.query(
+    "select place_guest_order($1,$2,$3,$4) as result",
+    [a, "a".repeat(64), key, JSON.stringify(body)],
+  );
+  return result.rows[0].result;
+};
+let order;
+await ok("tenant owner cannot see other draft catalog", async () => {
+  await login(ownerA);
+  const { rows } = await db.query(
+    "select id from products where restaurant_id=$1",
+    [b],
+  );
+  assert.equal(rows.length, 0);
+});
+await ok("cross-tenant writes rejected by RLS", async () => {
+  await rejected(
+    () =>
+      db.query(
+        "insert into categories(restaurant_id,name) values($1,'Intrusão')",
+        [b],
+      ),
+    /row-level security/,
+  );
+});
+await ok("cross-tenant foreign keys rejected", async () => {
+  await root();
+  await rejected(
+    () =>
+      db.query(
+        "insert into products(restaurant_id,category_id,name,price_cents) values($1,$2,'Inválido',100)",
+        [a, cb],
+      ),
+    /foreign key/,
+  );
+});
+await ok("order uses frozen server prices and exact totals", async () => {
+  order = await place("90000000-0000-4000-8000-000000000001");
+  assert.equal(order.total_cents, 5000);
+  const { rows } = await db.query(
+    "select quantity,unit_price_cents from order_items where order_id=$1",
+    [order.id],
+  );
+  assert.deepEqual(rows, [{ quantity: 2, unit_price_cents: 2500 }]);
+});
+await ok("repeated order key returns same persisted order", async () => {
+  const repeated = await place("90000000-0000-4000-8000-000000000001");
+  assert.equal(repeated.id, order.id);
+});
+await ok("same key with changed payload rejected", () =>
+  rejected(
+    () =>
+      place("90000000-0000-4000-8000-000000000001", {
+        ...payload,
+        name: "Outra pessoa",
+      }),
+    /IDEMPOTENCY_CONFLICT/,
+  ),
+);
+await ok("stale price rolls back full order", async () => {
+  await rejected(
+    () =>
+      place("90000000-0000-4000-8000-000000000002", {
+        ...payload,
+        items: [{ ...payload.items[0], expected_price: 1 }],
+      }),
+    /PRICE_CHANGED/,
+  );
+  assert.equal(
+    (await db.query("select count(*)::int n from orders")).rows[0].n,
+    1,
+  );
+});
+await ok("order cannot include product from another tenant", () =>
+  rejected(
+    () =>
+      place("90000000-0000-4000-8000-000000000003", {
+        ...payload,
+        items: [{ ...payload.items[0], product_id: pb }],
+      }),
+    /UNAVAILABLE/,
+  ),
+);
+await ok("paused restaurant rejects new orders", async () => {
+  await db.query("update restaurants set accepting_orders=false where id=$1", [
+    a,
+  ]);
+  await rejected(() => place("90000000-0000-4000-8000-000000000004"), /CLOSED/);
+  await db.query("update restaurants set accepting_orders=true where id=$1", [
+    a,
+  ]);
+});
+await ok("operations cannot read marketing contacts", async () => {
+  await login(staff);
+  assert.equal((await db.query("select * from contacts")).rows.length, 0);
+});
+await ok("operations cannot edit catalog", async () => {
+  const { rows } = await db.query(
+    "update products set price_cents=1 where id=$1 returning id",
+    [pa],
+  );
+  assert.equal(rows.length, 0);
+});
+await ok("operations can advance assigned tenant order", async () => {
+  const { rows } = await db.query(
+    "select advance_order($1,$2,'recebido','em_preparo',null,15) as result",
+    [a, order.id],
+  );
+  assert.equal(rows[0].result.status, "em_preparo");
+});
+await ok("stale status transition rejected", () =>
+  rejected(
+    () =>
+      db.query("select advance_order($1,$2,'recebido','em_preparo')", [
+        a,
+        order.id,
+      ]),
+    /STALE_ORDER/,
+  ),
+);
+await ok("cancel requires reason", () =>
+  rejected(
+    () =>
+      db.query("select advance_order($1,$2,'em_preparo','cancelado','')", [
+        a,
+        order.id,
+      ]),
+    /INVALID_TRANSITION/,
+  ),
+);
+await ok("another owner cannot read or mutate orders", async () => {
+  await login(ownerB);
+  assert.equal((await db.query("select * from orders")).rows.length, 0);
+  await rejected(
+    () =>
+      db.query("select advance_order($1,$2,'em_preparo','pronto')", [
+        a,
+        order.id,
+      ]),
+    /FORBIDDEN/,
+  );
+});
+await ok("revoked consent cannot be restored by anonymous signup", async () => {
+  await login(ownerA);
+  await db.query(
+    "select revoke_marketing($1,(select id from contacts where restaurant_id=$1 limit 1))",
+    [a],
+  );
+  await root();
+  await db.query("select subscribe_guest($1,$2,$3,$4)", [
+    a,
+    "a".repeat(64),
+    "Outro nome",
+    payload.phone,
+  ]);
+  const c = (
+    await db.query(
+      "select name,marketing_status from contacts where restaurant_id=$1",
+      [a],
+    )
+  ).rows[0];
+  assert.equal(c.name, payload.name);
+  assert.equal(c.marketing_status, "revoked");
+});
+await ok(
+  "category migration preserves product references atomically",
+  async () => {
+    await login(ownerA);
+    const c = (
+      await db.query(
+        "insert into categories(restaurant_id,name) values($1,'Nova categoria') returning id",
+        [a],
+      )
+    ).rows[0].id;
+    await db.query("select move_and_remove_category($1,$2,$3)", [a, ca, c]);
+    assert.equal(
+      (await db.query("select category_id from products where id=$1", [pa]))
+        .rows[0].category_id,
+      c,
+    );
+  },
+);
+await ok(
+  "settings deactivate tables without deleting order references",
+  async () => {
+    await db.query("select save_restaurant_settings($1,$2,2)", [
+      a,
+      JSON.stringify({
+        name: "Casa A",
+        subtitle: "Comida",
+        phone: "",
+        address: "",
+        privacy_email: "test@example.test",
+        retention_days: 90,
+        accepting_orders: true,
+        opening_hours: [{ day: 1, open: "18:00", close: "23:00" }],
+      }),
+    ]);
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int n from dining_tables where active and restaurant_id=$1",
+          [a],
+        )
+      ).rows[0].n,
+      2,
+    );
+  },
+);
+await root();
+await db.query(
+  "insert into product_media(id,restaurant_id,product_id,kind,version,state,duration_seconds) values($1,$2,$3,'video',$4,'ready',10)",
+  [media, a, pa, version],
+);
+const view = {
+  id: "a0000000-0000-4000-8000-000000000001",
+  media_id: media,
+  version,
+  product_id: pa,
+  sequence: 1,
+  position: 0,
+  watched_seconds: 3,
+  segments: [[0, 3]],
+};
+const observe = (body) =>
+  db.query("select record_video_view($1,$2,$3)", [
+    a,
+    "a".repeat(64),
+    JSON.stringify(body),
+  ]);
+await ok("video observation records qualified unique coverage", async () => {
+  await observe(view);
+  const v = (
+    await db.query(
+      "select watched_seconds::float,coverage::float,qualified from video_view_sessions",
+    )
+  ).rows[0];
+  assert.equal(v.watched_seconds, 3);
+  assert.equal(v.coverage, 0.3);
+  assert.equal(v.qualified, true);
+});
+await ok("video retries are deduplicated by sequence", async () => {
+  await observe(view);
+  assert.equal(
+    (await db.query("select count(*)::int n from video_view_sessions")).rows[0]
+      .n,
+    1,
+  );
+});
+await ok("forged video intervals rejected", () =>
+  rejected(
+    () => observe({ ...view, sequence: 2, watched_seconds: 500 }),
+    /INVALID_INTERVAL/,
+  ),
+);
+await ok("wrong media version rejected", () =>
+  rejected(
+    () => observe({ ...view, version: "80000000-0000-4000-8000-000000000002" }),
+    /INVALID_MEDIA/,
+  ),
+);
+await ok(
+  "cart events deduplicate and associate with qualified video and order",
+  async () => {
+    const event = "b0000000-0000-4000-8000-000000000001";
+    await db.query("select record_cart_add($1,$2,$3,$4)", [
+      a,
+      "a".repeat(64),
+      event,
+      pa,
+    ]);
+    await db.query("select record_cart_add($1,$2,$3,$4)", [
+      a,
+      "a".repeat(64),
+      event,
+      pa,
+    ]);
+    assert.equal(
+      (await db.query("select count(*)::int n from cart_add_events")).rows[0].n,
+      1,
+    );
+    await login(ownerA);
+    const row = (await db.query("select * from video_associations($1,30)", [a]))
+      .rows[0];
+    assert.equal(Number(row.viewer_sessions), 1);
+    assert.equal(Number(row.cart_sessions), 1);
+    assert.equal(Number(row.order_sessions), 1);
+  },
+);
+await ok("association report rejects other tenant owner", async () => {
+  await login(ownerB);
+  await rejected(
+    () => db.query("select * from video_associations($1,30)", [a]),
+    /FORBIDDEN/,
+  );
+});
+await db.close();
+console.log(
+  `${count} database checks passed. Supabase Auth, Storage, Realtime and pgcrypto still require hosted validation.`,
+);

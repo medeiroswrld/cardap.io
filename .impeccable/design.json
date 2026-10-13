@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-12T14:17:03.506Z",
+  "title": "Design System: Brasa",
+  "extensions": {
+    "colorMeta": {
+      "brand": {
+        "role": "primary",
+        "displayName": "Vinho da casa",
+        "tonalRamp": [
+          "oklch(15.00% 0.15217 24.68)",
+          "oklch(26.43% 0.15217 24.68)",
+          "oklch(37.86% 0.15217 24.68)",
+          "oklch(49.29% 0.15217 24.68)",
+          "oklch(60.71% 0.15217 24.68)",
+          "oklch(72.14% 0.15217 24.68)",
+          "oklch(83.57% 0.15217 24.68)",
+          "oklch(95.00% 0.15217 24.68)"
+        ]
+      },
+      "brand-dark": {
+        "role": "primary",
+        "displayName": "Vinho escuro",
+        "tonalRamp": [
+          "oklch(15.00% 0.12972 24.72)",
+          "oklch(26.43% 0.12972 24.72)",
+          "oklch(37.86% 0.12972 24.72)",
+          "oklch(49.29% 0.12972 24.72)",
+          "oklch(60.71% 0.12972 24.72)",
+          "oklch(72.14% 0.12972 24.72)",
+          "oklch(83.57% 0.12972 24.72)",
+          "oklch(95.00% 0.12972 24.72)"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Creme",
+        "tonalRamp": [
+          "oklch(15.00% 0.01095 63.36)",
+          "oklch(26.43% 0.01095 63.36)",
+          "oklch(37.86% 0.01095 63.36)",
+          "oklch(49.29% 0.01095 63.36)",
+          "oklch(60.71% 0.01095 63.36)",
+          "oklch(72.14% 0.01095 63.36)",
+          "oklch(83.57% 0.01095 63.36)",
+          "oklch(95.00% 0.01095 63.36)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Branco",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 89.88)",
+          "oklch(26.43% 0.00000 89.88)",
+          "oklch(37.86% 0.00000 89.88)",
+          "oklch(49.29% 0.00000 89.88)",
+          "oklch(60.71% 0.00000 89.88)",
+          "oklch(72.14% 0.00000 89.88)",
+          "oklch(83.57% 0.00000 89.88)",
+          "oklch(95.00% 0.00000 89.88)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Marrom escuro",
+        "tonalRamp": [
+          "oklch(15.00% 0.01477 32.67)",
+          "oklch(26.43% 0.01477 32.67)",
+          "oklch(37.86% 0.01477 32.67)",
+          "oklch(49.29% 0.01477 32.67)",
+          "oklch(60.71% 0.01477 32.67)",
+          "oklch(72.14% 0.01477 32.67)",
+          "oklch(83.57% 0.01477 32.67)",
+          "oklch(95.00% 0.01477 32.67)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Marrom de apoio",
+        "tonalRamp": [
+          "oklch(15.00% 0.02101 39.31)",
+          "oklch(26.43% 0.02101 39.31)",
+          "oklch(37.86% 0.02101 39.31)",
+          "oklch(49.29% 0.02101 39.31)",
+          "oklch(60.71% 0.02101 39.31)",
+          "oklch(72.14% 0.02101 39.31)",
+          "oklch(83.57% 0.02101 39.31)",
+          "oklch(95.00% 0.02101 39.31)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Areia",
+        "tonalRamp": [
+          "oklch(15.00% 0.01624 58.62)",
+          "oklch(26.43% 0.01624 58.62)",
+          "oklch(37.86% 0.01624 58.62)",
+          "oklch(49.29% 0.01624 58.62)",
+          "oklch(60.71% 0.01624 58.62)",
+          "oklch(72.14% 0.01624 58.62)",
+          "oklch(83.57% 0.01624 58.62)",
+          "oklch(95.00% 0.01624 58.62)"
+        ]
+      },
+      "soft": {
+        "role": "neutral",
+        "displayName": "Creme de apoio",
+        "tonalRamp": [
+          "oklch(15.00% 0.01203 67.68)",
+          "oklch(26.43% 0.01203 67.68)",
+          "oklch(37.86% 0.01203 67.68)",
+          "oklch(49.29% 0.01203 67.68)",
+          "oklch(60.71% 0.01203 67.68)",
+          "oklch(72.14% 0.01203 67.68)",
+          "oklch(83.57% 0.01203 67.68)",
+          "oklch(95.00% 0.01203 67.68)"
+        ]
+      },
+      "green": {
+        "role": "semantic",
+        "displayName": "Verde de estado",
+        "tonalRamp": [
+          "oklch(15.00% 0.08535 156.19)",
+          "oklch(26.43% 0.08535 156.19)",
+          "oklch(37.86% 0.08535 156.19)",
+          "oklch(49.29% 0.08535 156.19)",
+          "oklch(60.71% 0.08535 156.19)",
+          "oklch(72.14% 0.08535 156.19)",
+          "oklch(83.57% 0.08535 156.19)",
+          "oklch(95.00% 0.08535 156.19)"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Vermelho de exclusão",
+        "tonalRamp": [
+          "oklch(15.00% 0.15861 25.61)",
+          "oklch(26.43% 0.15861 25.61)",
+          "oklch(37.86% 0.15861 25.61)",
+          "oklch(49.29% 0.15861 25.61)",
+          "oklch(60.71% 0.15861 25.61)",
+          "oklch(72.14% 0.15861 25.61)",
+          "oklch(83.57% 0.15861 25.61)",
+          "oklch(95.00% 0.15861 25.61)"
+        ]
+      },
+      "admin-background": {
+        "role": "neutral",
+        "displayName": "Fundo da gestão",
+        "tonalRamp": [
+          "oklch(15.00% 0.00451 78.30)",
+          "oklch(26.43% 0.00451 78.30)",
+          "oklch(37.86% 0.00451 78.30)",
+          "oklch(49.29% 0.00451 78.30)",
+          "oklch(60.71% 0.00451 78.30)",
+          "oklch(72.14% 0.00451 78.30)",
+          "oklch(83.57% 0.00451 78.30)",
+          "oklch(95.00% 0.00451 78.30)"
+        ]
+      },
+      "sidebar-background": {
+        "role": "neutral",
+        "displayName": "Fundo da navegação",
+        "tonalRamp": [
+          "oklch(15.00% 0.00852 67.73)",
+          "oklch(26.43% 0.00852 67.73)",
+          "oklch(37.86% 0.00852 67.73)",
+          "oklch(49.29% 0.00852 67.73)",
+          "oklch(60.71% 0.00852 67.73)",
+          "oklch(72.14% 0.00852 67.73)",
+          "oklch(83.57% 0.00852 67.73)",
+          "oklch(95.00% 0.00852 67.73)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Produto na fotografia",
+        "purpose": "Nome do produto; varia conforme breakpoint."
+      },
+      "headline": {
+        "displayName": "Introdução do cardápio",
+        "purpose": "Título principal do cliente em desktop."
+      },
+      "title": {
+        "displayName": "Título do diálogo",
+        "purpose": "Título de modal no desktop."
+      },
+      "body": {
+        "displayName": "Corpo base",
+        "purpose": "Base do documento; apoios têm ajustes locais."
+      },
+      "label": {
+        "displayName": "Ação padrão",
+        "purpose": "Texto do botão padrão."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog",
+        "value": "0 25px 80px #251c1a30",
+        "purpose": "Sobreposição de diálogo."
+      },
+      {
+        "name": "toast",
+        "value": "0 9px 28px #251c1a25",
+        "purpose": "Feedback flutuante."
+      },
+      {
+        "name": "floating-bag",
+        "value": "0 5px 22px #54191923",
+        "purpose": "Sacola acima do conteúdo."
+      },
+      {
+        "name": "mobile-categories",
+        "value": "0 -6px 18px #251c1a04",
+        "purpose": "Separação suave da barra inferior."
+      },
+      {
+        "name": "segmented-active",
+        "value": "0 2px 4px #251c1a08",
+        "purpose": "Seleção segmentada."
+      },
+      {
+        "name": "input-focus",
+        "value": "0 0 0 3px #a6323212",
+        "purpose": "Foco de campo."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Transformações e entrada de sobreposições."
+      },
+      {
+        "name": "button-state",
+        "value": "150ms",
+        "purpose": "Cor e transformação de botão."
+      },
+      {
+        "name": "fade-in",
+        "value": "180ms",
+        "purpose": "Overlay e toast."
+      },
+      {
+        "name": "dialog-and-drawer",
+        "value": "220ms",
+        "purpose": "Diálogo, painel inferior e gaveta."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "Animações e transições quando prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-min",
+        "value": "1500px"
+      },
+      {
+        "name": "compact-max",
+        "value": "1200px"
+      },
+      {
+        "name": "tablet-max",
+        "value": "980px"
+      },
+      {
+        "name": "mobile-max",
+        "value": "700px"
+      },
+      {
+        "name": "narrow-max",
+        "value": "370px"
+      },
+      {
+        "name": "short-mobile",
+        "value": "(max-width: 700px) and (max-height: 740px)"
+      },
+      {
+        "name": "connected-compact-max",
+        "value": "1100px"
+      }
+    ],
+    "notes": [
+      "As rampas OKLCH são metadados sintetizados para o painel; não são tokens implementados ou cores novas autorizadas.",
+      "Valores normativos de cores, tipografia, raios, espaços e componentes vivem no frontmatter de DESIGN.md.",
+      "SHIP de 11/10/2026 limita-se às três correções do demonstrativo local; a extensão conectada de 12/10/2026 recebeu SHIP no escopo visual de gestão desktop/mobile e acompanhamento mobile.",
+      "Extensão conectada: migrations 001–004 aplicadas, 14 tabelas públicas com RLS, 24 testes locais de banco e teste Playwright real de login/onboarding/foto/pedido/status/isolamento aprovados, conforme evidência recebida do agente responsável. Dados temporários removidos. Esta atualização documental não executou testes.",
+      "Capturas conectadas disponíveis: .impeccable/review/connected-admin-desktop.png, .impeccable/review/connected-admin-mobile.png, .impeccable/review/connected-order-mobile.png.",
+      "Limitações: Stream retorna HTTP 403; associação observacional implementada, sem validação ponta a ponta do upload Stream; sem aprovação geral de produção.",
+      "Navegação conectada: lateral sticky de 236px, 200px até 1100px, horizontal rolável e estática no topo até 700px. Acompanhamento consulta a cada 5 segundos; gestão reconcilia a cada 15 segundos.",
+      "Revisão imersiva solicitada em 12/10/2026: mídia em 100dvh, sobreposições discretas, ícones laterais e categorias na base. Sem barras de compra ou sacola aberta. Gestos vertical/produto e horizontal/categoria. Compra, busca e sacola em painéis; vídeo ativo automático sem som, respeitando movimento reduzido. Revisão visual pelo implementador; não estende pareceres SHIP históricos."
+    ]
+  },
+  "components": [
+    {
+      "name": "Button default",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Variante default da API Button; tamanho padrão.",
+      "html": "<button class=\"ds-button-primary\">Adicionar</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:9px;padding:12px 19px;font:750 12px var(--font-sans,\"Manrope Variable\",sans-serif);white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1));background:var(--brand,#a63232);color:#fff;}.ds-button-primary:hover:not(:disabled){background:var(--brand-dark,#852626);filter:brightness(.97)}.ds-button-primary:active:not(:disabled){transform:scale(.98)}.ds-button-primary:disabled{opacity:.45;cursor:not-allowed}.ds-button-primary:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Button outline",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Variante outline da API Button; tamanho padrão.",
+      "html": "<button class=\"ds-button-outline\">Continuar escolhendo</button>",
+      "css": ".ds-button-outline{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:9px;padding:12px 19px;font:750 12px var(--font-sans,\"Manrope Variable\",sans-serif);white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1));background:#fff;color:var(--text,#251c1a);border-color:var(--border,#e9ded6);}.ds-button-outline:hover:not(:disabled){background:var(--soft,#f5eee7);filter:brightness(.97)}.ds-button-outline:active:not(:disabled){transform:scale(.98)}.ds-button-outline:disabled{opacity:.45;cursor:not-allowed}.ds-button-outline:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Button secondary",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Variante secondary da API Button; tamanho padrão.",
+      "html": "<button class=\"ds-button-secondary\">Ver detalhes</button>",
+      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:9px;padding:12px 19px;font:750 12px var(--font-sans,\"Manrope Variable\",sans-serif);white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1));background:var(--soft,#f5eee7);color:var(--brand,#a63232);}.ds-button-secondary:hover:not(:disabled){filter:brightness(.97)}.ds-button-secondary:active:not(:disabled){transform:scale(.98)}.ds-button-secondary:disabled{opacity:.45;cursor:not-allowed}.ds-button-secondary:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Button ghost",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Variante ghost da API Button; tamanho padrão.",
+      "html": "<button class=\"ds-button-ghost\">Voltar</button>",
+      "css": ".ds-button-ghost{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:9px;padding:12px 19px;font:750 12px var(--font-sans,\"Manrope Variable\",sans-serif);white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1));background:transparent;color:var(--text,#251c1a);}.ds-button-ghost:hover:not(:disabled){background:var(--soft,#f5eee7);filter:brightness(.97)}.ds-button-ghost:active:not(:disabled){transform:scale(.98)}.ds-button-ghost:disabled{opacity:.45;cursor:not-allowed}.ds-button-ghost:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Button destructive",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Variante destructive da API Button; tamanho padrão.",
+      "html": "<button class=\"ds-button-destructive\">Excluir</button>",
+      "css": ".ds-button-destructive{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;border-radius:9px;padding:12px 19px;font:750 12px var(--font-sans,\"Manrope Variable\",sans-serif);white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1));background:#a32929;color:#fff;}.ds-button-destructive:hover:not(:disabled){filter:brightness(.97)}.ds-button-destructive:active:not(:disabled){transform:scale(.98)}.ds-button-destructive:disabled{opacity:.45;cursor:not-allowed}.ds-button-destructive:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Campo de formulário",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo com rótulo, borda e foco de marca.",
+      "html": "<label class=\"ds-field\">Nome<input placeholder=\"Como podemos chamar você?\"></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:8px;font:700 11px var(--font-sans,\"Manrope Variable\",sans-serif);color:var(--text,#251c1a)}.ds-field input{min-height:44px;padding:11px 13px;border:1px solid var(--border,#e9ded6);border-radius:9px;color:var(--text,#251c1a);background:#fff;font:450 12px var(--font-sans,\"Manrope Variable\",sans-serif);caret-color:var(--brand,#a63232);outline:none}.ds-field input::placeholder{color:var(--muted,#6f605b)}.ds-field input:focus{border-color:var(--brand,#a63232);box-shadow:0 0 0 3px #a6323212}"
+    },
+    {
+      "name": "Categoria selecionada",
+      "kind": "nav",
+      "refersTo": "category-active",
+      "description": "Botão de categoria desktop, com seleção sólida.",
+      "html": "<nav aria-label=\"Categorias\"><button class=\"ds-category\" aria-pressed=\"true\">Lanches</button></nav>",
+      "css": ".ds-category{display:flex;align-items:center;gap:13px;min-height:51px;width:100%;border:0;border-radius:9px;padding:13px 14px;text-align:left;font:600 12px var(--font-sans,\"Manrope Variable\",sans-serif);color:#fff;background:var(--brand,#a63232);cursor:pointer;transition:background-color 150ms ease,transform 150ms var(--ease,cubic-bezier(0.23,1,0.32,1))}.ds-category:hover{filter:brightness(.97)}.ds-category:active{transform:scale(.98)}.ds-category:focus-visible{outline:3px solid #a6323280;outline-offset:3px}"
+    },
+    {
+      "name": "Etiqueta do produto",
+      "kind": "chip",
+      "refersTo": "food-tag",
+      "description": "Etiqueta informativa sem interação.",
+      "html": "<span class=\"ds-food-tag\">Favorito da casa</span>",
+      "css": ".ds-food-tag{background:var(--background,#fff8f2);color:var(--brand,#a63232);display:inline-flex;align-items:center;gap:6px;padding:8px 11px;border-radius:7px;font:750 9px var(--font-sans,\"Manrope Variable\",sans-serif)}"
+    },
+    {
+      "name": "Painel da sacola",
+      "kind": "card",
+      "refersTo": "bag-panel",
+      "description": "Estrutura da sacola com cabeçalho e resumo; sem dados de pedido inventados.",
+      "html": "<section class=\"ds-bag\"><header><h2>Sua sacola</h2><span>0 itens</span></header><div><h3>Seu próximo favorito<br>começa aqui.</h3><p>Escolha um produto do cardápio.</p></div></section>",
+      "css": ".ds-bag{border:1px solid var(--border,#e9ded6);background:#fff;border-radius:14px;overflow:hidden;color:var(--text,#251c1a);font-family:var(--font-sans,\"Manrope Variable\",sans-serif)}.ds-bag header{display:flex;align-items:center;justify-content:space-between;padding:21px 20px;border-bottom:1px solid #f0e8e0}.ds-bag h2{font-size:14px;font-weight:750;margin:0}.ds-bag header span{color:var(--muted,#6f605b);font-size:9px}.ds-bag>div{text-align:center;padding:30px 16px 22px}.ds-bag h3{font-size:17px;font-weight:750;line-height:1.45;margin:0}.ds-bag p{font-size:10px;line-height:1.8;color:var(--muted,#6f605b);margin:10px 0 0}"
+    },
+    {
+      "name": "Navegação da gestão conectada",
+      "kind": "nav",
+      "description": "Botão selecionado com aria-current; a seção ativa é estado local de ConnectedAdmin. Usa navegação horizontal rolável no móvel, sem gaveta.",
+      "html": "<nav class=\"ds-connected-nav\" aria-label=\"Gestão\"><button aria-current=\"page\" class=\"ds-connected-active\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"/><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"/><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"/></svg>Visão geral</button><button>Pedidos</button></nav>",
+      "css": ".ds-connected-nav{display:grid;gap:6px;font-family:var(--font-sans,\"Manrope Variable\",sans-serif)}.ds-connected-nav button{display:flex;align-items:center;gap:12px;padding:13px 14px;min-height:46px;border:0;border-radius:10px;text-align:left;font:650 13px var(--font-sans,\"Manrope Variable\",sans-serif);background:none;color:var(--text,#251c1a);cursor:pointer;transition:background-color 150ms ease,color 150ms ease,transform 150ms var(--ease,cubic-bezier(.23,1,.32,1))}.ds-connected-nav .ds-connected-active{background:#f5e5df;color:var(--brand,#a63232)}.ds-connected-nav button:hover{background:#f9eeea;filter:brightness(.97)}.ds-connected-nav button:active{transform:scale(.98)}.ds-connected-nav button:focus-visible{outline:3px solid #a6323280;outline-offset:3px}@media(max-width:700px){.ds-connected-nav{display:flex;overflow-x:auto;padding-bottom:3px}.ds-connected-nav button{flex-shrink:0;white-space:nowrap}}@media(prefers-reduced-motion:reduce){.ds-connected-nav button{transition-duration:.01ms}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Comida no centro, pedido à mão",
+    "overview": "O Brasa combina fundo creme, vinho fechado, Manrope local e fotografia de comida em escala generosa. A identidade é acolhedora e direta: hierarquia de preço, controles sólidos, ícones lineares e separações discretas deixam a escolha e o pedido visíveis.\n\nA gestão compartilha essa linguagem, com maior densidade de dados, superfícies claras e estados escritos por extenso. O nome Brasa identifica o projeto e o demonstrativo; na gestão conectada, a marca textual exibe o nome cadastrado pelo restaurante. Nome comercial definitivo continua aberto em PRODUCT.md.",
+    "keyCharacteristics": [
+      "Fotografia e vídeo como conteúdo principal do cardápio.",
+      "Vinho nas ações e seleções; creme no ambiente e branco nas superfícies.",
+      "Tipografia única com contraste de tamanho e peso.",
+      "Movimento curto, ligado à ação, com alternativa de movimento reduzido."
+    ],
+    "rules": [
+      {
+        "name": "The Legibilidade da Comida Rule",
+        "body": "O gradiente escuro fica restrito à fotografia para sustentar o texto; preço e adicionar permanecem em superfície clara externa à imagem.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do preservar a paleta e a Manrope local descritas nos tokens.",
+      "Do manter preço e ação de adicionar fora da fotografia.",
+      "Do usar estados textuais junto às cores e foco visível nos controles.",
+      "Do respeitar a área segura e o espaço ocupado pela navegação inferior.",
+      "Do distinguir demonstração local de dados conectados; manter a indicação de demonstração nas superfícies que ainda usam dados locais."
+    ],
+    "donts": [
+      "Don’t apresentar dados locais como conectados ou a integração testada como aprovação geral de produção.",
+      "Don’t usar o gradiente de legibilidade da fotografia como decoração geral.",
+      "Don’t reproduzir marcas ou logotipos das referências fornecidas.",
+      "Don’t inferir aprovação de acessibilidade completa a partir das capturas ou dos ajustes de CSS."
+    ]
+  }
+}

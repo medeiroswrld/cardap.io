@@ -1,0 +1,136 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Check, Clock3, Utensils } from "lucide-react";
+import type { RealOrder } from "@/lib/connected-types";
+import { statusNames, statusFlow } from "@/lib/types";
+import { money } from "@/lib/utils";
+import { requestJson } from "@/lib/client-api";
+export function ConnectedTracking({
+  restaurantId,
+  slug,
+  id,
+}: {
+  restaurantId: string;
+  slug: string;
+  id?: string;
+}) {
+  const [orders, setOrders] = useState<RealOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const refresh = useCallback(async () => {
+    try {
+      const ids: string[] = id
+        ? [id]
+        : JSON.parse(
+            localStorage.getItem(`menu:${restaurantId}:orders`) || "[]",
+          );
+      const results = await Promise.all(
+        ids.map((orderId) =>
+          requestJson<RealOrder>(
+            `/api/restaurants/${restaurantId}/orders/${orderId}`,
+          ),
+        ),
+      );
+      setOrders(results);
+      setError("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [restaurantId, id]);
+  useEffect(() => {
+    queueMicrotask(() => void refresh());
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 5000);
+    const visible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [refresh]);
+  return (
+    <main className="standalone connected-tracking">
+      <Link href={`/r/${slug}`} className="back-link">
+        <ArrowLeft size={18} /> Voltar ao cardápio
+      </Link>
+      <span className="eyebrow">Da cozinha para sua mesa</span>
+      <h1>{id ? "Acompanhe seu pedido" : "Meus pedidos"}</h1>
+      <p>Atualização automática a cada 5 segundos. Pagamento no local.</p>
+      {loading && <p role="status">Buscando seu pedido…</p>}
+      {error && (
+        <div className="notice" role="alert">
+          {error}{" "}
+          <button
+            className="button button-secondary"
+            onClick={() => void refresh()}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+      {!loading && !error && !orders.length && (
+        <div className="empty-state">
+          <Utensils />
+          <h2>Nenhum pedido por aqui.</h2>
+          <p>Os pedidos desta sessão aparecem aqui após a confirmação.</p>
+        </div>
+      )}
+      {orders.map((order) => (
+        <article className="panel connected-order" key={order.id}>
+          <div className="panel-heading">
+            <h2>Pedido #{order.number}</h2>
+            <span className="status-pill">{statusNames[order.status]}</span>
+          </div>
+          <p>
+            Mesa {order.dining_tables?.number} ·{" "}
+            {new Date(order.created_at).toLocaleString("pt-BR")}
+          </p>
+          {order.status === "cancelado" ? (
+            <div className="notice">Cancelado: {order.cancellation_reason}</div>
+          ) : (
+            <ol className="connected-steps">
+              {statusFlow.map((status, index) => (
+                <li
+                  key={status}
+                  className={
+                    index <= statusFlow.indexOf(order.status) ? "complete" : ""
+                  }
+                >
+                  <Check size={17} />
+                  {statusNames[status]}
+                </li>
+              ))}
+            </ol>
+          )}
+          {order.estimate_minutes && (
+            <p>
+              <Clock3 size={16} /> Estimativa informada pela equipe:{" "}
+              {order.estimate_minutes} minutos.
+            </p>
+          )}
+          <div className="checkout-summary">
+            {order.order_items.map((item) => (
+              <div key={item.id}>
+                <span>
+                  {item.quantity}× {item.product_name}
+                  {item.note && <small> — {item.note}</small>}
+                </span>
+                <strong>{money(item.quantity * item.unit_price_cents)}</strong>
+              </div>
+            ))}
+            <div className="total-row">
+              <span>Total</span>
+              <strong>{money(order.total_cents)}</strong>
+            </div>
+          </div>
+        </article>
+      ))}
+    </main>
+  );
+}
