@@ -104,7 +104,7 @@ Auditoria de dependências nesta entrega: `npm audit --omit=dev` sem vulnerabili
 ## Deploy e recuperação
 
 - Vercel ou ambiente Node compatível: `npm ci`, `npm run build`, `npm start`. Configure variáveis e a URL HTTPS, depois confira cookies, origens e redirects.
-- Publicação informada: `https://cardap-io-lilac.vercel.app`. Na inspeção de 13/10/2026, o login estava desativado por falta de variáveis do Supabase. Configure na Vercel as variáveis de `.env.example`, com `NEXT_PUBLIC_APP_URL=https://cardap-io-lilac.vercel.app`, e gere novo deploy. Atualize também os redirects Auth no Supabase. A demo mantém seu aviso; os slugs reais carregam apenas dados reais.
+- Publicação: `https://cardap-io-lilac.vercel.app`. Em 13/10/2026, foram configuradas as seis variáveis de produção na Vercel, com as credenciais de servidor salvas como Secret e `NEXT_PUBLIC_APP_URL=https://cardap-io-lilac.vercel.app`. O redeploy do commit `705cd45` ficou Ready e o login foi ativado. Entrega de e-mail e redirects Auth no Supabase continuam precisando de validação. A demo mantém seu aviso; os slugs reais carregam apenas dados reais.
 - Supabase, Stream, hospedagem, domínio e SMTP podem ter custos; planos, volume e orçamento não foram contratados nesta entrega.
 - Antes do piloto, configure backups/retention no plano Supabase, exportações protegidas e um teste real de restauração em ambiente separado. Defina retenção/exclusão dos contatos, imagens e vídeos com o restaurante.
 - Não há backup remoto dos dados de demonstração. Um reset do navegador elimina os testes locais.
