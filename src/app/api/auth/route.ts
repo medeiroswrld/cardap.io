@@ -17,9 +17,17 @@ export async function POST(request: Request) {
     }
     if (!input.email) throw new Error("EMAIL_REQUIRED");
     if (input.action === "recover") {
-      await client.auth.resetPasswordForEmail(input.email, {
+      const { error } = await client.auth.resetPasswordForEmail(input.email, {
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm?next=/redefinir-senha`,
       });
+      if (error && error.code !== "user_not_found")
+        return Response.json(
+          {
+            error:
+              "Não foi possível solicitar o e-mail de recuperação agora. Tente novamente mais tarde ou fale com o suporte.",
+          },
+          { status: 503, headers: noStore },
+        );
       return Response.json(
         {
           ok: true,
