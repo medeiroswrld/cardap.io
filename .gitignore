@@ -10,3 +10,5 @@ lint-report.json
 .impeccable/review/
 .vercel/
 *.log
+
+playwright/.auth/

@@ -7,11 +7,11 @@ test.skip(
   "Explicit opt-in: creates and removes isolated hosted test data.",
 );
 test.use({ trace: "off", actionTimeout: 15000 });
-test("Supabase real: login, catálogo, foto, pedido, status e isolamento", async ({
+test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e isolamento", async ({
   page,
   browser,
 }) => {
-  test.setTimeout(180000);
+  test.setTimeout(240000);
   loadEnvFile(".env.local");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const service = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -156,6 +156,86 @@ test("Supabase real: login, catálogo, foto, pedido, status e isolamento", async
     );
     expect(associations.status()).toBe(200);
     expect(await associations.json()).toEqual([]);
+    // Only Cloudflare's upload/processing responses are simulated. The owner
+    // login, database, anonymous catalog refresh and playback use the real app.
+    const assetId = randomUUID();
+    const playbackUrl = new URL("/__test-reel.webm", page.url()).href;
+    await guest.route("**/__test-reel.webm", (route) =>
+      route.fulfill({
+        path: "tests/fixtures/reel.webm",
+        contentType: "video/webm",
+      }),
+    );
+    await page.route("**/__test-upload", (route) =>
+      route.fulfill({ status: 200 }),
+    );
+    let statusChecks = 0;
+    await page.route(`**/api/restaurants/${tenant}/media`, async (route) => {
+      if (route.request().method() === "POST") {
+        const { error } = await service.from("product_media").insert({
+          id: assetId,
+          restaurant_id: tenant,
+          product_id: product.id,
+          provider_asset_id: randomUUID().replaceAll("-", ""),
+          kind: "video",
+          state: "processing",
+        });
+        if (error) throw error;
+        await route.fulfill({
+          json: {
+            assetId,
+            uploadURL: new URL("/__test-upload", page.url()).href,
+          },
+        });
+      } else if (route.request().method() === "PATCH") {
+        statusChecks++;
+        const state = statusChecks === 1 ? "processing" : "ready";
+        if (state === "ready") {
+          const { error } = await service
+            .from("product_media")
+            .update({
+              state,
+              playback_url: playbackUrl,
+              duration_seconds: 2,
+            })
+            .eq("id", assetId)
+            .eq("restaurant_id", tenant);
+          if (error) throw error;
+        }
+        await route.fulfill({ json: { state } });
+      } else await route.continue();
+    });
+    await page
+      .getByRole("button", { name: "Editar produto", exact: true })
+      .click();
+    await modal
+      .getByLabel("Escolher foto ou vídeo")
+      .setInputFiles("tests/fixtures/reel.webm");
+    await expect(modal.getByRole("status")).toContainText("reel.webm");
+    await modal
+      .getByRole("button", { name: "Salvar produto", exact: true })
+      .click();
+    await expect(
+      modal.getByText("Processando vídeo", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      modal.getByText("Vídeo pronto para o cardápio", { exact: true }),
+    ).toBeVisible({ timeout: 20000 });
+    expect(statusChecks).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press("Escape");
+    // No navigation or reload: the already-open customer menu must update.
+    const reelVideo = guest.locator(".immersive-reel").first().locator("video");
+    await expect(reelVideo).toBeVisible({ timeout: 35000 });
+    await expect
+      .poll(() =>
+        reelVideo.evaluate(
+          (video: HTMLVideoElement) => !video.paused && video.currentTime > 0,
+        ),
+      )
+      .toBe(true);
+    await expect(
+      guest.getByRole("button", { name: /Abrir sacola com 1/ }),
+    ).toBeVisible();
     await guest.getByRole("button", { name: /Abrir sacola com/ }).click();
     await guest.getByRole("button", { name: "Revisar pedido" }).click();
     await guest

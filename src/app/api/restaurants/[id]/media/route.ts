@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
-import { createVideoUpload, getVideoStatus } from "@/lib/cloudflare";
+import { syncVideoAsset } from "@/lib/sync-video";
+import { createVideoUpload } from "@/lib/cloudflare";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 export async function POST(
   request: Request,
@@ -59,23 +60,7 @@ export async function PATCH(
       .eq("restaurant_id", id)
       .single();
     if (!asset?.provider_asset_id) throw new Error("FORBIDDEN");
-    const remote = await getVideoStatus(asset.provider_asset_id);
-    const state =
-      remote.status.state === "error" || remote.duration > 45
-        ? "failed"
-        : remote.readyToStream
-          ? "ready"
-          : "processing";
-    const { error } = await serviceClient()
-      .from("product_media")
-      .update({
-        state,
-        duration_seconds: remote.duration || null,
-        playback_url: state === "ready" ? remote.playback?.hls : null,
-      })
-      .eq("id", assetId)
-      .eq("restaurant_id", id);
-    if (error) throw error;
+    const { state } = await syncVideoAsset(id, asset);
     return Response.json({ state }, { headers: noStore });
   } catch (error) {
     return apiError(error);

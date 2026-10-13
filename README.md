@@ -13,10 +13,11 @@ npm run dev
 
 - Cardápio: http://localhost:3000/r/demo
 - Mesa identificada: http://localhost:3000/r/demo?mesa=4
-- Gestão: http://localhost:3000/demo/gestao
+- Gestão do restaurante (exige login): http://localhost:3000/gestao
+- Gestão da demonstração (também exige login): http://localhost:3000/demo/gestao
 - Login conectado: http://localhost:3000/login
 
-`/` também abre o cardápio. Use o mesmo navegador e duas abas para experimentar pedido e gestão. Os dados ficam no localStorage, no namespace `brasa:demo:v1`. O checkout é um teste local, não um pedido real. Use dados fictícios. Limpar os dados do site reinicia a demonstração. Outro navegador possui outra demonstração, sem sincronização entre dispositivos.
+`/` encaminha para a gestão: visitantes entram em `/login` e usuários autenticados seguem para seu restaurante. O cardápio público fica em `/r/[slug]` e não contém atalhos para a gestão. A antiga gestão de demonstração também valida a sessão no servidor antes de renderizar. Use o mesmo navegador e duas abas para experimentar pedido e gestão. Os dados ficam no localStorage, no namespace `brasa:demo:v1`. O checkout é um teste local, não um pedido real. Use dados fictícios. Limpar os dados do site reinicia a demonstração. Outro navegador possui outra demonstração, sem sincronização entre dispositivos.
 
 ## O que está utilizável
 
@@ -38,6 +39,8 @@ Acesse /login para criar sua conta e depois /gestao para cadastrar o restaurante
 O painel conectado inclui produtos, upload de fotos no Storage, categorias, pedidos por etapa, contatos, configurações, horários e QR das mesas. Donos gerenciam o restaurante; operações acessam os pedidos. O painel usa Realtime e reconciliação a cada 15 segundos; o cliente consulta seu pedido a cada 5 segundos enquanto a aba está visível. O acesso é restrito ao cookie de sessão, nunca ao telefone informado.
 
 O restaurante nasce pausado. Cadastre produtos publicados, mesas, horários e o contato de privacidade, depois habilite os pedidos. O pagamento acontece no estabelecimento.
+
+O cardápio conectado consulta alterações a cada 15 segundos enquanto está visível e ao voltar para a aba. Produtos, preços e vídeos prontos são atualizados sem recarregar a página e sem apagar a sacola. Compartilhe `/r/seu-endereco`: `/r/demo` contém somente a demonstração local, que não compartilha dados entre localhost, Vercel ou outros navegadores.
 
 As migrations 001 a 004 foram aplicadas no projeto fornecido. Verificação no painel: 14 tabelas públicas, todas com RLS habilitado. As APIs pública e de servidor responderam 200. Não execute novamente essas migrations nesse projeto.
 
@@ -67,8 +70,8 @@ As migrations 001 a 004 foram aplicadas no projeto fornecido. Verificação no p
 - Preencha `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_STREAM_API_TOKEN`, com permissão limitada ao Stream da conta.
 - O endpoint `POST /api/restaurants/:id/media` exige dono, valida produto/tenant e devolve upload direto temporário, limitado a 45 segundos.
 - A confirmação em `PATCH` consulta o provedor com autenticação; não aceita um estado de processamento declarado pelo navegador. Somente o servidor pode gravar os estados de mídia.
-- O campo “Escolher foto ou vídeo” aceita arquivos do dispositivo, mostra uma prévia e valida tipo, tamanho e duração. Ao salvar, fotos vão ao Storage e vídeos MP4/MOV/WebM de até 45 segundos e 200 MB vão diretamente ao Stream. Produtos novos são salvos antes de iniciar o envio, sem exigir fechar e reabrir o cadastro. Falhas de vídeo mantêm o arquivo selecionado para tentar novamente. Use “Verificar processamento” até o provedor confirmar. HLS funciona via player nativo ou hls.js, com foto em caso de falha. TUS para arquivos maiores não está implementado.
-- Última verificação da conta fornecida: Stream retornou 403 (código 10002). Fotos continuam funcionais; o vídeo depende da correção da conta/permissão do token.
+- O campo “Escolher foto ou vídeo” aceita arquivos do dispositivo, mostra uma prévia e valida tipo, tamanho e duração. Ao salvar, fotos vão ao Storage e vídeos MP4/MOV/WebM de até 45 segundos e 200 MB vão diretamente ao Stream. Produtos novos são salvos antes de iniciar o envio, sem exigir fechar e reabrir o cadastro. Falhas de vídeo mantêm o arquivo selecionado para tentar novamente. O cadastro confere o processamento a cada 5 segundos; o painel também reconcilia até 5 mídias pendentes por atualização. Mantenha a gestão aberta até aparecer “Vídeo pronto para o cardápio”; ainda não há webhook independente do painel. O botão “Verificar processamento” permite tentar novamente após uma falha. HLS no cardápio funciona via player nativo ou hls.js, com foto em caso de falha. TUS para arquivos maiores não está implementado.
+- Verificação de 13/10/2026 no ambiente local: Stream retornou 401 (código 10000). Fotos continuam funcionais; upload real de vídeo depende da correção da conta/permissão do token. Confira também `NEXT_PUBLIC_APP_URL` na Vercel: essa origem é usada nas permissões de reprodução dos novos uploads.
 - Bucket preparado `restaurant-media`: imagens JPEG/PNG/WebP até 5 MB, caminho começando pelo UUID do restaurante e escrita por dono. Fotos desse bucket são públicas; não envie documentos ou dados pessoais nele.
 - Na demo, fotos de até 1 MB ficam no armazenamento local e vídeos de até 45 segundos/200 MB ficam no IndexedDB, com reprodução após recarregar a página. O limite disponível depende do navegador; arquivos locais não são compartilhados com outros dispositivos. Não é necessário informar links. Nenhum vídeo de terceiros foi incluído. Fontes das fotos em `public/images/SOURCES.md`.
 - Nunca use prefixo `NEXT_PUBLIC_` para chaves privilegiadas. Elas só são importadas por módulos server-only.
@@ -101,10 +104,15 @@ Auditoria de dependências nesta entrega: `npm audit --omit=dev` sem vulnerabili
 ## Deploy e recuperação
 
 - Vercel ou ambiente Node compatível: `npm ci`, `npm run build`, `npm start`. Configure variáveis e a URL HTTPS, depois confira cookies, origens e redirects.
-- A aplicação ainda não foi publicada. Configure HTTPS, origem exata e redirects antes do deploy. A demo mantém seu aviso; os slugs reais carregam apenas dados reais.
+- Publicação informada: `https://cardap-io-lilac.vercel.app`. Na inspeção de 13/10/2026, o login estava desativado por falta de variáveis do Supabase. Configure na Vercel as variáveis de `.env.example`, com `NEXT_PUBLIC_APP_URL=https://cardap-io-lilac.vercel.app`, e gere novo deploy. Atualize também os redirects Auth no Supabase. A demo mantém seu aviso; os slugs reais carregam apenas dados reais.
 - Supabase, Stream, hospedagem, domínio e SMTP podem ter custos; planos, volume e orçamento não foram contratados nesta entrega.
 - Antes do piloto, configure backups/retention no plano Supabase, exportações protegidas e um teste real de restauração em ambiente separado. Defina retenção/exclusão dos contatos, imagens e vídeos com o restaurante.
 - Não há backup remoto dos dados de demonstração. Um reset do navegador elimina os testes locais.
 - Defina alternativa operacional com a equipe em queda de conexão. Nenhum pedido deve ser tratado como recebido sem confirmação persistida do backend conectado.
 
 Fontes de implementação: [Next.js](https://nextjs.org/docs/app/getting-started/installation), [Supabase SSR](https://supabase.com/docs/guides/auth/server-side/creating-a-client), [Cloudflare Stream](https://developers.cloudflare.com/stream/uploading-videos/direct-creator-uploads/).
+
+
+### Testes da área autenticada
+
+Os testes da interface de gestão da demonstração exigem `PLAYWRIGHT_ADMIN_STORAGE_STATE`, apontando para um storage state de uma conta de teste autenticada no mesmo ambiente. Guarde o arquivo em `playwright/.auth/` (ignorado pelo Git). Sem essa sessão, somente esses cenários são ignorados; os testes públicos e de bloqueio de acesso seguem ativos. Não há senha fixa nem bypass de autenticação para testes. O fluxo conectado completo continua opt-in via `RUN_CONNECTED_LIVE=1`.

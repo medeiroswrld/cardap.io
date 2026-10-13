@@ -117,7 +117,9 @@ export function MediaPicker({
       </p>
       {demo && (
         <p className="field-help">
-          Nesta demonstração, os arquivos ficam somente neste navegador.
+          Nesta demonstração, os arquivos ficam somente neste navegador e neste
+          endereço. Para compartilhar com clientes, cadastre o produto na gestão
+          do seu restaurante.
         </p>
       )}
       {error && (

@@ -22,7 +22,10 @@ export async function createVideoUpload(creator: string) {
       allowedOrigins: [new URL(process.env.NEXT_PUBLIC_APP_URL!).hostname],
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(10000),
   });
+  if ([401, 403].includes(response.status))
+    throw new Error("STREAM_AUTH_FAILED");
   if (!response.ok) throw new Error("STREAM_UPLOAD_FAILED");
   const data = await response.json();
   if (!data.success || !data.result?.uid || !data.result?.uploadURL)
@@ -34,7 +37,10 @@ export async function getVideoStatus(uid: string) {
   const response = await fetch(`${base()}/${uid}`, {
     headers: headers(),
     cache: "no-store",
+    signal: AbortSignal.timeout(10000),
   });
+  if ([401, 403].includes(response.status))
+    throw new Error("STREAM_AUTH_FAILED");
   if (!response.ok) throw new Error("STREAM_STATUS_FAILED");
   const data = await response.json();
   if (!data.success) throw new Error("STREAM_STATUS_FAILED");

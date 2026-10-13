@@ -74,3 +74,22 @@ A tela da demo ainda tinha números fixos “—” e o observador exigia metada
 No painel conectado, associações com sacola/pedidos passam a ser consultadas novamente quando as métricas são atualizadas, a cada reconciliação do workspace. O estado vazio explica que acessos autenticados da própria equipe não contam e orienta testar como cliente em janela anônima. Não houve alteração de permissões nem gravação no Supabase nesta correção.
 
 Validação desta correção: quatro testes passaram (métricas locais com vídeo enviado, exclusão de fotos, controles de reprodução e cobertura de trechos). Lint, TypeScript e build passaram. Captura do teste em .impeccable/review/demo-metrics-working.png; dados do vídeo sintético pertencem somente ao contexto isolado do teste.
+
+
+## Separação de cardápio e gestão — 12/10/2026
+
+O endereço principal `/` encaminha para `/gestao`, que exige sessão e direciona visitantes a `/login`. Removido o atalho de gestão do cardápio público. Login mostra “Entrar na gestão”; a opção de demonstração abre apenas `/r/demo`. Todas as subrotas de `/demo/gestao` agora validam o usuário no servidor antes de renderizar, com atualização de cookies pelo proxy. As verificações de associação e permissão dos restaurantes reais permanecem nas páginas e APIs existentes.
+
+Os testes que editam a demonstração agora dependem de uma sessão autenticada fornecida por `PLAYWRIGHT_ADMIN_STORAGE_STATE` e são ignorados quando ela não está disponível. Novos testes cobrem visitantes em `/`, `/gestao`, restaurante específico e subrotas de demonstração, ausência de atalhos públicos, rejeição das APIs e permanência no login após falha. Não foi introduzido acesso alternativo de teste na aplicação.
+
+## Sincronização gestão → Reels — 13/10/2026
+
+Corrigidos dois problemas do modo conectado: o cadastro consultava o processamento do vídeo apenas uma vez, e o cardápio aberto conservava o catálogo inicial. O cadastro agora consulta a cada 5 segundos, com erro explícito e nova tentativa manual. O workspace do dono também reconcilia até 5 mídias pendentes por atualização, mesmo com o formulário fechado. Somente resposta autenticada do provedor pode marcar a mídia pronta; duração deve ser positiva, até 45 segundos, com HLS disponível. Ainda não há webhook: manter a gestão aberta até concluir o processamento.
+
+Novo GET público `/api/catalog/[slug]` usa o mesmo leitor anônimo/RLS do cardápio e respostas sem cache. O cliente consulta a cada 15 segundos e ao retornar à aba, atualizando produtos/configurações sem apagar a sacola. O player é remontado quando muda a mídia, inclusive ao substituir uma tentativa anterior que falhou. Falhas 401/403 no Stream exibem orientação específica sobre a configuração; chamadas ao provedor têm timeout de 10 segundos.
+
+Diagnóstico local: Supabase respondeu 200; antes do teste não havia produtos nem mídias no banco configurado. Cloudflare Stream respondeu 401, código 10000. O usuário informou que usou `https://cardap-io-lilac.vercel.app/r/demo`. Inspeção da publicação confirmou que `/login` mostra Supabase não configurado e mantém o botão de entrada desabilitado. `/r/demo` e `/demo/gestao` são locais ao navegador/origem e não compartilham dados com o catálogo real. A gestão de demonstração agora explica isso no conteúdo e oferece link à gestão conectada; o seletor de mídia também explica a diferença.
+
+Validação: 16 testes passaram na mesma rodada, incluindo login real, bloqueio das rotas/API para visitantes, foto no Storage, pedido, isolamento entre dois restaurantes e Reels em quatro tamanhos. O teste de sincronização enviou um arquivo pelo cadastro, simulou somente upload/processamento do Cloudflare e gravou a mídia temporária no Supabase real; um cliente em sessão separada recebeu e reproduziu o vídeo sem reload, preservando a sacola. As duas contas, restaurantes, foto, mídia e pedido temporários foram limpos no `finally`. Não afirmar que o upload real no Cloudflare passou: a credencial continua recusada.
+
+Lint, TypeScript e build final passaram. Consulta após a limpeza confirmou zero produtos, mídias e restaurantes com prefixo de teste. O usuário autorizou copiar variáveis locais para a Vercel e ajustar a origem. A CLI disponível pertence à equipe `automatic-gen`, que não possui esse projeto; a configuração está aguardando login na conta correta pela aba da Vercel. Não alterar o projeto `bot`, que é de outro trabalho.

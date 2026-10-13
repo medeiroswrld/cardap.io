@@ -1,4 +1,4 @@
-import { MenuApp } from "@/components/menu-app";
+import { redirect } from "next/navigation";
 export default function Home() {
-  return <MenuApp />;
+  redirect("/gestao");
 }

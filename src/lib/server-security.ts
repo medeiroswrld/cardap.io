@@ -18,21 +18,25 @@ export function apiError(error: unknown) {
       ? 401
       : message === "FORBIDDEN" || message === "ORIGIN_REJECTED"
         ? 403
-        : message.includes("configurad") || message === "APP_URL_REQUIRED"
+        : message.includes("configurad") ||
+            message === "APP_URL_REQUIRED" ||
+            message === "STREAM_AUTH_FAILED"
           ? 503
           : 400;
   return Response.json(
     {
       error:
-        status === 503
-          ? "Integração ainda não configurada."
-          : message === "GUEST_SESSION_EXPIRED"
-            ? "Sua sessão de pedidos expirou ou pertence a outro navegador. Fale com a equipe para acompanhar o pedido."
-            : status === 401
-              ? "Entre na sua conta para continuar."
-              : status === 403
-                ? "Acesso não permitido."
-                : "Não foi possível concluir a solicitação. Confira os dados e tente novamente.",
+        message === "STREAM_AUTH_FAILED"
+          ? "O serviço de vídeos recusou o acesso. Confira a configuração do Cloudflare Stream antes de reenviar."
+          : status === 503
+            ? "Integração ainda não configurada."
+            : message === "GUEST_SESSION_EXPIRED"
+              ? "Sua sessão de pedidos expirou ou pertence a outro navegador. Fale com a equipe para acompanhar o pedido."
+              : status === 401
+                ? "Entre na sua conta para continuar."
+                : status === 403
+                  ? "Acesso não permitido."
+                  : "Não foi possível concluir a solicitação. Confira os dados e tente novamente.",
     },
     { status, headers: noStore },
   );

@@ -159,12 +159,6 @@ export function MenuApp() {
             <span>Mesa {String(table).padStart(2, "0")}</span>
             <ChevronDown size={14} />
           </button>
-          <Link
-            className="management-link"
-            href={mode === "demo" ? "/demo/gestao" : "/gestao"}
-          >
-            Área de gestão <ArrowRight size={15} />
-          </Link>
           <button
             className="mobile-bag button button-icon button-outline"
             aria-label={`Abrir sacola com ${count} itens`}
@@ -353,7 +347,7 @@ export function MenuApp() {
                     aria-label={`${p.name}, ${index + 1} de ${items.length}`}
                   >
                     <div className="food-visual">
-                      <ProductMedia product={p} />
+                      <ProductMedia key={p.video || p.image} product={p} />
                       {view === "feed" && (
                         <>
                           <div className="food-image-shade" />

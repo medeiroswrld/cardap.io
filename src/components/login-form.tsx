@@ -77,7 +77,7 @@ export function LoginForm({ configured }: { configured: boolean }) {
           <div>
             <h2>
               {mode === "login"
-                ? "Que bom ter você por aqui."
+                ? "Entrar na gestão"
                 : mode === "signup"
                   ? "O próximo capítulo da sua casa."
                   : "Vamos recuperar seu acesso."}
@@ -163,11 +163,8 @@ export function LoginForm({ configured }: { configured: boolean }) {
           </button>
           <div className="login-demo">
             <p>Quer conhecer primeiro?</p>
-            <Link
-              className="button button-outline full-width"
-              href="/demo/gestao"
-            >
-              Explorar a demonstração
+            <Link className="button button-outline full-width" href="/r/demo">
+              Ver cardápio de demonstração
             </Link>
           </div>
         </form>

@@ -1,3 +1,4 @@
+import { syncVideoAsset } from "@/lib/sync-video";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
@@ -47,6 +48,24 @@ export async function GET(
       )
     )
       throw new Error("DATABASE_ERROR");
+    if (role === "owner") {
+      const pending = (media.data || [])
+        .filter(
+          (asset) =>
+            ["uploading", "processing"].includes(asset.state) &&
+            asset.provider_asset_id,
+        )
+        .slice(0, 5);
+      await Promise.all(
+        pending.map(async (asset) => {
+          try {
+            Object.assign(asset, await syncVideoAsset(id, asset));
+          } catch {
+            /* Keep the last status. The editor exposes retry errors. */
+          }
+        }),
+      );
+    }
     let contacts: unknown[] = [];
     let metrics: unknown[] = [];
     if (role === "owner") {

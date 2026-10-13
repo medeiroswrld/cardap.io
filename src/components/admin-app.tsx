@@ -279,6 +279,11 @@ export function AdminApp({ section }: { section: string }) {
           </div>
         </header>
         <main className="admin-content">
+          <p className="notice">
+            Você está na demonstração. Produtos e vídeos ficam somente neste
+            navegador e não aparecem para outros clientes.{" "}
+            <Link href="/gestao">Abrir a gestão do meu restaurante</Link>
+          </p>
           {!page ? (
             <div className="empty-state">
               <h1>Página não encontrada</h1>

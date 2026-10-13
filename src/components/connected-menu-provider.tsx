@@ -7,12 +7,14 @@ import { requestJson } from "@/lib/client-api";
 import { ensureGuestSession } from "@/lib/guest-session";
 import { isRestaurantOpen } from "@/lib/opening-hours";
 export function ConnectedMenuProvider({
-  catalog,
+  catalog: initialCatalog,
   children,
 }: {
   catalog: Catalog;
   children: React.ReactNode;
 }) {
+  const [catalog, setCatalog] = useState(initialCatalog);
+  const lastCatalog = useRef(JSON.stringify(initialCatalog));
   const [state, setState] = useState<DemoState>(() => ({
     version: 1,
     ...catalogState(catalog),
@@ -24,6 +26,44 @@ export function ConnectedMenuProvider({
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
+  useEffect(() => {
+    let disposed = false;
+    let refreshing = false;
+    const refresh = async () => {
+      if (document.hidden || refreshing) return;
+      refreshing = true;
+      try {
+        const next = await requestJson<Catalog>(
+          `/api/catalog/${encodeURIComponent(initialCatalog.restaurant.slug)}`,
+        );
+        const serialized = JSON.stringify(next);
+        if (
+          disposed ||
+          next.restaurant.id !== initialCatalog.restaurant.id ||
+          serialized === lastCatalog.current
+        )
+          return;
+        lastCatalog.current = serialized;
+        setCatalog(next);
+        current.current = { ...current.current, ...catalogState(next) };
+        setState(current.current);
+      } catch {
+        /* Preserve the loaded menu and bag during a connection failure. */
+      } finally {
+        refreshing = false;
+      }
+    };
+    const timer = setInterval(() => void refresh(), 15000);
+    const resume = () => void refresh();
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [initialCatalog.restaurant.id, initialCatalog.restaurant.slug]);
   const base = `/api/restaurants/${catalog.restaurant.id}`;
   const bagKey = `menu:${catalog.restaurant.id}:bag`;
   useEffect(() => {

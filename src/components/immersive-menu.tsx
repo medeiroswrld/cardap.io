@@ -163,6 +163,7 @@ export function ImmersiveMenu({
                 aria-label={`${product.name}, ${index + 1} de ${items.length}`}
               >
                 <ProductMedia
+                  key={product.video || product.image}
                   product={product}
                   autoPlay={index === active}
                   suspended={blocked || searchOpen}

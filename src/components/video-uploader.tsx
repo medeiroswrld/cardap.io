@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaRow } from "@/lib/connected-types";
 import { requestJson } from "@/lib/client-api";
 import { Button } from "./ui/button";
@@ -14,32 +14,54 @@ export function VideoUploader({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [asset] = useState(uploaded?.id || media[0]?.id || "");
-  const [state, setState] = useState(uploaded?.state || media[0]?.state || "");
-  async function verify(id = asset) {
+  const asset = uploaded?.id || media[0]?.id || "";
+  const serverState =
+    media.find((row) => row.id === asset)?.state || uploaded?.state || "";
+  const [checked, setChecked] = useState<{ id: string; state: string } | null>(
+    null,
+  );
+  const state = ["ready", "failed"].includes(serverState)
+    ? serverState
+    : checked?.id === asset
+      ? checked.state
+      : serverState;
+  const inFlight = useRef(false);
+  const verify = useCallback(async () => {
+    if (!asset || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     try {
       const result = await requestJson<{ state: string }>(
         `/api/restaurants/${restaurantId}/media`,
-        { assetId: id },
+        { assetId: asset },
         "PATCH",
       );
-      setState(result.state);
-    } catch {
+      setChecked({ id: asset, state: result.state });
+    } catch (err) {
       setError(
-        "Não foi possível confirmar o processamento do vídeo. Tente novamente em instantes.",
+        (err as Error).message ||
+          "Não foi possível confirmar o processamento do vídeo. Tente novamente.",
       );
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
-  }
+  }, [asset, restaurantId]);
+  useEffect(() => {
+    if (!asset || ["ready", "failed"].includes(state) || error) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) void verify();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [asset, state, error, verify]);
   return (
     <div className="form-stack connected-danger">
       <h3>Vídeo do produto</h3>
       <p className="field-help">
         Vídeo vertical, até 45 segundos e 200 MB. A foto continua aparecendo
-        durante o processamento.
+        durante o processamento. A confirmação é automática; mantenha a gestão
+        aberta até o vídeo ficar pronto.
       </p>
       {state && (
         <p role="status">
