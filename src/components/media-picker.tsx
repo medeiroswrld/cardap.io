@@ -2,6 +2,11 @@
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { resolveDemoVideo } from "@/lib/demo-media";
+import {
+  VIDEO_MAX_BYTES,
+  VIDEO_MAX_SECONDS,
+  VIDEO_TYPES,
+} from "@/lib/video-config";
 
 export function MediaPicker({
   photo,
@@ -68,7 +73,7 @@ export function MediaPicker({
         <input
           type="file"
           aria-label="Escolher foto ou vídeo"
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
           disabled={disabled || checking}
           onChange={async (e) => {
             const selected = e.target.files?.[0];
@@ -78,19 +83,21 @@ export function MediaPicker({
             setChecking(true);
             onChecking?.(true);
             try {
-              const videoFile = [
-                "video/mp4",
-                "video/quicktime",
-                "video/webm",
-              ].includes(selected.type);
+              const videoFile = VIDEO_TYPES.includes(
+                selected.type as (typeof VIDEO_TYPES)[number],
+              );
               if (
                 !videoFile &&
                 !["image/jpeg", "image/png", "image/webp"].includes(
                   selected.type,
                 )
               )
-                throw new Error("Escolha JPG, PNG, WebP, MP4, MOV ou WebM.");
-              const max = videoFile ? 200 : demo ? 1 : 5;
+                throw new Error("Escolha JPG, PNG, WebP, MP4 ou WebM.");
+              const max = videoFile
+                ? VIDEO_MAX_BYTES / 1024 / 1024
+                : demo
+                  ? 1
+                  : 5;
               if (selected.size > max * 1024 * 1024)
                 throw new Error(
                   `Escolha ${videoFile ? "um vídeo" : "uma foto"} de até ${max} MB.`,
@@ -112,8 +119,8 @@ export function MediaPicker({
         </p>
       )}
       <p className="field-help">
-        Fotos JPG, PNG ou WebP até {demo ? 1 : 5} MB. Vídeos MP4, MOV ou WebM
-        até 45 segundos e 200 MB.
+        Fotos JPG, PNG ou WebP até {demo ? 1 : 5} MB. Vídeos MP4 (H.264) ou WebM
+        até 45 segundos e 20 MB.
       </p>
       {demo && (
         <p className="field-help">
@@ -131,11 +138,11 @@ export function MediaPicker({
   );
 }
 
-async function validateVideo(file: File) {
+export async function validateVideo(file: File) {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   try {
-    await new Promise<void>((resolve, reject) => {
+    return await new Promise<number>((resolve, reject) => {
       const timer = setTimeout(
         () =>
           reject(
@@ -149,9 +156,9 @@ async function validateVideo(file: File) {
         if (
           Number.isFinite(video.duration) &&
           video.duration > 0 &&
-          video.duration <= 45
+          video.duration <= VIDEO_MAX_SECONDS
         )
-          resolve();
+          resolve(video.duration);
         else reject(new Error("Escolha um vídeo de até 45 segundos."));
       };
       video.onerror = () => {

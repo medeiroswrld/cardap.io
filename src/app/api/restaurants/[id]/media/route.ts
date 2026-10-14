@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { syncVideoAsset } from "@/lib/sync-video";
-import { createVideoUpload } from "@/lib/cloudflare";
+import {
+  VIDEO_BUCKET,
+  VIDEO_MAX_BYTES,
+  VIDEO_MAX_SECONDS,
+  VIDEO_TYPES,
+  STORAGE_VIDEO_PREFIX,
+} from "@/lib/video-config";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 export async function POST(
   request: Request,
@@ -11,8 +17,13 @@ export async function POST(
     checkOrigin(request);
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
-    const { productId } = z
-      .object({ productId: z.uuid() })
+    const { productId, contentType, duration } = z
+      .object({
+        productId: z.uuid(),
+        contentType: z.enum(VIDEO_TYPES),
+        size: z.number().int().positive().max(VIDEO_MAX_BYTES),
+        duration: z.number().positive().max(VIDEO_MAX_SECONDS),
+      })
       .parse(await request.json());
     const { data: product } = await supabase
       .from("products")
@@ -21,13 +32,21 @@ export async function POST(
       .eq("restaurant_id", id)
       .single();
     if (!product) throw new Error("FORBIDDEN");
-    const upload = await createVideoUpload(id);
-    const { data: asset, error } = await serviceClient()
+    const service = serviceClient();
+    const assetId = crypto.randomUUID();
+    const path = `${id}/${productId}/${assetId}.${contentType === "video/mp4" ? "mp4" : "webm"}`;
+    const { data: upload, error: uploadError } = await service.storage
+      .from(VIDEO_BUCKET)
+      .createSignedUploadUrl(path, { upsert: false });
+    if (uploadError || !upload) throw new Error("VIDEO_STORAGE_UNAVAILABLE");
+    const { data: asset, error } = await service
       .from("product_media")
       .insert({
+        id: assetId,
         restaurant_id: id,
         product_id: productId,
-        provider_asset_id: upload.uid,
+        provider_asset_id: STORAGE_VIDEO_PREFIX + path,
+        duration_seconds: duration,
         state: "uploading",
         kind: "video",
       })
@@ -35,7 +54,7 @@ export async function POST(
       .single();
     if (error) throw error;
     return Response.json(
-      { ...upload, assetId: asset.id },
+      { provider: "supabase", path, token: upload.token, assetId: asset.id },
       { headers: noStore },
     );
   } catch (error) {

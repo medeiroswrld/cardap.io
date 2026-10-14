@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect as baseExpect } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadEnvFile } from "node:process";
 import { randomUUID } from "node:crypto";
@@ -6,7 +6,8 @@ test.skip(
   process.env.RUN_CONNECTED_LIVE !== "1",
   "Explicit opt-in: creates and removes isolated hosted test data.",
 );
-test.use({ trace: "off", actionTimeout: 15000 });
+test.use({ trace: "off", actionTimeout: 30000, screenshot: "only-on-failure" });
+const expect = baseExpect.configure({ timeout: 30000 });
 test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e isolamento", async ({
   page,
   browser,
@@ -137,10 +138,16 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
         exact: true,
       })
       .click();
+    const cartEventResponse = guest.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/api/restaurants/${tenant}/cart-events`),
+      { timeout: 60000 },
+    );
     await guest
       .getByRole("dialog")
       .getByRole("button", { name: /^Adicionar •/ })
       .click();
+    expect((await cartEventResponse).status()).toBe(200);
     await expect
       .poll(async () => {
         const { count, error } = await service
@@ -156,55 +163,42 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
     );
     expect(associations.status()).toBe(200);
     expect(await associations.json()).toEqual([]);
-    // Only Cloudflare's upload/processing responses are simulated. The owner
-    // login, database, anonymous catalog refresh and playback use the real app.
-    const assetId = randomUUID();
-    const playbackUrl = new URL("/__test-reel.webm", page.url()).href;
-    await guest.route("**/__test-reel.webm", (route) =>
-      route.fulfill({
-        path: "tests/fixtures/reel.webm",
-        contentType: "video/webm",
-      }),
-    );
-    await page.route("**/__test-upload", (route) =>
-      route.fulfill({ status: 200 }),
-    );
-    let statusChecks = 0;
-    await page.route(`**/api/restaurants/${tenant}/media`, async (route) => {
-      if (route.request().method() === "POST") {
-        const { error } = await service.from("product_media").insert({
-          id: assetId,
-          restaurant_id: tenant,
-          product_id: product.id,
-          provider_asset_id: randomUUID().replaceAll("-", ""),
-          kind: "video",
-          state: "processing",
-        });
-        if (error) throw error;
-        await route.fulfill({
-          json: {
-            assetId,
-            uploadURL: new URL("/__test-upload", page.url()).href,
-          },
-        });
-      } else if (route.request().method() === "PATCH") {
-        statusChecks++;
-        const state = statusChecks === 1 ? "processing" : "ready";
-        if (state === "ready") {
-          const { error } = await service
-            .from("product_media")
-            .update({
-              state,
-              playback_url: playbackUrl,
-              duration_seconds: 2,
-            })
-            .eq("id", assetId)
-            .eq("restaurant_id", tenant);
-          if (error) throw error;
-        }
-        await route.fulfill({ json: { state } });
-      } else await route.continue();
+    const mediaEndpoint = `/api/restaurants/${tenant}/media`;
+    const origin = new URL(page.url()).origin;
+    const uploadInput = {
+      productId: product.id,
+      contentType: "video/webm",
+      size: 1000,
+      duration: 2,
+    };
+    const anonymousUpload = await guest.request.post(mediaEndpoint, {
+      headers: { origin },
+      data: uploadInput,
     });
+    expect(anonymousUpload.status()).toBe(401);
+    const foreignUpload = await page.request.post(
+      `/api/restaurants/${tenantIds[1]}/media`,
+      { headers: { origin }, data: uploadInput },
+    );
+    expect(foreignUpload.status()).toBe(403);
+    for (const invalid of [
+      { size: 20971521 },
+      { duration: 46 },
+      { contentType: "text/html" },
+    ]) {
+      const rejected = await page.request.post(mediaEndpoint, {
+        headers: { origin },
+        data: { ...uploadInput, ...invalid },
+      });
+      expect(rejected.status()).toBe(400);
+    }
+    const deniedPath = `${tenant}/${product.id}/unauthorized.webm`;
+    const directUpload = await clients[1].storage
+      .from("restaurant-videos")
+      .upload(deniedPath, new Uint8Array([0]), { contentType: "video/webm" });
+    if (!directUpload.error)
+      await service.storage.from("restaurant-videos").remove([deniedPath]);
+    expect(directUpload.error).toBeTruthy();
     await page
       .getByRole("button", { name: "Editar produto", exact: true })
       .click();
@@ -216,12 +210,23 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
       .getByRole("button", { name: "Salvar produto", exact: true })
       .click();
     await expect(
-      modal.getByText("Processando vídeo", { exact: true }),
-    ).toBeVisible();
-    await expect(
       modal.getByText("Vídeo pronto para o cardápio", { exact: true }),
-    ).toBeVisible({ timeout: 20000 });
-    expect(statusChecks).toBeGreaterThanOrEqual(2);
+    ).toBeVisible({ timeout: 30000 });
+    const { data: uploadedMedia } = await service
+      .from("product_media")
+      .select("id,provider_asset_id,playback_url,state")
+      .eq("product_id", product.id)
+      .single();
+    expect(uploadedMedia?.state).toBe("ready");
+    expect(uploadedMedia?.provider_asset_id).toMatch(/^storage:/);
+    const videoResponse = await guest.request.get(uploadedMedia!.playback_url!);
+    expect(videoResponse.ok()).toBe(true);
+    expect(videoResponse.headers()["content-type"]).toContain("video/webm");
+    const foreignConfirm = await page.request.patch(
+      `/api/restaurants/${tenantIds[1]}/media`,
+      { headers: { origin }, data: { assetId: uploadedMedia!.id } },
+    );
+    expect(foreignConfirm.status()).toBe(403);
     await page.keyboard.press("Escape");
     // No navigation or reload: the already-open customer menu must update.
     const reelVideo = guest.locator(".immersive-reel").first().locator("video");
@@ -307,6 +312,22 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
       .in("slug", [`integration-${suffix}`, `other-${suffix}`]);
     for (const row of dangling.data || [])
       if (!tenantIds.includes(row.id)) tenantIds.push(row.id);
+    if (tenantIds.length) {
+      const { data: testMedia } = await service
+        .from("product_media")
+        .select("provider_asset_id")
+        .in("restaurant_id", tenantIds);
+      const paths = (testMedia || [])
+        .map((m) => m.provider_asset_id as string)
+        .filter((id) => id?.startsWith("storage:"))
+        .map((id) => id.slice("storage:".length));
+      if (paths.length) {
+        const { error } = await service.storage
+          .from("restaurant-videos")
+          .remove(paths);
+        if (error) throw new Error("Test video cleanup failed");
+      }
+    }
     for (const id of tenantIds) {
       const { error } = await service.from("restaurants").delete().eq("id", id);
       if (error) console.error("Test tenant cleanup failed", id, error.code);

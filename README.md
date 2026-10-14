@@ -65,16 +65,17 @@ As migrations 001 a 004 foram aplicadas no projeto fornecido. Verificação no p
 
 `place_guest_order` serializa tentativas da mesma sessão, compara hash do payload por chave e limita pedidos por sessão. Ainda é obrigatório configurar limite por IP/origem e proteção da criação de sessões no provedor de hospedagem; múltiplas sessões podem contornar o limite por sessão. A persistência de demonstração não oferece transações/distribuição de banco e não deve ser usada para operação real.
 
-### Cloudflare Stream e fotos
+### Vídeos do piloto no Supabase Storage
 
-- Preencha `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_STREAM_API_TOKEN`, com permissão limitada ao Stream da conta.
-- O endpoint `POST /api/restaurants/:id/media` exige dono, valida produto/tenant e devolve upload direto temporário, limitado a 45 segundos.
-- A confirmação em `PATCH` consulta o provedor com autenticação; não aceita um estado de processamento declarado pelo navegador. Somente o servidor pode gravar os estados de mídia.
-- O campo “Escolher foto ou vídeo” aceita arquivos do dispositivo, mostra uma prévia e valida tipo, tamanho e duração. Ao salvar, fotos vão ao Storage e vídeos MP4/MOV/WebM de até 45 segundos e 200 MB vão diretamente ao Stream. Produtos novos são salvos antes de iniciar o envio, sem exigir fechar e reabrir o cadastro. Falhas de vídeo mantêm o arquivo selecionado para tentar novamente. O cadastro confere o processamento a cada 5 segundos; o painel também reconcilia até 5 mídias pendentes por atualização. Mantenha a gestão aberta até aparecer “Vídeo pronto para o cardápio”; ainda não há webhook independente do painel. O botão “Verificar processamento” permite tentar novamente após uma falha. HLS no cardápio funciona via player nativo ou hls.js, com foto em caso de falha. TUS para arquivos maiores não está implementado.
-- Verificação de 13/10/2026 no ambiente local: Stream retornou 401 (código 10000). Fotos continuam funcionais; upload real de vídeo depende da correção da conta/permissão do token. Confira também `NEXT_PUBLIC_APP_URL` na Vercel: essa origem é usada nas permissões de reprodução dos novos uploads.
-- Bucket preparado `restaurant-media`: imagens JPEG/PNG/WebP até 5 MB, caminho começando pelo UUID do restaurante e escrita por dono. Fotos desse bucket são públicas; não envie documentos ou dados pessoais nele.
-- Na demo, fotos de até 1 MB ficam no armazenamento local e vídeos de até 45 segundos/200 MB ficam no IndexedDB, com reprodução após recarregar a página. O limite disponível depende do navegador; arquivos locais não são compartilhados com outros dispositivos. Não é necessário informar links. Nenhum vídeo de terceiros foi incluído. Fontes das fotos em `public/images/SOURCES.md`.
-- Nunca use prefixo `NEXT_PUBLIC_` para chaves privilegiadas. Elas só são importadas por módulos server-only.
+- Novos vídeos usam `restaurant-videos`, sem depender de assinatura Cloudflare. O seletor aceita MP4 (H.264) ou WebM de até 45 segundos e 20 MB. Não há conversão automática de codecs nem streaming adaptativo; exporte MOV/HEVC para MP4 H.264 antes de enviar.
+- Configure o bucket com a migration `005_video_storage.sql` ou `node scripts/setup-video-storage.mjs` (somente cria se ausente e verifica os limites). No projeto fornecido, o bucket foi criado pela API em 14/10/2026. As migrations 001–004 não devem ser reaplicadas.
+- `POST /api/restaurants/:id/media` exige dono e produto do mesmo restaurante. Emite URL assinada para um caminho exclusivo, sem sobrescrita. O arquivo vai direto do navegador ao Storage, sem passar pela Vercel. Não há políticas de escrita direta para usuários nesse bucket.
+- `PATCH` verifica no servidor a existência, tamanho e MIME do objeto antes de publicar sua URL. A duração é medida no navegador e validada na API; este piloto não faz análise independente da duração/codecs no servidor. Os estados não podem ser declarados diretamente pelo cliente.
+- Reprodução pública, como as fotos do cardápio. Evite documentos e dados pessoais. A gestão reconcilia envios pendentes, e o cardápio aberto consulta novidades a cada 15 segundos. O teste conectado faz upload e reprodução reais, sem simular o provedor.
+- O limite por arquivo é aplicado no bucket e na API. A franquia total e o tráfego continuam sujeitos ao plano Supabase; não há garantia de uso ilimitado ou custo zero. Substituições mantêm versões anteriores para métricas; revisar armazenamento e limpar versões sem uso antes de ampliar o piloto.
+- Mídias legadas do Cloudflare ainda podem ser reproduzidas e sincronizadas se houver assinatura e credenciais válidas. As variáveis Cloudflare são opcionais para novos uploads. Nenhum plano Cloudflare foi contratado.
+- Fotos usam `restaurant-media`: JPEG/PNG/WebP até 5 MB, escrita por dono e reprodução pública. Na demo, fotos de até 1 MB e vídeos de até 20 MB ficam somente no navegador; use a gestão real para compartilhar entre dispositivos.
+- Chaves privilegiadas permanecem apenas no servidor. `.env.local` é ignorado pelo Git.
 
 ## Limites atuais
 
@@ -96,6 +97,8 @@ npm run check:connections
 ```
 
 Os testes Playwright usam um navegador instalado via `npx playwright install chromium`. Se já houver Chromium no ambiente, defina `PLAYWRIGHT_CHROMIUM_EXECUTABLE` com o caminho completo. `PLAYWRIGHT_BASE_URL` permite testar outra porta/instância. Capturas ficam em `.impeccable/review/`. Os testes usam contextos isolados e dados fictícios.
+
+Em 14/10/2026, build e lint passaram. O cenário conectado passou contra a versão compilada local com Supabase real: upload assinado de vídeo, reprodução automática no Reels já aberto, preservação da sacola, pedido e isolamento entre restaurantes. Os dados e arquivos temporários são removidos ao terminar. Esse teste também verifica rejeição de tipo, tamanho e duração inválidos e de escrita direta no bucket.
 
 Na validação de 12/10/2026, os 16 cenários passaram em lotes: 15 na rodada completa e um após corrigir a inicialização do seletor de perfil da demonstração. O teste real confirmou login, onboarding, foto no Storage, sacola, consulta de associações, pedido, acompanhamento e isolamento. Ele exige `RUN_CONNECTED_LIVE=1` e autorização explícita para criar e remover duas contas e restaurantes temporários, uma foto e um pedido. Sem essa opção, o cenário hospedado é ignorado. Não execute dois processos Playwright simultaneamente.
 

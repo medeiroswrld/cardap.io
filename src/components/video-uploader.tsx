@@ -3,6 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MediaRow } from "@/lib/connected-types";
 import { requestJson } from "@/lib/client-api";
 import { Button } from "./ui/button";
+import { browserClient } from "@/lib/supabase/browser";
+import { VIDEO_BUCKET, VIDEO_MAX_BYTES, VIDEO_TYPES } from "@/lib/video-config";
+import { validateVideo } from "./media-picker";
 export function VideoUploader({
   restaurantId,
   media,
@@ -59,9 +62,9 @@ export function VideoUploader({
     <div className="form-stack connected-danger">
       <h3>Vídeo do produto</h3>
       <p className="field-help">
-        Vídeo vertical, até 45 segundos e 200 MB. A foto continua aparecendo
-        durante o processamento. A confirmação é automática; mantenha a gestão
-        aberta até o vídeo ficar pronto.
+        Vídeo vertical MP4 (H.264) ou WebM, até 45 segundos e 20 MB. A foto
+        continua aparecendo até o envio terminar. Mantenha esta tela aberta até
+        a confirmação.
       </p>
       {state && (
         <p role="status">
@@ -94,17 +97,30 @@ export async function uploadProductVideo(
   productId: string,
   file: File,
 ) {
-  const result = await requestJson<{ assetId: string; uploadURL: string }>(
-    `/api/restaurants/${restaurantId}/media`,
-    { productId },
-  );
-  const form = new FormData();
-  form.append("file", file);
-  const response = await fetch(result.uploadURL, {
-    method: "POST",
-    body: form,
+  if (
+    !VIDEO_TYPES.includes(file.type as (typeof VIDEO_TYPES)[number]) ||
+    file.size > VIDEO_MAX_BYTES ||
+    file.size === 0
+  )
+    throw new Error("Escolha um vídeo MP4 ou WebM de até 20 MB.");
+  const duration = await validateVideo(file);
+  const result = await requestJson<{
+    assetId: string;
+    path: string;
+    token: string;
+  }>(`/api/restaurants/${restaurantId}/media`, {
+    productId,
+    contentType: file.type,
+    size: file.size,
+    duration,
   });
-  if (!response.ok)
+  const { error } = await browserClient()
+    .storage.from(VIDEO_BUCKET)
+    .uploadToSignedUrl(result.path, result.token, file, {
+      contentType: file.type,
+      cacheControl: "3600",
+    });
+  if (error)
     throw new Error(
       "O produto foi salvo, mas o envio do vídeo falhou. Tente salvar novamente para reenviar.",
     );
@@ -112,6 +128,6 @@ export async function uploadProductVideo(
     `/api/restaurants/${restaurantId}/media`,
     { assetId: result.assetId },
     "PATCH",
-  ).catch(() => ({ state: "processing" }));
+  );
   return { id: result.assetId, state: status.state };
 }
