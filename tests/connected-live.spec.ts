@@ -132,6 +132,39 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
     await expect(
       guest.getByRole("heading", { name: "Prato de teste" }),
     ).toBeVisible();
+    await expect
+      .poll(async () => {
+        const { data, error } = await service
+          .from("photo_view_sessions")
+          .select("qualified,visible_seconds")
+          .eq("restaurant_id", tenant);
+        if (error) throw error;
+        return data?.some((v) => v.qualified && Number(v.visible_seconds) >= 1);
+      })
+      .toBe(true);
+    const photoInput = {
+      id: randomUUID(),
+      product_id: product.id,
+      photo_url: product.photo_url,
+      sequence: 1,
+      visible_seconds: 3,
+    };
+    const ownerPhoto = await page.request.post(
+      `/api/restaurants/${tenant}/photo-views`,
+      {
+        headers: { origin: new URL(page.url()).origin },
+        data: photoInput,
+      },
+    );
+    expect(await ownerPhoto.json()).toEqual({ ignored: true });
+    const wrongPhoto = await guest.request.post(
+      `/api/restaurants/${tenant}/photo-views`,
+      {
+        headers: { origin: new URL(page.url()).origin },
+        data: { ...photoInput, photo_url: "https://example.test/forged.jpg" },
+      },
+    );
+    expect(wrongPhoto.status()).toBe(400);
     await guest
       .getByRole("button", {
         name: "Ver detalhes de Prato de teste",
@@ -259,6 +292,24 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
       fullPage: true,
     });
     const orderId = guest.url().split("/").at(-1)!;
+    const photoAssociations = await page.request.get(
+      `/api/restaurants/${tenant}/photo-associations?days=30`,
+    );
+    expect(photoAssociations.status()).toBe(200);
+    expect(await photoAssociations.json()).toEqual([
+      expect.objectContaining({
+        product_id: product.id,
+        cart_sessions: 1,
+        order_sessions: 1,
+        viewer_sessions: 1,
+      }),
+    ]);
+    const foreignPhotos = await clients[1]
+      .from("photo_view_sessions")
+      .select("id")
+      .eq("restaurant_id", tenant);
+    expect(foreignPhotos.error).toBeNull();
+    expect(foreignPhotos.data).toEqual([]);
     const stranger = await browser.newContext();
     const denied = await stranger.request.get(
       `/api/restaurants/${tenant}/orders/${orderId}`,
@@ -302,6 +353,15 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
         () => document.documentElement.scrollWidth > innerWidth,
       ),
     ).toBe(false);
+    await page.getByRole("button", { name: "Métricas", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Fotos", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("Foto atual", { exact: true })).toBeVisible();
+    await page.screenshot({
+      path: ".impeccable/review/photo-metrics-mobile.png",
+      fullPage: true,
+    });
     await customer.close();
   } finally {
     if (photoPath)

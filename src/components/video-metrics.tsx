@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { requestJson } from "@/lib/client-api";
 import { BarChart3 } from "lucide-react";
 import type { Workspace } from "@/lib/connected-types";
+import { PhotoMetrics } from "./photo-metrics";
 export function VideoMetrics({ data }: { data: Workspace }) {
   const [days, setDays] = useState(30);
   const [associations, setAssociations] = useState<
@@ -59,8 +60,7 @@ export function VideoMetrics({ data }: { data: Workspace }) {
     <>
       <div className="connected-toolbar">
         <p>
-          Reprodução observada, por versão do vídeo. Atualização automática a
-          cada 15 segundos.
+          Fotos e vídeos do cardápio. Atualização automática a cada 15 segundos.
         </p>
         <label className="form-label">
           Período
@@ -73,6 +73,8 @@ export function VideoMetrics({ data }: { data: Workspace }) {
           </select>
         </label>
       </div>
+      <PhotoMetrics data={data} days={days} now={now} />
+      <h2>Vídeos</h2>
       <div className="connected-stats">
         {[
           ["Sessões observadas", String(views.length)],

@@ -20,6 +20,8 @@ for (const file of [
   "002_connected_management.sql",
   "003_video_observations.sql",
   "004_cart_associations.sql",
+  "005_video_storage.sql",
+  "006_photo_observations.sql",
 ]) {
   const sql = readFileSync(
     new URL("../supabase/migrations/" + file, import.meta.url),
@@ -405,6 +407,78 @@ await ok("association report rejects other tenant owner", async () => {
     () => db.query("select * from video_associations($1,30)", [a]),
     /FORBIDDEN/,
   );
+});
+await db.exec("reset role");
+await db.query("update products set photo_url=$1 where id=$2", [
+  "https://example.test/photo.jpg",
+  pa,
+]);
+const photoView = {
+  id: "c0000000-0000-4000-8000-000000000001",
+  product_id: pa,
+  photo_url: "https://example.test/photo.jpg",
+  sequence: 1,
+  visible_seconds: 3,
+};
+const observePhoto = (body) =>
+  db.query("select record_photo_view($1,$2,$3)", [
+    a,
+    "a".repeat(64),
+    JSON.stringify(body),
+  ]);
+await ok("photo observation qualifies and deduplicates retries", async () => {
+  await observePhoto(photoView);
+  await observePhoto(photoView);
+  const rows = (
+    await db.query(
+      "select visible_seconds::float,qualified from photo_view_sessions",
+    )
+  ).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].visible_seconds, 3);
+  assert.equal(rows[0].qualified, true);
+});
+await ok("forged photo interval rejected", () =>
+  rejected(
+    () => observePhoto({ ...photoView, sequence: 2, visible_seconds: 500 }),
+    /INVALID_INTERVAL/,
+  ),
+);
+await ok("different photo rejected", () =>
+  rejected(
+    () =>
+      observePhoto({
+        ...photoView,
+        photo_url: "https://example.test/forged.jpg",
+      }),
+    /INVALID_PHOTO/,
+  ),
+);
+await ok("foreign product rejected for photo metrics", () =>
+  rejected(
+    () => observePhoto({ ...photoView, product_id: pb }),
+    /INVALID_PHOTO/,
+  ),
+);
+await ok("photo report associates same session cart and order", async () => {
+  await login(ownerA);
+  const row = (await db.query("select * from photo_associations($1,30)", [a]))
+    .rows[0];
+  assert.equal(Number(row.viewer_sessions), 1);
+  assert.equal(Number(row.cart_sessions), 1);
+  assert.equal(Number(row.order_sessions), 1);
+});
+await ok("photo data and report isolated by owner", async () => {
+  await login(ownerB);
+  assert.equal(
+    (await db.query("select * from photo_view_sessions")).rows.length,
+    0,
+  );
+  await rejected(
+    () => db.query("select * from photo_associations($1,30)", [a]),
+    /FORBIDDEN/,
+  );
+  await rejected(() => observePhoto(photoView), /permission denied/);
 });
 await db.close();
 console.log(

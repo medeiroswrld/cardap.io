@@ -14,6 +14,7 @@ export type Product = {
   categoryId: string;
   image: string;
   video?: string;
+  photoAnalytics?: { restaurantId: string; url: string };
   analytics?: {
     restaurantId: string;
     mediaId: string;

@@ -85,6 +85,13 @@ export type Workspace = {
   tables: TableRow[];
   orders: RealOrder[];
   contacts: RealContact[];
+  photoMetrics: {
+    product_id: string;
+    photo_url: string;
+    visible_seconds: number;
+    qualified: boolean;
+    created_at: string;
+  }[];
   metrics: {
     product_id: string;
     media_id: string;
@@ -121,6 +128,9 @@ export function catalogState(catalog: Catalog): {
         price: p.price_cents,
         categoryId: p.category_id,
         image: p.photo_url || "/images/placeholder.svg",
+        photoAnalytics: p.photo_url
+          ? { restaurantId: catalog.restaurant.id, url: p.photo_url }
+          : undefined,
         video: media?.provider_asset_id
           ? media.playback_url || undefined
           : undefined,

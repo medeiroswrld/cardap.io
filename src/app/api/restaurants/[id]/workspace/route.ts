@@ -68,8 +68,9 @@ export async function GET(
     }
     let contacts: unknown[] = [];
     let metrics: unknown[] = [];
+    let photoMetrics: unknown[] = [];
     if (role === "owner") {
-      const [c, m] = await Promise.all([
+      const [c, m, photos] = await Promise.all([
         supabase
           .from("contacts")
           .select("*")
@@ -84,10 +85,18 @@ export async function GET(
           .eq("restaurant_id", id)
           .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
           .limit(10000),
+        supabase
+          .from("photo_view_sessions")
+          .select("product_id,photo_url,visible_seconds,qualified,created_at")
+          .eq("restaurant_id", id)
+          .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(10000),
       ]);
-      if (c.error || m.error) throw new Error("DATABASE_ERROR");
+      if (c.error || m.error || photos.error) throw new Error("DATABASE_ERROR");
       contacts = c.data;
       metrics = m.data;
+      photoMetrics = photos.data;
     }
     return Response.json(
       {
@@ -100,6 +109,7 @@ export async function GET(
         orders: orders.data,
         contacts,
         metrics,
+        photoMetrics,
       },
       { headers: noStore },
     );

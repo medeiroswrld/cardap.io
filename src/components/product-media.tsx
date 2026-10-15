@@ -4,6 +4,7 @@ import { ImageIcon, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import type { Product } from "@/lib/types";
 import { resolveDemoVideo } from "@/lib/demo-media";
 import { useVideoObservation } from "./use-video-observation";
+import { usePhotoObservation } from "./use-photo-observation";
 export function ProductMedia({
   product,
   preview = false,
@@ -16,6 +17,7 @@ export function ProductMedia({
   suspended?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const photoRef = useRef<HTMLImageElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -24,6 +26,11 @@ export function ProductMedia({
   const manualPause = useRef(false);
   const lastActive = useRef(autoPlay);
   useVideoObservation(ref, product, preview);
+  usePhotoObservation(
+    photoRef,
+    product,
+    preview || suspended || Boolean(product.video && !failed),
+  );
   useEffect(() => {
     const video = ref.current;
     if (!video || !product.video) return;
@@ -166,6 +173,7 @@ export function ProductMedia({
         </>
       ) : (
         <img
+          ref={photoRef}
           src={product.image || "/images/placeholder.svg"}
           alt={product.name}
           loading={product.featured ? "eager" : "lazy"}

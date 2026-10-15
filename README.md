@@ -79,6 +79,13 @@ As migrations 001 a 004 foram aplicadas no projeto fornecido. Verificação no p
 
 ## Limites atuais
 
+### Métricas de fotos
+
+- A migration `006_photo_observations.sql` foi aplicada ao projeto em 15/10/2026. Mantém observações de fotos separadas das reproduções de vídeo, com leitura restrita ao dono do restaurante.
+- Uma foto carregada conta após 1 segundo com pelo menos 50% visível e a aba ativa. Prévias, placeholders e acessos de membros autenticados não contam. Cada visita ao painel da foto é uma observação, não uma pessoa única. Trocar a foto preserva o histórico anterior pelo endereço do arquivo.
+- A gestão mostra visualizações qualificadas, tempo visível total/médio e sessões com o mesmo produto na sacola ou em um pedido. O período é de 7 ou 30 dias; atualização a cada 15 segundos. Associações não significam causalidade e incluem pedidos cancelados.
+- O servidor valida sessão, produto e foto publicada, elimina reenvios pela sequência e limita intervalos e frequência. O tempo visível continua sendo uma estimativa do navegador, sujeita a perdas e bloqueios. As métricas começam com novas visitas, sem preenchimento retroativo.
+
 - Convites da equipe são administrados no Supabase; não há envio de convites no app. Usuários de operação precisam de associação em `restaurant_members`.
 - Recuperação/cadastro de senha têm rotas implementadas; entrega de e-mail depende das configurações Auth/SMTP do projeto.
 - O prazo de revisão de dados nas configurações é informativo. Não existe exclusão automática por retenção.
