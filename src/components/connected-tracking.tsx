@@ -1,4 +1,5 @@
 "use client";
+import { OrderChoices } from "./order-choices";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Utensils } from "lucide-react";
@@ -119,6 +120,10 @@ export function ConnectedTracking({
               <div key={item.id}>
                 <span>
                   {item.quantity}× {item.product_name}
+                  <OrderChoices
+                    removed={item.removed_ingredients}
+                    additions={item.add_ons}
+                  />
                   {item.note && <small> — {item.note}</small>}
                 </span>
                 <strong>{money(item.quantity * item.unit_price_cents)}</strong>

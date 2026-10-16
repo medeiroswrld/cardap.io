@@ -22,6 +22,7 @@ for (const file of [
   "004_cart_associations.sql",
   "005_video_storage.sql",
   "006_photo_observations.sql",
+  "007_product_options.sql",
 ]) {
   const sql = readFileSync(
     new URL("../supabase/migrations/" + file, import.meta.url),
@@ -480,6 +481,201 @@ await ok("photo data and report isolated by owner", async () => {
   );
   await rejected(() => observePhoto(photoView), /permission denied/);
 });
+
+const extra = "a0000000-0000-4000-8000-000000000001";
+const foreignExtra = "a0000000-0000-4000-8000-000000000002";
+const optionKey = "b0000000-0000-4000-8000-000000000001";
+const saveExtra = (
+  tenant = a,
+  id = extra,
+  ids = [pa],
+  price = 500,
+  active = true,
+) =>
+  db.query("select save_product_option($1,$2,$3,$4,$5,$6)", [
+    tenant,
+    id,
+    "Queijo extra",
+    price,
+    active,
+    ids,
+  ]);
+await ok("owner creates an option and product links atomically", async () => {
+  await login(ownerA);
+  await saveExtra();
+  await db.query(
+    "update products set removable_ingredients=array['Cebola','Tomate'] where id=$1",
+    [pa],
+  );
+  assert.equal(
+    (
+      await db.query("select * from product_option_links where option_id=$1", [
+        extra,
+      ])
+    ).rows.length,
+    1,
+  );
+});
+await ok("foreign product assignment rolls back price and links", async () => {
+  await rejected(() => saveExtra(a, extra, [pa, pb], 900), /INVALID_PRODUCTS/);
+  assert.equal(
+    (
+      await db.query("select price_cents from product_options where id=$1", [
+        extra,
+      ])
+    ).rows[0].price_cents,
+    500,
+  );
+  assert.equal(
+    (
+      await db.query("select * from product_option_links where option_id=$1", [
+        extra,
+      ])
+    ).rows.length,
+    1,
+  );
+});
+await ok("operations and foreign owner cannot edit options", async () => {
+  await login(staff);
+  await rejected(() => saveExtra(), /FORBIDDEN/);
+  await login(ownerB);
+  await rejected(() => saveExtra(), /FORBIDDEN/);
+  await saveExtra(b, foreignExtra, [pb]);
+  await root();
+});
+await root();
+await db.query("update restaurants set opening_hours=$2 where id=$1", [
+  a,
+  JSON.stringify(
+    Array.from({ length: 7 }, (_, day) => ({
+      day,
+      open: "00:00",
+      close: "23:59:59",
+    })),
+  ),
+]);
+await db.query("update dining_tables set active=true where id=$1", [table]);
+const custom = {
+  ...payload,
+  items: [
+    {
+      ...payload.items[0],
+      expected_price: 3000,
+      option_ids: [extra],
+      removed_ingredients: ["Cebola"],
+    },
+  ],
+};
+await ok(
+  "server prices extras per unit and freezes removals and names",
+  async () => {
+    const result = await place(optionKey, custom);
+    assert.equal(result.total_cents, 6000);
+    const row = (
+      await db.query("select * from order_items where order_id=$1", [result.id])
+    ).rows[0];
+    assert.equal(row.unit_price_cents, 3000);
+    assert.deepEqual(row.removed_ingredients, ["Cebola"]);
+    assert.deepEqual(row.add_ons, [
+      { id: extra, name: "Queijo extra", price_cents: 500 },
+    ]);
+  },
+);
+await ok(
+  "tampered extra total and invalid removals reject whole order",
+  async () => {
+    const key = "b0000000-0000-4000-8000-000000000002";
+    await rejected(
+      () =>
+        place(key, {
+          ...custom,
+          items: [{ ...custom.items[0], expected_price: 2500 }],
+        }),
+      /PRICE_CHANGED/,
+    );
+    await rejected(
+      () =>
+        place(key, {
+          ...custom,
+          items: [{ ...custom.items[0], removed_ingredients: ["Carne"] }],
+        }),
+      /OPTIONS_CHANGED/,
+    );
+    await rejected(
+      () =>
+        place(key, {
+          ...custom,
+          items: [
+            { ...custom.items[0], removed_ingredients: ["Cebola", "Cebola"] },
+          ],
+        }),
+      /OPTIONS_CHANGED/,
+    );
+    await rejected(
+      () =>
+        place(key, {
+          ...custom,
+          items: [{ ...custom.items[0], option_ids: [extra, extra] }],
+        }),
+      /OPTIONS_CHANGED/,
+    );
+    await rejected(
+      () =>
+        place(key, {
+          ...custom,
+          items: [{ ...custom.items[0], option_ids: [foreignExtra] }],
+        }),
+      /OPTIONS_CHANGED/,
+    );
+  },
+);
+await ok(
+  "unlinked, paused and repriced extras cannot silently change a cart",
+  async () => {
+    const key = "b0000000-0000-4000-8000-000000000003";
+    await login(ownerA);
+    await saveExtra(a, extra, []);
+    await root();
+    await rejected(() => place(key, custom), /OPTIONS_CHANGED/);
+    await login(ownerA);
+    await saveExtra(a, extra, [pa], 500, false);
+    await root();
+    await rejected(() => place(key, custom), /OPTIONS_CHANGED/);
+    await login(ownerA);
+    await saveExtra(a, extra, [pa], 700, true);
+    await root();
+    await rejected(() => place(key, custom), /PRICE_CHANGED/);
+    const repeated = await place(optionKey, custom);
+    assert.equal(repeated.total_cents, 6000);
+    const row = (
+      await db.query("select add_ons from order_items where order_id=$1", [
+        repeated.id,
+      ])
+    ).rows[0];
+    assert.equal(row.add_ons[0].price_cents, 500);
+    await rejected(
+      () =>
+        place(optionKey, {
+          ...custom,
+          items: [{ ...custom.items[0], removed_ingredients: [] }],
+        }),
+      /IDEMPOTENCY_CONFLICT/,
+    );
+  },
+);
+await ok(
+  "free options add no charge and removals never discount the base",
+  async () => {
+    await login(ownerA);
+    await saveExtra(a, extra, [pa], 0, true);
+    await root();
+    const result = await place("b0000000-0000-4000-8000-000000000004", {
+      ...custom,
+      items: [{ ...custom.items[0], expected_price: 2500 }],
+    });
+    assert.equal(result.total_cents, 5000);
+  },
+);
 await db.close();
 console.log(
   `${count} database checks passed. Supabase Auth, Storage, Realtime and pgcrypto still require hosted validation.`,

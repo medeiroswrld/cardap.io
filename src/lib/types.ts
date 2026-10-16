@@ -1,3 +1,4 @@
+import type { AddOn } from "./product-options";
 export type Category = {
   id: string;
   name: string;
@@ -9,6 +10,8 @@ export type Product = {
   name: string;
   description: string;
   ingredients: string;
+  removableIngredients?: string[];
+  addOns?: AddOn[];
   allergens: string;
   price: number;
   categoryId: string;
@@ -27,6 +30,8 @@ export type Product = {
   tag?: string;
 };
 export type BagItem = {
+  removedIngredients?: string[];
+  addOns?: AddOn[];
   productId: string;
   quantity: number;
   note: string;

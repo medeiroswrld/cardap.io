@@ -1,4 +1,5 @@
 "use client";
+import { sameBagChoice } from "@/lib/product-options";
 import { useEffect, useRef, useState } from "react";
 import { DemoContext, type Checkout } from "./demo-provider";
 import { catalogState, type Catalog } from "@/lib/connected-types";
@@ -91,7 +92,27 @@ export function ConnectedMenuProvider({
                 b.quantity > 0 &&
                 b.quantity <= 20 &&
                 Number.isInteger(b.price) &&
-                typeof b.note === "string",
+                typeof b.note === "string" &&
+                (b.removedIngredients === undefined ||
+                  (Array.isArray(b.removedIngredients) &&
+                    b.removedIngredients.every(
+                      (v: unknown) => typeof v === "string",
+                    ))) &&
+                (b.addOns === undefined ||
+                  (Array.isArray(b.addOns) &&
+                    b.addOns.every(
+                      (
+                        v: {
+                          id?: unknown;
+                          name?: unknown;
+                          price_cents?: unknown;
+                        } | null,
+                      ) =>
+                        v &&
+                        typeof v.id === "string" &&
+                        typeof v.name === "string" &&
+                        Number.isInteger(v.price_cents),
+                    ))),
             )
           : [];
         current.current = { ...current.current, bag };
@@ -119,9 +140,7 @@ export function ConnectedMenuProvider({
       if (!product?.available)
         throw new Error("Este produto não está disponível.");
       const bag = [...s.bag];
-      const i = bag.findIndex(
-        (b) => b.productId === item.productId && b.note === item.note,
-      );
+      const i = bag.findIndex((b) => sameBagChoice(b, item));
       if (i < 0) bag.push(item);
       else
         bag[i] = {
@@ -157,6 +176,8 @@ export function ConnectedMenuProvider({
         quantity: i.quantity,
         expected_price: i.price,
         note: i.note,
+        removed_ingredients: [...(i.removedIngredients || [])].sort(),
+        option_ids: (i.addOns || []).map((o) => o.id).sort(),
       })),
     };
     const fingerprint = Array.from(

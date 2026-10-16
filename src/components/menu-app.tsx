@@ -1,4 +1,5 @@
 "use client";
+import { OrderChoices } from "./order-choices";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -101,6 +102,10 @@ export function MenuApp() {
     feedRef.current?.scrollTo({ top: 0, behavior: "instant" });
   };
   const quickAdd = (p: Product) => {
+    if (p.removableIngredients?.length || p.addOns?.length) {
+      setSelected(p);
+      return;
+    }
     try {
       add({ productId: p.id, quantity: 1, note: "", price: p.price });
     } catch (e) {
@@ -677,6 +682,10 @@ export function Bag({
                 <div>
                   <strong>{p?.name || "Produto removido"}</strong>
                   <span>{money(item.price)}</span>
+                  <OrderChoices
+                    removed={item.removedIngredients}
+                    additions={item.addOns}
+                  />
                   {item.note && <small>{item.note}</small>}
                   <div className="quantity-control">
                     <button
@@ -738,6 +747,13 @@ function ProductDetail({
   const { add, notify, state } = useDemo();
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [optionIds, setOptionIds] = useState<string[]>([]);
+  const additions = (product.addOns || []).filter((o) =>
+    optionIds.includes(o.id),
+  );
+  const unitPrice =
+    product.price + additions.reduce((sum, o) => sum + o.price_cents, 0);
   return (
     <div className="product-detail">
       <img src={product.image} alt={product.name} />
@@ -746,6 +762,59 @@ function ProductDetail({
         <Info size={16} />
         {product.allergens}
       </div>
+      {!!product.removableIngredients?.length && (
+        <fieldset className="choice-group">
+          <legend>Ingredientes incluídos</legend>
+          <p className="field-help">
+            Desmarque o que deseja retirar. O preço permanece o mesmo.
+          </p>
+          {product.removableIngredients.map((name) => (
+            <label className="choice-row" key={name}>
+              <input
+                type="checkbox"
+                checked={!removed.includes(name)}
+                onChange={(e) =>
+                  setRemoved(
+                    e.target.checked
+                      ? removed.filter((v) => v !== name)
+                      : [...removed, name],
+                  )
+                }
+              />
+              <span>{name}</span>
+              <small>{removed.includes(name) ? "Retirar" : "Incluído"}</small>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {!!product.addOns?.length && (
+        <fieldset className="choice-group">
+          <legend>Adicionais opcionais</legend>
+          <p className="field-help">
+            Marque o que quiser acrescentar. Valores por unidade.
+          </p>
+          {product.addOns.map((o) => (
+            <label className="choice-row" key={o.id}>
+              <input
+                type="checkbox"
+                checked={optionIds.includes(o.id)}
+                disabled={optionIds.length >= 30 && !optionIds.includes(o.id)}
+                onChange={(e) =>
+                  setOptionIds(
+                    e.target.checked
+                      ? [...optionIds, o.id]
+                      : optionIds.filter((id) => id !== o.id),
+                  )
+                }
+              />
+              <span>{o.name}</span>
+              <small>
+                {o.price_cents ? "+ " + money(o.price_cents) : "Grátis"}
+              </small>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <label className="form-label">
         Alguma observação?
         <textarea
@@ -781,7 +850,13 @@ function ProductDetail({
                 productId: product.id,
                 quantity,
                 note,
-                price: product.price,
+                price: unitPrice,
+                removedIngredients: removed,
+                addOns: additions.map(({ id, name, price_cents }) => ({
+                  id,
+                  name,
+                  price_cents,
+                })),
               });
               onClose();
             } catch (e) {
@@ -790,7 +865,7 @@ function ProductDetail({
           }}
         >
           {product.available
-            ? `Adicionar • ${money(product.price * quantity)}`
+            ? `Adicionar • ${money(unitPrice * quantity)}`
             : "Indisponível"}
         </Button>
       </div>
@@ -884,6 +959,11 @@ function Checkout({ table }: { table: number }) {
             <span>
               {i.quantity}×{" "}
               {state.products.find((p) => p.id === i.productId)?.name}
+              <OrderChoices
+                removed={i.removedIngredients}
+                additions={i.addOns}
+              />
+              {i.note && <small>{i.note}</small>}
             </span>
             <strong>{money(i.quantity * i.price)}</strong>
           </div>

@@ -27,6 +27,10 @@ Web responsiva, prioridade para celular no cliente e tablet/computador na gestã
 - Sacola e pedido persistido no painel do estabelecimento.
 - Recebido → em preparo → pronto → entregue; cancelamento com motivo como exceção operacional.
 - Cadastro e publicação de produtos, vídeos/fotos e categorias personalizadas.
+- Ingredientes removíveis definidos por produto, incluídos por padrão; o cliente desmarca o que deseja retirar, sem desconto no preço.
+- Adicionais opcionais escolhidos por checkbox, uma vez por unidade do produto, com preço adicional individual (inclusive gratuito). A aba Opcionais da gestão permite cadastrar, editar, pausar e vincular cada opcional aos produtos em que será oferecido.
+- Sacola mantém separadas as combinações de ingredientes e adicionais. Sacola, finalização e pedido exibem as escolhas; pedidos recebidos preservam os nomes e preços dos adicionais e os ingredientes retirados, mesmo após alterações no cadastro.
+- No fluxo conectado, o servidor valida ingredientes retirados, adicionais ativos e seus vínculos, calcula o preço por unidade e rejeita escolhas ou preços que tenham mudado antes do envio.
 - Tempo assistido por vídeo e mini CRM por estabelecimento.
 - Pagamento no local; pagamento online depois.
 - Vermelho fechado, fundo claro e destaque para comida; personalização de cores depois.
@@ -35,7 +39,7 @@ Web responsiva, prioridade para celular no cliente e tablet/computador na gestã
 Um cardápio que facilita escolher e pedir, com vídeos que o restaurante consegue manter atualizados. Vídeo, NFC e métricas já existem no mercado; não apresentar esses recursos como exclusividade. O piloto deve testar facilidade de publicação, uso pela equipe e qualidade do pedido.
 
 ## Limites do MVP
-Sem delivery, integração com PDV, cobrança automática da assinatura, campanhas automáticas de WhatsApp, previsão de preparo por IA, aplicativo nativo, painel de agência ou editor de vídeo. Complementos pagos complexos e combos ficam para uma segunda etapa; primeiro piloto pode usar produtos completos e observações sem cobrança adicional.
+Sem delivery, integração com PDV, cobrança automática da assinatura, campanhas automáticas de WhatsApp, previsão de preparo por IA, aplicativo nativo, painel de agência ou editor de vídeo. Adicionais simples com preço por unidade e retirada de ingredientes sem desconto fazem parte do MVP; regras complexas de complementos e combos ficam para uma segunda etapa. Observações livres continuam disponíveis sem cobrança adicional.
 
 ## Princípios
 Preço e ação de pedir sempre legíveis. Dados de restaurantes separados. Métricas observadas, sem alegar causalidade sobre vendas. Pedido só aparece como enviado após persistência confirmada. Marketing é opcional e separado da identificação para atendimento.

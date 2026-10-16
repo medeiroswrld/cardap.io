@@ -52,7 +52,7 @@ As migrations 001 a 004 foram aplicadas no projeto fornecido. Verificação no p
 4. Configure a URL do site e os redirecionamentos de Auth para `/auth/confirm`. Ative confirmação de e-mail e configure SMTP para entrega confiável. Nenhum login/senha é fornecido ou embutido.
 5. As entidades têm `restaurant_id`, chaves compostas e RLS. Dono gerencia catálogo; operação pode consultar pedidos e usar a função de transição. Contatos e métricas são restritos ao dono.
 6. `onboard_restaurant` cria restaurante fechado e categorias para o usuário autenticado. Preencha horários estruturados, mesas e produtos. Horários são intervalos dentro do mesmo dia; para atravessar meia-noite, cadastre dois intervalos em dias adjacentes.
-7. A suíte `npm run test:database` executa 24 verificações transacionais e de RLS em PostgreSQL embarcado. Ela representa Auth/Storage localmente e não substitui a validação hospedada. `supabase/tests/isolation.sql` é opcional para homologação descartável com pgTAP. Execute também ACEITE-E-PILOTO.md antes de um piloto.
+7. A suíte `npm run test:database` executa 37 verificações transacionais e de RLS em PostgreSQL embarcado. Ela representa Auth/Storage localmente e não substitui a validação hospedada. `supabase/tests/isolation.sql` é opcional para homologação descartável com pgTAP. Execute também ACEITE-E-PILOTO.md antes de um piloto.
 
 ### Contratos de pedido
 
@@ -126,3 +126,12 @@ Fontes de implementação: [Next.js](https://nextjs.org/docs/app/getting-started
 ### Testes da área autenticada
 
 Os testes da interface de gestão da demonstração exigem `PLAYWRIGHT_ADMIN_STORAGE_STATE`, apontando para um storage state de uma conta de teste autenticada no mesmo ambiente. Guarde o arquivo em `playwright/.auth/` (ignorado pelo Git). Sem essa sessão, somente esses cenários são ignorados; os testes públicos e de bloqueio de acesso seguem ativos. Não há senha fixa nem bypass de autenticação para testes. O fluxo conectado completo continua opt-in via `RUN_CONNECTED_LIVE=1`.
+
+## Ingredientes e opcionais
+
+- Em **Produtos → Editar produto**, informe os ingredientes que podem ser retirados, um por linha. Eles aparecem marcados no detalhe do prato; desmarcar não reduz o preço. A descrição completa de ingredientes e os alérgenos continuam separados.
+- Em **Opcionais**, cadastre nome, preço por unidade (zero para grátis), disponibilidade e os produtos vinculados. A lista mostra onde cada opcional é usado; pausar o opcional retira-o das novas escolhas.
+- O cliente escolhe adicionais antes de adicionar à sacola. O custo de cada adicional é multiplicado pela quantidade do produto. Versões diferentes do mesmo prato ficam em linhas separadas.
+- Sacola, revisão, acompanhamento e cozinha exibem retiradas e adicionais. O servidor valida os vínculos e preços e salva as escolhas no pedido; alterações futuras não modificam pedidos anteriores.
+- A migration 007_product_options.sql foi aplicada no projeto fornecido em 15/10/2026. Em outro projeto, execute as migrations em ordem antes de publicar esta versão.
+- Teste hospedado específico: RUN_CONNECTED_LIVE=1 com npm test -- tests/options-live.spec.ts. Cria duas contas temporárias, verifica cadastro, sacola persistida, pedidos e isolamento, e limpa apenas seus dados ao terminar.

@@ -33,11 +33,14 @@ import { Modal } from "./ui/dialog";
 import { MediaPicker } from "./media-picker";
 import { VideoUploader, uploadProductVideo } from "./video-uploader";
 import { VideoMetrics } from "./video-metrics";
+import { ProductOptionsAdmin } from "./product-options-admin";
+import { OrderChoices } from "./order-choices";
 type Save = (body: unknown) => Promise<void>;
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
   ["pedidos", "Pedidos", ShoppingBag],
   ["produtos", "Produtos", Utensils],
+  ["opcionais", "Opcionais", Plus],
   ["categorias", "Categorias", FolderOpen],
   ["metricas", "Métricas", BarChart3],
   ["contatos", "Contatos", Users],
@@ -289,6 +292,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
               {owner && page === "produtos" && (
                 <Products data={data} save={save} busy={busy} />
               )}
+              {owner && page === "opcionais" && (
+                <ProductOptionsAdmin data={data} save={save} busy={busy} />
+              )}
               {owner && page === "categorias" && (
                 <Categories data={data} save={save} busy={busy} />
               )}
@@ -378,6 +384,10 @@ function Orders({
                       {order.order_items.map((item) => (
                         <li key={item.id}>
                           {item.quantity}× {item.product_name}
+                          <OrderChoices
+                            removed={item.removed_ingredients}
+                            additions={item.add_ons}
+                          />
                           {item.note && <small>{item.note}</small>}
                         </li>
                       ))}
@@ -531,6 +541,7 @@ function Products({
       name: "",
       description: "",
       ingredients: "",
+      removable_ingredients: [],
       allergens: "",
       price_cents: 0,
       photo_url: null,
@@ -652,6 +663,13 @@ function Products({
                     name: edit.name,
                     description: edit.description,
                     ingredients: edit.ingredients,
+                    removable_ingredients: [
+                      ...new Set(
+                        (edit.removable_ingredients || [])
+                          .map((v) => v.trim())
+                          .filter(Boolean),
+                      ),
+                    ],
                     allergens: edit.allergens,
                     price_cents: edit.price_cents,
                     photo_url: photo,
@@ -740,6 +758,25 @@ function Products({
                 </label>
               ),
             )}
+            <label className="form-label">
+              Ingredientes que o cliente pode retirar
+              <textarea
+                maxLength={2430}
+                value={(edit.removable_ingredients || []).join("\n")}
+                onChange={(e) =>
+                  setEdit({
+                    ...edit,
+                    removable_ingredients: e.target.value.split("\n"),
+                  })
+                }
+                placeholder={"Cebola\nTomate\nMolho"}
+              />
+              <span className="field-help">
+                Um por linha, até 30 ingredientes (80 caracteres cada). Todos
+                vêm marcados; retirar não reduz o preço. Cadastre adicionais
+                pagos na aba Opcionais.
+              </span>
+            </label>
             <MediaPicker
               photo={edit.photo_url}
               video={

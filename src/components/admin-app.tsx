@@ -1,4 +1,5 @@
 "use client";
+import { OrderChoices } from "./order-choices";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -730,6 +731,10 @@ function Orders() {
                           <span>{item.quantity}×</span>
                           <p>
                             {item.name}
+                            <OrderChoices
+                              removed={item.removedIngredients}
+                              additions={item.addOns}
+                            />
                             {item.note && <small>{item.note}</small>}
                           </p>
                         </div>
@@ -801,6 +806,10 @@ function Orders() {
                   <strong>
                     {item.quantity}× {item.name}
                   </strong>
+                  <OrderChoices
+                    removed={item.removedIngredients}
+                    additions={item.addOns}
+                  />
                   {item.note && <p>{item.note}</p>}
                 </div>
                 <span>{money(item.price * item.quantity)}</span>

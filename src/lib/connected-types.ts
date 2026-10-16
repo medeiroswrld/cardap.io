@@ -20,6 +20,14 @@ export type CategoryRow = {
   position: number;
   visible: boolean;
 };
+export type OptionRow = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  price_cents: number;
+  active: boolean;
+};
+export type OptionLink = { product_id: string; option_id: string };
 export type ProductRow = {
   id: string;
   restaurant_id: string;
@@ -27,6 +35,7 @@ export type ProductRow = {
   name: string;
   description: string;
   ingredients: string;
+  removable_ingredients: string[];
   allergens: string;
   price_cents: number;
   photo_url: string | null;
@@ -64,6 +73,8 @@ export type RealOrder = {
     quantity: number;
     unit_price_cents: number;
     note: string;
+    removed_ingredients: string[];
+    add_ons: import("./product-options").AddOn[];
   }[];
   order_status_events: { status: string; created_at: string }[];
 };
@@ -79,6 +90,8 @@ export type RealContact = {
 export type Workspace = {
   restaurant: RestaurantRow;
   role: "owner" | "operations";
+  options: OptionRow[];
+  optionLinks: OptionLink[];
   categories: CategoryRow[];
   products: ProductRow[];
   media: MediaRow[];
@@ -104,6 +117,8 @@ export type Workspace = {
 };
 export type Catalog = {
   restaurant: RestaurantRow;
+  options: OptionRow[];
+  optionLinks: OptionLink[];
   categories: CategoryRow[];
   products: ProductRow[];
   media: MediaRow[];
@@ -124,6 +139,14 @@ export function catalogState(catalog: Catalog): {
         name: p.name,
         description: p.description,
         ingredients: p.ingredients,
+        removableIngredients: p.removable_ingredients || [],
+        addOns: (catalog.options || []).filter(
+          (o) =>
+            o.active &&
+            catalog.optionLinks?.some(
+              (l) => l.product_id === p.id && l.option_id === o.id,
+            ),
+        ),
         allergens: p.allergens,
         price: p.price_cents,
         categoryId: p.category_id,

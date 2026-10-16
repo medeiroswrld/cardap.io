@@ -1,4 +1,5 @@
 "use client";
+import { OrderChoices } from "./order-choices";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -160,6 +161,10 @@ export function TrackingPage({ id }: { id?: string }) {
                     <strong>
                       {i.quantity}× {i.name}
                     </strong>
+                    <OrderChoices
+                      removed={i.removedIngredients}
+                      additions={i.addOns}
+                    />
                     {i.note && <p>{i.note}</p>}
                   </div>
                   <strong>{money(i.price * i.quantity)}</strong>

@@ -9,43 +9,67 @@ export async function GET(
   try {
     const id = z.uuid().parse((await params).id);
     const { supabase, role } = await requireMember(id);
-    const [restaurant, categories, products, media, tables, orders] =
-      await Promise.all([
-        supabase.from("restaurants").select("*").eq("id", id).single(),
-        supabase
-          .from("categories")
-          .select("*")
-          .eq("restaurant_id", id)
-          .order("position"),
-        supabase
-          .from("products")
-          .select("*")
-          .eq("restaurant_id", id)
-          .eq("archived", false)
-          .order("position"),
-        supabase
-          .from("product_media")
-          .select("*")
-          .eq("restaurant_id", id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("dining_tables")
-          .select("*")
-          .eq("restaurant_id", id)
-          .order("number"),
-        supabase
-          .from("orders")
-          .select(
-            "*,dining_tables(number),order_items(*),order_status_events(status,created_at)",
-          )
-          .eq("restaurant_id", id)
-          .order("created_at", { ascending: false })
-          .limit(200),
-      ]);
+    const [
+      restaurant,
+      categories,
+      products,
+      media,
+      tables,
+      orders,
+      options,
+      optionLinks,
+    ] = await Promise.all([
+      supabase.from("restaurants").select("*").eq("id", id).single(),
+      supabase
+        .from("categories")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("position"),
+      supabase
+        .from("products")
+        .select("*")
+        .eq("restaurant_id", id)
+        .eq("archived", false)
+        .order("position"),
+      supabase
+        .from("product_media")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("dining_tables")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("number"),
+      supabase
+        .from("orders")
+        .select(
+          "*,dining_tables(number),order_items(*),order_status_events(status,created_at)",
+        )
+        .eq("restaurant_id", id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("product_options")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("name"),
+      supabase
+        .from("product_option_links")
+        .select("product_id,option_id")
+        .eq("restaurant_id", id),
+    ]);
     if (
-      [restaurant, categories, products, media, tables, orders].some(
-        (r) => r.error,
-      )
+      [
+        restaurant,
+        categories,
+        products,
+        media,
+        tables,
+        orders,
+        options,
+        optionLinks,
+      ].some((r) => r.error)
     )
       throw new Error("DATABASE_ERROR");
     if (role === "owner") {
@@ -103,6 +127,8 @@ export async function GET(
         restaurant: restaurant.data,
         role,
         categories: categories.data,
+        options: options.data,
+        optionLinks: optionLinks.data,
         products: products.data,
         media: media.data,
         tables: tables.data,

@@ -1,4 +1,5 @@
 "use client";
+import { sameBagChoice, choicePrice } from "@/lib/product-options";
 import {
   createContext,
   useCallback,
@@ -126,9 +127,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       )
         throw new Error("Este produto não está disponível.");
       const bag = [...s.bag];
-      const i = bag.findIndex(
-        (b) => b.productId === item.productId && b.note === item.note,
-      );
+      const i = bag.findIndex((b) => sameBagChoice(b, item));
       if (i >= 0)
         bag[i] = {
           ...bag[i],
@@ -195,13 +194,13 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
           throw new Error(
             "Um item ficou indisponível. Remova-o da sacola para continuar.",
           );
-        if (p.price !== b.price)
+        if (choicePrice(p, b) !== b.price)
           throw new Error(
             "Um preço mudou. Remova e adicione o item novamente para confirmar o novo valor.",
           );
         if (!Number.isInteger(b.quantity) || b.quantity < 1 || b.quantity > 20)
           throw new Error("Quantidade inválida.");
-        return { ...b, name: p.name, price: p.price };
+        return { ...b, name: p.name, price: choicePrice(p, b) };
       });
       const at = new Date().toISOString();
       result = {

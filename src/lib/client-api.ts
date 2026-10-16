@@ -15,7 +15,19 @@ export async function requestJson<T>(
   }));
   if (!response.ok)
     throw new Error(
-      data.error || "Não foi possível concluir. Tente novamente.",
+      (
+        {
+          PRICE_CHANGED:
+            "Um preço mudou. Remova o item da sacola e adicione novamente para conferir o valor atual.",
+          OPTIONS_CHANGED:
+            "Um ingrediente ou adicional mudou. Remova o item da sacola e escolha novamente.",
+          UNAVAILABLE:
+            "Um produto não está mais disponível. Revise sua sacola.",
+          CLOSED: "O restaurante não está recebendo pedidos agora.",
+        } as Record<string, string>
+      )[data.error] ||
+        data.error ||
+        "Não foi possível concluir. Tente novamente.",
     );
   return data as T;
 }

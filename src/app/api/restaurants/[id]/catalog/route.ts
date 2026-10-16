@@ -7,6 +7,11 @@ const product = z.object({
   name: z.string().trim().min(2).max(100),
   description: z.string().max(300),
   ingredients: z.string().max(1500),
+  removable_ingredients: z
+    .array(z.string().trim().min(1).max(80))
+    .max(30)
+    .refine((v) => new Set(v).size === v.length)
+    .optional(),
   allergens: z.string().max(400),
   price_cents: z.number().int().positive().max(1000000),
   photo_url: z.url().nullable(),
@@ -15,6 +20,17 @@ const product = z.object({
   position: z.number().int().min(0).max(10000),
 });
 const schema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("save_option"),
+    id: z.uuid(),
+    name: z.string().trim().min(2).max(80),
+    price_cents: z.number().int().min(0).max(100000),
+    active: z.boolean(),
+    product_ids: z
+      .array(z.uuid())
+      .max(500)
+      .refine((v) => new Set(v).size === v.length),
+  }),
   z.object({ action: z.literal("save_product"), product }),
   z.object({ action: z.literal("archive_product"), id: z.uuid() }),
   z.object({
@@ -60,7 +76,17 @@ export async function POST(
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
     const body = schema.parse(await request.json());
-    if (body.action === "save_product") {
+    if (body.action === "save_option") {
+      const { error } = await supabase.rpc("save_product_option", {
+        p_restaurant: id,
+        p_id: body.id,
+        p_name: body.name,
+        p_price: body.price_cents,
+        p_active: body.active,
+        p_products: body.product_ids,
+      });
+      if (error) throw error;
+    } else if (body.action === "save_product") {
       const { data: existing } = await supabase
         .from("products")
         .select("id")

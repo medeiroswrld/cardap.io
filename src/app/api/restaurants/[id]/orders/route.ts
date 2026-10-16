@@ -15,6 +15,16 @@ const schema = z.object({
         quantity: z.number().int().min(1).max(20),
         expected_price: z.number().int().positive(),
         note: z.string().max(300),
+        removed_ingredients: z
+          .array(z.string().min(1).max(80))
+          .max(30)
+          .refine((v) => new Set(v).size === v.length)
+          .optional(),
+        option_ids: z
+          .array(z.uuid())
+          .max(30)
+          .refine((v) => new Set(v).size === v.length)
+          .optional(),
       }),
     )
     .min(1)
@@ -39,13 +49,15 @@ export async function POST(
     if (error) {
       const code = error.message.includes("PRICE_CHANGED")
         ? "PRICE_CHANGED"
-        : error.message.includes("IDEMPOTENCY_CONFLICT")
-          ? "IDEMPOTENCY_CONFLICT"
-          : error.message.includes("UNAVAILABLE")
-            ? "UNAVAILABLE"
-            : error.message.includes("CLOSED")
-              ? "CLOSED"
-              : "ORDER_REJECTED";
+        : error.message.includes("OPTIONS_CHANGED")
+          ? "OPTIONS_CHANGED"
+          : error.message.includes("IDEMPOTENCY_CONFLICT")
+            ? "IDEMPOTENCY_CONFLICT"
+            : error.message.includes("UNAVAILABLE")
+              ? "UNAVAILABLE"
+              : error.message.includes("CLOSED")
+                ? "CLOSED"
+                : "ORDER_REJECTED";
       return Response.json(
         { error: code },
         {
