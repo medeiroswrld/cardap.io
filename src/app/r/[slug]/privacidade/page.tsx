@@ -32,6 +32,15 @@ export default async function Page({
         banco de dados do restaurante. A equipe autorizada tem acesso conforme
         sua função.
       </p>
+      <h2>Curtidas e comentários</h2>
+      <p>
+        Avaliações são opcionais e ficam vinculadas a um pedido entregue. Os
+        comentários aparecem publicamente no cardápio sem seu nome ou telefone.
+        Você pode editar ou remover sua avaliação neste navegador enquanto a
+        sessão estiver válida. Depois disso, solicite a alteração à equipe pelo
+        contato abaixo. O convite para avaliar no Google abre um serviço
+        externo; nenhum comentário do cardápio é publicado lá automaticamente.
+      </p>
       <h2>Fale com o restaurante</h2>
       <p>
         Para solicitar acesso, correção, exclusão dos seus dados ou revogação de

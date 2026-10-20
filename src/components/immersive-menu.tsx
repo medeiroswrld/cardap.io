@@ -4,6 +4,8 @@ import {
   ArrowDown,
   ArrowUp,
   Flame,
+  Heart,
+  MessageCircle,
   Info,
   List,
   Search,
@@ -34,6 +36,7 @@ export function ImmersiveMenu({
   onBag,
   onInfo,
   onList,
+  onFeedback,
 }: {
   items: Product[];
   categories: Category[];
@@ -52,6 +55,7 @@ export function ImmersiveMenu({
   onBag: () => void;
   onInfo: () => void;
   onList: () => void;
+  onFeedback: (product: Product) => void;
 }) {
   const feed = useRef<HTMLDivElement>(null);
   const gesture = useRef<{ x: number; y: number } | null>(null);
@@ -196,6 +200,24 @@ export function ImmersiveMenu({
                   )}
                 </div>
                 <div className="immersive-actions">
+                  {product.restaurantId && (
+                    <>
+                      <button
+                        onClick={() => onFeedback(product)}
+                        aria-label={`Curtir ${product.name}`}
+                      >
+                        <Heart size={25} />
+                        <span>Curtir</span>
+                      </button>
+                      <button
+                        onClick={() => onFeedback(product)}
+                        aria-label={`Comentários de ${product.name}`}
+                      >
+                        <MessageCircle size={25} />
+                        <span>Comentar</span>
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => onProduct(product)}
                     aria-label={`Ingredientes de ${product.name}`}
@@ -213,10 +235,12 @@ export function ImmersiveMenu({
                     </span>
                     <span>Sacola</span>
                   </button>
-                  <button onClick={onInfo} aria-label="Sobre a casa">
-                    <Info size={26} />
-                    <span>A casa</span>
-                  </button>
+                  {!product.restaurantId && (
+                    <button onClick={onInfo} aria-label="Sobre a casa">
+                      <Info size={26} />
+                      <span>A casa</span>
+                    </button>
+                  )}
                 </div>
               </article>
             ))

@@ -23,6 +23,7 @@ for (const file of [
   "005_video_storage.sql",
   "006_photo_observations.sql",
   "007_product_options.sql",
+  "008_product_feedback.sql",
 ]) {
   const sql = readFileSync(
     new URL("../supabase/migrations/" + file, import.meta.url),
@@ -674,6 +675,156 @@ await ok(
       items: [{ ...custom.items[0], expected_price: 2500 }],
     });
     assert.equal(result.total_cents, 5000);
+  },
+);
+const feedback = (tenant = a, token = "a".repeat(64), product = pa) =>
+  db
+    .query("select read_guest_feedback($1,$2,$3) as result", [
+      tenant,
+      product,
+      token,
+    ])
+    .then((r) => r.rows[0].result);
+const saveFeedback = (
+  tenant = a,
+  token = "a".repeat(64),
+  product = pa,
+  liked = true,
+  comment = "Muito bom!",
+) =>
+  db.query("select save_guest_feedback($1,$2,$3,$4,$5,$6)", [
+    tenant,
+    token,
+    order.id,
+    product,
+    liked,
+    comment,
+  ]);
+await ok("feedback requires a delivered order owned by the guest", async () => {
+  await root();
+  await db.query(
+    "update guest_sessions set expires_at=now()+interval '1 hour' where id=$1",
+    [ga],
+  );
+  for (const status of ["recebido", "em_preparo", "pronto", "cancelado"]) {
+    await db.query("update orders set status=$1 where id=$2", [
+      status,
+      order.id,
+    ]);
+    await rejected(() => saveFeedback(), /DELIVERED_PURCHASE_REQUIRED/);
+  }
+  await db.query("update orders set status='entregue' where id=$1", [order.id]);
+  await rejected(() => saveFeedback(a, "z".repeat(64)), /SESSION_EXPIRED/);
+  await rejected(() => saveFeedback(b), /SESSION_EXPIRED/);
+  await rejected(
+    () => saveFeedback(a, "a".repeat(64), pb),
+    /DELIVERED_PURCHASE_REQUIRED/,
+  );
+  await db.query(
+    "insert into guest_sessions(restaurant_id,token_hash,expires_at) values($1,$2,now()+interval '1 hour')",
+    [a, "f".repeat(64)],
+  );
+  await rejected(
+    () => saveFeedback(a, "f".repeat(64)),
+    /DELIVERED_PURCHASE_REQUIRED/,
+  );
+});
+await ok(
+  "feedback retries and edits never inflate likes; public output omits identity",
+  async () => {
+    await db.query(
+      "update products set published=true, archived=false where id=$1",
+      [pa],
+    );
+    await saveFeedback();
+    await saveFeedback();
+    let data = await feedback();
+    assert.equal(data.likes, 1);
+    assert.equal(data.commentCount, 1);
+    assert.ok(data.eligibleOrderId);
+    assert.equal(data.mine.comment, "Muito bom!");
+    data = await feedback(a, null);
+    assert.equal(data.eligibleOrderId, null);
+    assert.equal(data.mine, null);
+    assert.deepEqual(Object.keys(data.comments[0]).sort(), [
+      "comment",
+      "id",
+      "liked",
+      "updated_at",
+    ]);
+    assert.ok(!JSON.stringify(data).includes("1199999"));
+    await saveFeedback(a, "a".repeat(64), pa, false, "Poderia melhorar.");
+    data = await feedback();
+    assert.equal(data.likes, 0);
+    assert.equal(data.commentCount, 1);
+    await saveFeedback(a, "a".repeat(64), pa, false, "");
+    data = await feedback();
+    assert.equal(data.commentCount, 0);
+  },
+);
+await ok(
+  "feedback is isolated by RLS and cannot be forged directly",
+  async () => {
+    await login(ownerB);
+    assert.equal(
+      (
+        await db.query(
+          "select * from product_feedback where restaurant_id=$1",
+          [a],
+        )
+      ).rows.length,
+      0,
+    );
+    await rejected(() => saveFeedback(), /permission denied/);
+    await login(ownerA);
+    assert.equal(
+      (
+        await db.query(
+          "select * from product_feedback where restaurant_id=$1",
+          [a],
+        )
+      ).rows.length,
+      1,
+    );
+    await rejected(
+      () => db.query("update product_feedback set liked=true"),
+      /permission denied/,
+    );
+    await db.exec("set role anon");
+    await rejected(
+      () => db.query("select * from product_feedback"),
+      /permission denied/,
+    );
+    await rejected(() => feedback(), /permission denied/);
+    await root();
+  },
+);
+await ok(
+  "expired sessions cannot review; Google invite does not depend on positive feedback",
+  async () => {
+    await rejected(
+      () =>
+        db.query(
+          "update restaurants set google_review_url='https://evil.test' where id=$1",
+          [a],
+        ),
+      /check constraint/,
+    );
+    await db.query(
+      "update restaurants set google_review_url='https://g.page/r/test/review' where id=$1",
+      [a],
+    );
+    assert.equal(
+      (await feedback()).googleReviewUrl,
+      "https://g.page/r/test/review",
+    );
+    await db.query(
+      "update guest_sessions set expires_at=now()-interval '1 minute' where id=$1",
+      [ga],
+    );
+    await rejected(() => saveFeedback(), /SESSION_EXPIRED/);
+    assert.equal((await feedback()).eligibleOrderId, null);
+    assert.equal((await feedback()).googleReviewUrl, "");
   },
 );
 await db.close();

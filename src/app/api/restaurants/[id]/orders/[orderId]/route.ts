@@ -33,7 +33,18 @@ export async function GET(_request: Request, { params }: Context) {
         { error: "Pedido não encontrado." },
         { status: 404, headers: noStore },
       );
-    return Response.json(data, { headers: noStore });
+    const { data: restaurant } =
+      data.status === "entregue"
+        ? await client
+            .from("restaurants")
+            .select("google_review_url")
+            .eq("id", id)
+            .single()
+        : { data: null };
+    return Response.json(
+      { ...data, google_review_url: restaurant?.google_review_url || "" },
+      { headers: noStore },
+    );
   } catch (error) {
     return apiError(error);
   }

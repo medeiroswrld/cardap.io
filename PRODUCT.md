@@ -35,6 +35,17 @@ Web responsiva, prioridade para celular no cliente e tablet/computador na gestã
 - Pagamento no local; pagamento online depois.
 - Vermelho fechado, fundo claro e destaque para comida; personalização de cores depois.
 
+## Curtidas, comentários e convite para o Google
+No cardápio conectado, qualquer visitante pode consultar as curtidas e os comentários públicos de um prato publicado. Os controles Curtir e Comentar abrem o painel de avaliações; salvar uma avaliação exige que a equipe tenha marcado como entregue um pedido da mesma sessão que contenha aquele prato. O acompanhamento do pedido entregue também oferece acesso às avaliações dos itens comprados. A regra vale para pratos com foto ou vídeo e é validada no servidor.
+
+O acesso usa o cookie de visitante do mesmo navegador, válido por até 12 horas desde a criação da sessão. Há uma curtida e um comentário por sessão e produto, mesmo que o cliente faça mais de um pedido. O comentário é opcional e aceita até 1.000 caracteres. O cliente pode editar ou remover a avaliação enquanto a sessão estiver válida; outro navegador ou uma sessão expirada não recupera esse acesso pelo telefone. Após esse prazo, a página de privacidade orienta procurar o restaurante. Remover limpa a curtida e o comentário públicos; o registro técnico permanece no banco.
+
+Comentários aparecem sem nome ou telefone do cliente, com identificação genérica de pedido entregue. O formulário orienta não escrever dados pessoais no texto. O painel público apresenta os totais e até 20 comentários mais recentes. Na gestão, somente o dono acessa a aba Avaliações, com até 200 avaliações mais recentes; os contadores dessa aba correspondem à amostra exibida e não incluem o Google.
+
+Cada restaurante pode configurar, em Configurações, um link opcional de avaliação do Perfil da Empresa no Google. O usuário ainda não forneceu esse link e pretende cadastrá-lo depois; vazio, ele mantém o convite oculto. Quando configurado, o convite aparece após a entrega, independentemente de curtida, comentário ou opinião positiva/negativa. O link abre outra aba, onde o cliente escreve e publica manualmente com sua conta Google. Não há publicação automática, cópia de comentários, sincronização ou importação de avaliações do Google.
+
+Evidência desta extensão (19/10/2026): 41 testes SQL aprovados; build com Webpack e lint aprovados; percurso Playwright na aplicação compilada local, conectado ao Supabase hospedado, aprovado com dados isolados removidos após o teste. A revisão independente das oito capturas retornou `ship` no escopo desta funcionalidade, sem correções materiais. O launcher/detector apresentou `cache_directory_failed`; a revisão visual e a documentação foram feitas a partir dos arquivos e capturas. Esses resultados não constituem aprovação geral de produção.
+
 ## Posicionamento a testar
 Um cardápio que facilita escolher e pedir, com vídeos que o restaurante consegue manter atualizados. Vídeo, NFC e métricas já existem no mercado; não apresentar esses recursos como exclusividade. O piloto deve testar facilidade de publicação, uso pela equipe e qualidade do pedido.
 

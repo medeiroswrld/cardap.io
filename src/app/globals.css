@@ -4711,7 +4711,7 @@ tr:last-child > td {
   bottom: calc(88px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 19px;
+  gap: 14px;
 }
 .immersive-actions > button {
   color: #fff;
@@ -4909,4 +4909,132 @@ body:has(.immersive-shell) .toast {
 .choice-group .field-help {
   font-size: 13px;
   line-height: 1.6;
+}
+
+/* Purchase feedback keeps the same quiet surfaces as product details. */
+.product-feedback {
+  display: grid;
+  gap: 24px;
+}
+.feedback-totals,
+.feedback-form-actions,
+.feedback-product-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.feedback-totals {
+  color: var(--muted);
+  font-size: 14px;
+}
+.feedback-totals span,
+.feedback-comment small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.feedback-form {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.feedback-form h3,
+.feedback-comments h3,
+.google-review-invite h3,
+.delivered-feedback h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.feedback-form > button {
+  justify-self: start;
+}
+.feedback-form textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.feedback-form .field-help {
+  margin: 0;
+  font-size: 13px;
+}
+.feedback-saved {
+  color: var(--green);
+  font-size: 14px;
+  margin: 0;
+}
+.feedback-locked {
+  background: var(--soft);
+  border-radius: 9px;
+  padding: 16px;
+  margin: 0;
+  font-size: 14px;
+}
+.google-review-invite {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.google-review-invite p,
+.google-review-invite small,
+.feedback-comments > p,
+.delivered-feedback > p {
+  margin: 0;
+  color: var(--muted);
+}
+.google-review-invite p {
+  font-size: 14px;
+}
+.google-review-invite small {
+  font-size: 12px;
+}
+.feedback-comments > p {
+  margin-top: 10px;
+}
+.feedback-comment {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.feedback-comment > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.feedback-comment strong {
+  font-size: 14px;
+}
+.feedback-comment time {
+  font-size: 12px;
+  color: var(--muted);
+}
+.feedback-comment p {
+  white-space: pre-wrap;
+  margin: 10px 0;
+  font-size: 14px;
+}
+.feedback-comment small {
+  font-size: 12px;
+  color: var(--brand);
+}
+.delivered-feedback {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.feedback-product-buttons .button {
+  white-space: normal;
+  text-align: left;
+}
+@media (max-height: 550px) {
+  .immersive-actions {
+    gap: 4px;
+  }
+  .immersive-actions > button {
+    min-height: 44px;
+  }
 }

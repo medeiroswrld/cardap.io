@@ -7,6 +7,7 @@ import type { RealOrder } from "@/lib/connected-types";
 import { statusNames, statusFlow } from "@/lib/types";
 import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
+import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
 export function ConnectedTracking({
   restaurantId,
   slug,
@@ -19,6 +20,10 @@ export function ConnectedTracking({
   const [orders, setOrders] = useState<RealOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [feedbackProduct, setFeedbackProduct] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const refresh = useCallback(async () => {
     try {
       const ids: string[] = id
@@ -134,8 +139,40 @@ export function ConnectedTracking({
               <strong>{money(order.total_cents)}</strong>
             </div>
           </div>
+          {order.status === "entregue" && (
+            <section className="delivered-feedback">
+              <h3>Seu pedido chegou. Conta pra gente?</h3>
+              <p>Curta e comente os pratos que você provou.</p>
+              <div className="feedback-product-buttons">
+                {Array.from(
+                  new Map(
+                    order.order_items.map((item) => [item.product_id, item]),
+                  ).values(),
+                ).map((item) => (
+                  <button
+                    key={item.product_id}
+                    className="button button-outline"
+                    onClick={() =>
+                      setFeedbackProduct({
+                        id: item.product_id,
+                        name: item.product_name,
+                      })
+                    }
+                  >
+                    Avaliar {item.product_name}
+                  </button>
+                ))}
+              </div>
+              <GoogleReviewInvite url={order.google_review_url} />
+            </section>
+          )}
         </article>
       ))}
+      <ProductFeedbackModal
+        restaurantId={restaurantId}
+        product={feedbackProduct}
+        onClose={() => setFeedbackProduct(null)}
+      />
     </main>
   );
 }

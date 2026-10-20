@@ -7,6 +7,7 @@ export type Category = {
 };
 export type Product = {
   id: string;
+  restaurantId?: string;
   name: string;
   description: string;
   ingredients: string;

@@ -16,6 +16,7 @@ import {
   QrCode,
   LogOut,
   LayoutDashboard,
+  MessageCircle,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { browserClient } from "@/lib/supabase/browser";
@@ -35,6 +36,8 @@ import { VideoUploader, uploadProductVideo } from "./video-uploader";
 import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderChoices } from "./order-choices";
+import { isGoogleReviewUrl } from "@/lib/feedback";
+import { FeedbackAdmin } from "./feedback-admin";
 type Save = (body: unknown) => Promise<void>;
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
@@ -43,6 +46,7 @@ const pages = [
   ["opcionais", "Opcionais", Plus],
   ["categorias", "Categorias", FolderOpen],
   ["metricas", "Métricas", BarChart3],
+  ["avaliacoes", "Avaliações", MessageCircle],
   ["contatos", "Contatos", Users],
   ["configuracoes", "Configurações", Settings],
   ["qr", "QR das mesas", QrCode],
@@ -305,6 +309,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <Contacts data={data} save={save} busy={busy} />
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
+              {owner && page === "avaliacoes" && (
+                <FeedbackAdmin feedback={data.feedback || []} />
+              )}
               {owner && page === "qr" && <TableQR data={data} />}
             </>
           )}
@@ -1048,6 +1055,15 @@ function SettingsForm({
       onSubmit={async (e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);
+        const googleReviewUrl = String(
+          form.get("google_review_url") || "",
+        ).trim();
+        if (!isGoogleReviewUrl(googleReviewUrl)) {
+          setError(
+            "Cole o link de avaliação do Perfil da Empresa no Google, ou deixe o campo vazio.",
+          );
+          return;
+        }
         const opening_hours = Array.from({ length: 7 }, (_, day) => day)
           .filter((day) => form.has(`day-${day}`))
           .map((day) => ({
@@ -1069,6 +1085,7 @@ function SettingsForm({
             phone: form.get("phone"),
             address: form.get("address"),
             privacy_email: form.get("privacy_email"),
+            google_review_url: googleReviewUrl,
             retention_days: Number(form.get("retention_days")),
             tables: Number(form.get("tables")),
             accepting_orders: form.has("accepting_orders"),
@@ -1111,6 +1128,22 @@ function SettingsForm({
           </label>
         ),
       )}
+      <label className="form-label">
+        Link de avaliação no Google
+        <input
+          name="google_review_url"
+          type="url"
+          maxLength={500}
+          defaultValue={r.google_review_url || ""}
+          placeholder="https://g.page/r/…/review"
+          aria-describedby="google-review-help"
+        />
+        <small id="google-review-help">
+          Opcional. No Perfil da Empresa no Google, abra Ler avaliações →
+          Receber mais avaliações e copie o link. O convite aparece para todos
+          os clientes após a entrega.
+        </small>
+      </label>
       <div className="form-columns">
         <label className="form-label">
           Número de mesas

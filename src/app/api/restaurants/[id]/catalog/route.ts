@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isGoogleReviewUrl } from "@/lib/feedback";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
@@ -52,6 +53,12 @@ const schema = z.discriminatedUnion("action", [
     phone: z.string().max(20),
     address: z.string().max(250),
     privacy_email: z.email(),
+    google_review_url: z
+      .string()
+      .trim()
+      .max(500)
+      .refine(isGoogleReviewUrl)
+      .optional(),
     retention_days: z.number().int().min(1).max(730),
     accepting_orders: z.boolean(),
     opening_hours: z

@@ -12,6 +12,7 @@ export type RestaurantRow = {
   address: string;
   privacy_email: string;
   retention_days: number;
+  google_review_url: string;
 };
 export type CategoryRow = {
   id: string;
@@ -65,6 +66,7 @@ export type RealOrder = {
   created_at: string;
   estimate_minutes: number | null;
   cancellation_reason: string | null;
+  google_review_url?: string;
   dining_tables: { number: number } | null;
   order_items: {
     id: string;
@@ -90,6 +92,14 @@ export type RealContact = {
 export type Workspace = {
   restaurant: RestaurantRow;
   role: "owner" | "operations";
+  feedback: {
+    id: string;
+    product_id: string;
+    liked: boolean;
+    comment: string;
+    updated_at: string;
+    products: { name: string } | null;
+  }[];
   options: OptionRow[];
   optionLinks: OptionLink[];
   categories: CategoryRow[];
@@ -136,6 +146,7 @@ export function catalogState(catalog: Catalog): {
       );
       return {
         id: p.id,
+        restaurantId: catalog.restaurant.id,
         name: p.name,
         description: p.description,
         ingredients: p.ingredients,

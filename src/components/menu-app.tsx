@@ -33,6 +33,7 @@ import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
 import { ProductMedia } from "./product-media";
 import { ImmersiveMenu } from "./immersive-menu";
+import { ProductFeedbackModal } from "./product-feedback";
 import { money } from "@/lib/utils";
 import type { Product } from "@/lib/types";
 const categoryIcons: Record<string, typeof Hamburger> = {
@@ -47,6 +48,7 @@ export function MenuApp() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"feed" | "list">("feed");
   const [selected, setSelected] = useState<Product | null>(null);
+  const [feedbackProduct, setFeedbackProduct] = useState<Product | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -506,16 +508,27 @@ export function MenuApp() {
           table={table}
           accepting={state.settings.accepting}
           blocked={
-            !!selected || bagOpen || checkoutOpen || infoOpen || newsOpen
+            !!selected ||
+            !!feedbackProduct ||
+            bagOpen ||
+            checkoutOpen ||
+            infoOpen ||
+            newsOpen
           }
           onProduct={setSelected}
           onBag={() => setBagOpen(true)}
           onInfo={() => setInfoOpen(true)}
           onList={() => setView("list")}
+          onFeedback={setFeedbackProduct}
         />
       ) : (
         regularCatalog
       )}
+      <ProductFeedbackModal
+        restaurantId={feedbackProduct?.restaurantId || ""}
+        product={feedbackProduct}
+        onClose={() => setFeedbackProduct(null)}
+      />
       <Modal open={bagOpen} onOpenChange={setBagOpen} title="Sua sacola">
         <Bag
           inModal
@@ -541,6 +554,17 @@ export function MenuApp() {
         title={selected?.name || "Produto"}
         description="Conheça os ingredientes e deixe o pedido do seu jeito."
       >
+        {selected?.restaurantId && (
+          <button
+            className="button button-outline"
+            onClick={() => {
+              setFeedbackProduct(selected);
+              setSelected(null);
+            }}
+          >
+            Curtidas e comentários
+          </button>
+        )}
         {selected && (
           <ProductDetail
             key={selected.id}
