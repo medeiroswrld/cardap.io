@@ -1,4 +1,5 @@
 export type FeedbackData = {
+  enabled: boolean;
   likes: number;
   commentCount: number;
   comments: {
@@ -6,9 +7,10 @@ export type FeedbackData = {
     comment: string;
     liked: boolean;
     updated_at: string;
+    verifiedPurchase: boolean;
   }[];
   eligibleOrderId: string | null;
-  mine: { liked: boolean; comment: string } | null;
+  mine: { liked: boolean; comment: string; commentHidden?: boolean } | null;
   googleReviewUrl: string;
 };
 

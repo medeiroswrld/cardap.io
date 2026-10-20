@@ -310,7 +310,12 @@ export function ConnectedAdmin({ id }: { id: string }) {
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
               {owner && page === "avaliacoes" && (
-                <FeedbackAdmin feedback={data.feedback || []} />
+                <FeedbackAdmin
+                  feedback={data.feedback || []}
+                  enabled={data.restaurant.feedback_enabled}
+                  save={save}
+                  busy={busy}
+                />
               )}
               {owner && page === "qr" && <TableQR data={data} />}
             </>

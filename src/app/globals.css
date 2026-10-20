@@ -4713,6 +4713,19 @@ tr:last-child > td {
   flex-direction: column;
   gap: 14px;
 }
+.social-error {
+  position: absolute;
+  right: 64px;
+  bottom: 0;
+  width: min(250px, 65vw);
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--cream, #fff8f2);
+  color: var(--wine, #8b292d);
+  font-size: 13px;
+  line-height: 1.5;
+  text-shadow: none;
+}
 .immersive-actions > button {
   color: #fff;
   min-width: 48px;

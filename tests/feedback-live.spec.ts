@@ -10,7 +10,7 @@ test.skip(
 test.use({ trace: "off", screenshot: "only-on-failure", actionTimeout: 30000 });
 const expect = baseExpect.configure({ timeout: 30000 });
 
-test("curtidas e comentários só após entrega, persistência, Google e isolamento", async ({
+test("interações antes do pedido, moderação, controles do restaurante e isolamento", async ({
   page,
   browser,
   baseURL,
@@ -129,19 +129,76 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
       .fill("https://g.page/r/test/review");
     await page.getByRole("button", { name: "Salvar configurações" }).click();
     await expect(page.getByRole("status")).toContainText("Alteração salva");
-    expect(
-      (await post(`/api/restaurants/${tenant}/session`, {})).status(),
-    ).toBe(200);
     await customer.goto(`/r/${slug}`);
+    await customer
+      .getByRole("button", { name: "Curtir Burger da casa", exact: true })
+      .click();
+    await expect(
+      customer.getByRole("button", {
+        name: "Descurtir Burger da casa",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(customer.getByRole("dialog")).toHaveCount(0);
+    await customer
+      .getByRole("button", { name: "Descurtir Burger da casa", exact: true })
+      .click();
+    await expect(
+      customer.getByRole("button", {
+        name: "Curtir Burger da casa",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await customer
+      .getByRole("button", { name: "Comentários de Burger da casa" })
+      .click();
+    const beforeOrder = customer.getByRole("dialog");
+    await expect(
+      beforeOrder.getByRole("button", { name: "Curtir prato", exact: true }),
+    ).toBeVisible();
+    await beforeOrder
+      .getByLabel("Seu comentário (opcional)")
+      .fill("Parece delicioso! Ainda vou pedir.");
+    await beforeOrder
+      .getByRole("button", { name: "Curtir prato", exact: true })
+      .click();
+    await expect(beforeOrder.getByRole("status")).toHaveText(
+      "Curtida registrada.",
+    );
+    await expect(
+      beforeOrder.getByLabel("Seu comentário (opcional)"),
+    ).toHaveValue("Parece delicioso! Ainda vou pedir.");
+    expect(
+      (await (await guest.request.get(endpoint)).json()).commentCount,
+    ).toBe(0);
+    await beforeOrder.getByRole("button", { name: "Salvar avaliação" }).click();
+    await expect(beforeOrder.getByRole("status")).toHaveText(
+      "Avaliação salva no cardápio.",
+    );
+    const pre = await (await guest.request.get(endpoint)).json();
+    expect(pre.likes).toBe(1);
+    expect(pre.eligibleOrderId).toBeNull();
+    expect(pre.comments[0].verifiedPurchase).toBe(false);
+    expect(pre.googleReviewUrl).toBe("");
+    await expect(
+      beforeOrder.getByText("Visitante", { exact: true }),
+    ).toBeVisible();
+    await customer.screenshot({
+      path: ".impeccable/review/social-before-order.png",
+    });
+    await customer.reload();
     await customer
       .getByRole("button", { name: "Comentários de Burger da casa" })
       .click();
     await expect(
-      customer.getByText(/Depois que a equipe marcar/),
-    ).toBeVisible();
-    await expect(
-      customer.getByRole("button", { name: "Salvar avaliação" }),
-    ).toHaveCount(0);
+      beforeOrder.getByRole("button", { name: "Curti este prato" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await beforeOrder
+      .getByRole("button", { name: "Remover avaliação" })
+      .click();
+    await expect(beforeOrder.getByRole("status")).toHaveText(
+      "Sua avaliação foi removida.",
+    );
     await customer.getByRole("button", { name: "Fechar", exact: true }).click();
     const placed = await post(`/api/restaurants/${tenant}/orders`, {
       key: randomUUID(),
@@ -160,7 +217,9 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
       liked: true,
       comment: "Gostei da comida.",
     };
-    expect((await post(endpoint, payload)).status()).toBe(403);
+    expect((await post(endpoint, { liked: false, comment: "" })).status()).toBe(
+      200,
+    );
     await customer.goto(`/r/${slug}/pedido/${order.id}`);
     await expect(
       customer.getByRole("button", { name: "Avaliar Burger da casa" }),
@@ -193,6 +252,7 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
     await modal
       .getByRole("button", { name: "Curtir prato", exact: true })
       .click();
+    await expect(modal.getByRole("status")).toHaveText("Curtida registrada.");
     await modal
       .getByLabel("Seu comentário (opcional)")
       .fill("Ponto da carne ótimo! Voltaria para provar os outros pratos.");
@@ -221,7 +281,7 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
       fullPage: false,
     });
     await modal
-      .getByRole("heading", { name: "Quem provou, conta" })
+      .getByRole("heading", { name: "Conversa sobre o prato" })
       .scrollIntoViewIfNeeded();
     await customer.screenshot({
       path: ".impeccable/review/feedback-comments-desktop.png",
@@ -276,7 +336,7 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
           data: payload,
         })
       ).status(),
-    ).toBe(403);
+    ).toBe(200);
     expect(
       (
         await post(
@@ -292,7 +352,15 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
           payload,
         )
       ).status(),
-    ).toBe(403);
+    ).toBe(200);
+    await outsider.request.post(endpoint, {
+      headers: { origin },
+      data: { liked: false, comment: "" },
+    });
+    await post(`/api/restaurants/${tenant}/products/${notOrdered}/feedback`, {
+      liked: false,
+      comment: "",
+    });
     await page.reload();
     await page.getByRole("button", { name: "Avaliações", exact: true }).click();
     await expect(
@@ -307,6 +375,63 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
       path: ".impeccable/review/feedback-admin-mobile.png",
       fullPage: true,
     });
+    await page
+      .getByRole("button", { name: "Ocultar comentário", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Restaurar comentário" }),
+    ).toBeVisible();
+    expect(
+      (await (await guest.request.get(endpoint)).json()).commentCount,
+    ).toBe(0);
+    await post(endpoint, payload);
+    expect(
+      (await (await guest.request.get(endpoint)).json()).commentCount,
+    ).toBe(0);
+    await page.getByRole("button", { name: "Restaurar comentário" }).click();
+    await expect(
+      page.getByRole("button", { name: "Ocultar comentário", exact: true }),
+    ).toBeVisible();
+    expect(
+      (await (await guest.request.get(endpoint)).json()).commentCount,
+    ).toBe(1);
+    await page
+      .getByLabel("Permitir curtidas e comentários no cardápio")
+      .click();
+    await expect(
+      page.getByLabel("Permitir curtidas e comentários no cardápio"),
+    ).not.toBeChecked();
+    expect((await post(endpoint, payload)).status()).toBe(403);
+    const disabled = await (await outsider.request.get(endpoint)).json();
+    expect(disabled.enabled).toBe(false);
+    expect(disabled.comments).toEqual([]);
+    const checkMenu = await guest.newPage();
+    await checkMenu.goto(`/r/${slug}`);
+    await expect(
+      checkMenu.getByRole("button", { name: "Comentários de Burger da casa" }),
+    ).toHaveCount(0);
+    await checkMenu.close();
+    await page.screenshot({
+      path: ".impeccable/review/social-admin-controls.png",
+      fullPage: true,
+    });
+    await page
+      .getByLabel("Permitir curtidas e comentários no cardápio")
+      .click();
+    await expect(
+      page.getByLabel("Permitir curtidas e comentários no cardápio"),
+    ).toBeChecked();
+    expect((await (await guest.request.get(endpoint)).json()).enabled).toBe(
+      true,
+    );
+    expect(
+      (
+        await outsider.request.post(`/api/restaurants/${tenant}/catalog`, {
+          headers: { origin },
+          data: { action: "feedback_settings", enabled: false },
+        })
+      ).status(),
+    ).toBe(401);
     await modal.getByRole("button", { name: "Remover avaliação" }).click();
     await expect(modal.getByRole("status")).toHaveText(
       "Sua avaliação foi removida.",
@@ -322,7 +447,10 @@ test("curtidas e comentários só após entrega, persistência, Google e isolame
       fullPage: true,
     });
     await customer
-      .getByRole("button", { name: "Curtir Burger da casa", exact: true })
+      .getByRole("button", {
+        name: "Comentários de Burger da casa",
+        exact: true,
+      })
       .click();
     await expect(
       customer.getByRole("button", { name: "Curtir prato", exact: true }),

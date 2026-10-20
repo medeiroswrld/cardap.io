@@ -24,6 +24,7 @@ for (const file of [
   "006_photo_observations.sql",
   "007_product_options.sql",
   "008_product_feedback.sql",
+  "009_social_feedback.sql",
 ]) {
   const sql = readFileSync(
     new URL("../supabase/migrations/" + file, import.meta.url),
@@ -700,35 +701,61 @@ const saveFeedback = (
     liked,
     comment,
   ]);
-await ok("feedback requires a delivered order owned by the guest", async () => {
-  await root();
-  await db.query(
-    "update guest_sessions set expires_at=now()+interval '1 hour' where id=$1",
-    [ga],
-  );
-  for (const status of ["recebido", "em_preparo", "pronto", "cancelado"]) {
-    await db.query("update orders set status=$1 where id=$2", [
-      status,
+await ok(
+  "visitors can interact without ordering; products and tenants remain isolated",
+  async () => {
+    await root();
+    await db.query(
+      "update guest_sessions set expires_at=now()+interval '1 hour' where id=$1",
+      [ga],
+    );
+    await db.query(
+      "update products set published=true, archived=false where id=$1",
+      [pa],
+    );
+    for (const status of ["recebido", "em_preparo", "pronto", "cancelado"]) {
+      await db.query("update orders set status=$1 where id=$2", [
+        status,
+        order.id,
+      ]);
+      await saveFeedback();
+      assert.equal((await feedback()).comments[0].verifiedPurchase, false);
+    }
+    await rejected(() => saveFeedback(a, "z".repeat(64)), /SESSION_EXPIRED/);
+    await rejected(() => saveFeedback(b), /SESSION_EXPIRED/);
+    await rejected(
+      () => saveFeedback(a, "a".repeat(64), pb),
+      /PRODUCT_NOT_FOUND/,
+    );
+    await db.query(
+      "insert into guest_sessions(restaurant_id,token_hash,expires_at) values($1,$2,now()+interval '1 hour')",
+      [a, "f".repeat(64)],
+    );
+    await saveFeedback(a, "f".repeat(64));
+    assert.equal(
+      (await feedback(a, "f".repeat(64))).comments.every(
+        (c) => !c.verifiedPurchase,
+      ),
+      true,
+    );
+    await saveFeedback(a, "f".repeat(64), pa, false, "");
+    await db.query("update products set published=false where id=$1", [pa]);
+    await rejected(() => saveFeedback(), /PRODUCT_NOT_FOUND/);
+    await db.query("update products set published=true where id=$1", [pa]);
+    await db.query(
+      "update categories set visible=false where id=(select category_id from products where id=$1)",
+      [pa],
+    );
+    await rejected(() => saveFeedback(), /PRODUCT_NOT_FOUND/);
+    await db.query(
+      "update categories set visible=true where id=(select category_id from products where id=$1)",
+      [pa],
+    );
+    await db.query("update orders set status='entregue' where id=$1", [
       order.id,
     ]);
-    await rejected(() => saveFeedback(), /DELIVERED_PURCHASE_REQUIRED/);
-  }
-  await db.query("update orders set status='entregue' where id=$1", [order.id]);
-  await rejected(() => saveFeedback(a, "z".repeat(64)), /SESSION_EXPIRED/);
-  await rejected(() => saveFeedback(b), /SESSION_EXPIRED/);
-  await rejected(
-    () => saveFeedback(a, "a".repeat(64), pb),
-    /DELIVERED_PURCHASE_REQUIRED/,
-  );
-  await db.query(
-    "insert into guest_sessions(restaurant_id,token_hash,expires_at) values($1,$2,now()+interval '1 hour')",
-    [a, "f".repeat(64)],
-  );
-  await rejected(
-    () => saveFeedback(a, "f".repeat(64)),
-    /DELIVERED_PURCHASE_REQUIRED/,
-  );
-});
+  },
+);
 await ok(
   "feedback retries and edits never inflate likes; public output omits identity",
   async () => {
@@ -751,6 +778,7 @@ await ok(
       "id",
       "liked",
       "updated_at",
+      "verifiedPurchase",
     ]);
     assert.ok(!JSON.stringify(data).includes("1199999"));
     await saveFeedback(a, "a".repeat(64), pa, false, "Poderia melhorar.");
@@ -784,7 +812,7 @@ await ok(
           [a],
         )
       ).rows.length,
-      1,
+      2,
     );
     await rejected(
       () => db.query("update product_feedback set liked=true"),
@@ -797,6 +825,58 @@ await ok(
     );
     await rejected(() => feedback(), /permission denied/);
     await root();
+  },
+);
+await ok(
+  "only the restaurant owner can disable interactions and hide or restore comments",
+  async () => {
+    await root();
+    await saveFeedback();
+    const fid = (
+      await db.query(
+        "select id from product_feedback where restaurant_id=$1 and guest_session_id=$2",
+        [a, ga],
+      )
+    ).rows[0].id;
+    await login(ownerB);
+    await rejected(
+      () => db.query("select moderate_feedback($1,$2,true)", [a, fid]),
+      /FORBIDDEN/,
+    );
+    await rejected(
+      () => db.query("select set_feedback_enabled($1,false)", [a]),
+      /FORBIDDEN/,
+    );
+    await login(staff);
+    await rejected(() => db.query("select moderate_feedback($1,$2,true)", [a,fid]), /FORBIDDEN/);
+    await rejected(() => db.query("select set_feedback_enabled($1,false)",[a]), /FORBIDDEN/);
+    await login(ownerA);
+    await db.query("select moderate_feedback($1,$2,true)", [a, fid]);
+    await root();
+    assert.equal((await feedback(a, null)).commentCount, 0);
+    assert.equal((await feedback(a, null)).likes, 1);
+    assert.equal((await feedback()).mine.commentHidden, true);
+    await saveFeedback(a, "a".repeat(64), pa, true, "Edit does not unhide");
+    assert.equal((await feedback(a, null)).commentCount, 0);
+    await login(ownerA);
+    await rejected(
+      () => db.query("select moderate_feedback($1,$2,false)", [b, fid]),
+      /FORBIDDEN/,
+    );
+    await db.query("select moderate_feedback($1,$2,false)", [a, fid]);
+    await db.query("select set_feedback_enabled($1,false)", [a]);
+    await root();
+    const hidden = await feedback();
+    assert.equal(hidden.enabled, false);
+    assert.equal(hidden.likes, 0);
+    assert.deepEqual(hidden.comments, []);
+    assert.equal(hidden.mine, null);
+    await rejected(() => saveFeedback(), /FEEDBACK_DISABLED/);
+    await login(ownerA);
+    await db.query("select set_feedback_enabled($1,true)", [a]);
+    await root();
+    assert.equal((await feedback()).commentCount, 1);
+    assert.equal((await feedback()).likes, 1);
   },
 );
 await ok(

@@ -4,7 +4,7 @@ import { serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 type Context = { params: Promise<{ id: string; productId: string }> };
 const input = z.object({
-  order_id: z.uuid(),
+  order_id: z.uuid().optional(),
   liked: z.boolean(),
   comment: z.string().trim().max(1000),
 });
@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: Context) {
       p_restaurant: id,
       p_product: productId,
       p_token_hash: hash(token),
-      p_order: body.order_id,
+      p_order: body.order_id || null,
       p_liked: body.liked,
       p_comment: body.comment,
     });
@@ -56,8 +56,9 @@ export async function POST(request: Request, { params }: Context) {
     if (error)
       return Response.json(
         {
-          error:
-            "Só é possível avaliar um prato do seu pedido após a entrega. Atualize a página e tente novamente.",
+          error: error.message.includes("FEEDBACK_DISABLED")
+            ? "O restaurante desativou as curtidas e os comentários."
+            : "Não foi possível salvar. Confira se o prato ainda está no cardápio e tente novamente.",
         },
         { status: 403, headers: noStore },
       );

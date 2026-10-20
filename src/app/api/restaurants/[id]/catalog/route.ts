@@ -21,6 +21,12 @@ const product = z.object({
   position: z.number().int().min(0).max(10000),
 });
 const schema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("feedback_settings"), enabled: z.boolean() }),
+  z.object({
+    action: z.literal("moderate_feedback"),
+    id: z.uuid(),
+    hidden: z.boolean(),
+  }),
   z.object({
     action: z.literal("save_option"),
     id: z.uuid(),
@@ -83,7 +89,20 @@ export async function POST(
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
     const body = schema.parse(await request.json());
-    if (body.action === "save_option") {
+    if (body.action === "feedback_settings") {
+      const { error } = await supabase.rpc("set_feedback_enabled", {
+        p_restaurant: id,
+        p_enabled: body.enabled,
+      });
+      if (error) throw error;
+    } else if (body.action === "moderate_feedback") {
+      const { error } = await supabase.rpc("moderate_feedback", {
+        p_restaurant: id,
+        p_feedback: body.id,
+        p_hidden: body.hidden,
+      });
+      if (error) throw error;
+    } else if (body.action === "save_option") {
       const { error } = await supabase.rpc("save_product_option", {
         p_restaurant: id,
         p_id: body.id,

@@ -554,7 +554,7 @@ export function MenuApp() {
         title={selected?.name || "Produto"}
         description="Conheça os ingredientes e deixe o pedido do seu jeito."
       >
-        {selected?.restaurantId && (
+        {selected?.restaurantId && selected.feedbackEnabled !== false && (
           <button
             className="button button-outline"
             onClick={() => {

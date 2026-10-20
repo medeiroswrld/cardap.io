@@ -13,6 +13,7 @@ export type RestaurantRow = {
   privacy_email: string;
   retention_days: number;
   google_review_url: string;
+  feedback_enabled: boolean;
 };
 export type CategoryRow = {
   id: string;
@@ -67,6 +68,7 @@ export type RealOrder = {
   estimate_minutes: number | null;
   cancellation_reason: string | null;
   google_review_url?: string;
+  feedback_enabled?: boolean;
   dining_tables: { number: number } | null;
   order_items: {
     id: string;
@@ -97,6 +99,7 @@ export type Workspace = {
     product_id: string;
     liked: boolean;
     comment: string;
+    comment_hidden: boolean;
     updated_at: string;
     products: { name: string } | null;
   }[];
@@ -147,6 +150,7 @@ export function catalogState(catalog: Catalog): {
       return {
         id: p.id,
         restaurantId: catalog.restaurant.id,
+        feedbackEnabled: catalog.restaurant.feedback_enabled,
         name: p.name,
         description: p.description,
         ingredients: p.ingredients,

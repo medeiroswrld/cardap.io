@@ -4,8 +4,6 @@ import {
   ArrowDown,
   ArrowUp,
   Flame,
-  Heart,
-  MessageCircle,
   Info,
   List,
   Search,
@@ -14,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { ProductMedia } from "./product-media";
+import { SocialActions } from "./product-feedback";
 import { Modal } from "./ui/dialog";
 import { money } from "@/lib/utils";
 import type { Category, Product } from "@/lib/types";
@@ -200,24 +199,16 @@ export function ImmersiveMenu({
                   )}
                 </div>
                 <div className="immersive-actions">
-                  {product.restaurantId && (
-                    <>
-                      <button
-                        onClick={() => onFeedback(product)}
-                        aria-label={`Curtir ${product.name}`}
-                      >
-                        <Heart size={25} />
-                        <span>Curtir</span>
-                      </button>
-                      <button
-                        onClick={() => onFeedback(product)}
-                        aria-label={`Comentários de ${product.name}`}
-                      >
-                        <MessageCircle size={25} />
-                        <span>Comentar</span>
-                      </button>
-                    </>
-                  )}
+                  {product.restaurantId &&
+                    product.feedbackEnabled !== false && (
+                      <SocialActions
+                        restaurantId={product.restaurantId}
+                        productId={product.id}
+                        name={product.name}
+                        active={index === active && !blocked}
+                        onComments={() => onFeedback(product)}
+                      />
+                    )}
                   <button
                     onClick={() => onProduct(product)}
                     aria-label={`Ingredientes de ${product.name}`}

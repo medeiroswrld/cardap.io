@@ -141,28 +141,35 @@ export function ConnectedTracking({
           </div>
           {order.status === "entregue" && (
             <section className="delivered-feedback">
-              <h3>Seu pedido chegou. Conta pra gente?</h3>
-              <p>Curta e comente os pratos que você provou.</p>
-              <div className="feedback-product-buttons">
-                {Array.from(
-                  new Map(
-                    order.order_items.map((item) => [item.product_id, item]),
-                  ).values(),
-                ).map((item) => (
-                  <button
-                    key={item.product_id}
-                    className="button button-outline"
-                    onClick={() =>
-                      setFeedbackProduct({
-                        id: item.product_id,
-                        name: item.product_name,
-                      })
-                    }
-                  >
-                    Avaliar {item.product_name}
-                  </button>
-                ))}
-              </div>
+              {order.feedback_enabled !== false && (
+                <>
+                  <h3>Seu pedido chegou. Conta pra gente?</h3>
+                  <p>Curta e comente os pratos que você provou.</p>
+                  <div className="feedback-product-buttons">
+                    {Array.from(
+                      new Map(
+                        order.order_items.map((item) => [
+                          item.product_id,
+                          item,
+                        ]),
+                      ).values(),
+                    ).map((item) => (
+                      <button
+                        key={item.product_id}
+                        className="button button-outline"
+                        onClick={() =>
+                          setFeedbackProduct({
+                            id: item.product_id,
+                            name: item.product_name,
+                          })
+                        }
+                      >
+                        Avaliar {item.product_name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
               <GoogleReviewInvite url={order.google_review_url} />
             </section>
           )}

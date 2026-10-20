@@ -37,12 +37,16 @@ export async function GET(_request: Request, { params }: Context) {
       data.status === "entregue"
         ? await client
             .from("restaurants")
-            .select("google_review_url")
+            .select("google_review_url,feedback_enabled")
             .eq("id", id)
             .single()
         : { data: null };
     return Response.json(
-      { ...data, google_review_url: restaurant?.google_review_url || "" },
+      {
+        ...data,
+        google_review_url: restaurant?.google_review_url || "",
+        feedback_enabled: restaurant?.feedback_enabled ?? true,
+      },
       { headers: noStore },
     );
   } catch (error) {

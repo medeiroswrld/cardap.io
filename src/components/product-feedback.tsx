@@ -1,9 +1,96 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink, Heart, MessageCircle } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { isGoogleReviewUrl, type FeedbackData } from "@/lib/feedback";
 import { Modal } from "./ui/dialog";
+
+export function SocialActions({
+  restaurantId,
+  productId,
+  name,
+  active,
+  onComments,
+}: {
+  restaurantId: string;
+  productId: string;
+  name: string;
+  active: boolean;
+  onComments: () => void;
+}) {
+  const [data, setData] = useState<FeedbackData | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const inFlight = useRef(false);
+  const revision = useRef(0);
+  const endpoint = `/api/restaurants/${restaurantId}/products/${productId}/feedback`;
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    const version = revision.current;
+    void requestJson<FeedbackData>(endpoint)
+      .then((next) => {
+        if (!cancelled && version === revision.current) setData(next);
+      })
+      .catch(() => {
+        /* A click retries and reports write errors. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, endpoint]);
+  async function toggle() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    revision.current += 1;
+    setBusy(true);
+    setError("");
+    try {
+      await requestJson(`/api/restaurants/${restaurantId}/session`, {});
+      const current = await requestJson<FeedbackData>(endpoint);
+      if (!current.enabled) {
+        setData(current);
+        return;
+      }
+      const liked = !current.mine?.liked;
+      const comment = current.mine?.comment || "";
+      await requestJson(endpoint, { liked, comment });
+      setData({
+        ...current,
+        likes: current.likes + (liked ? 1 : -1),
+        mine: { ...current.mine, liked, comment },
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+  if (data?.enabled === false) return null;
+  return (
+    <>
+      <button
+        onClick={() => void toggle()}
+        disabled={busy}
+        aria-pressed={data?.mine?.liked || false}
+        aria-label={`${data?.mine?.liked ? "Descurtir" : "Curtir"} ${name}`}
+      >
+        <Heart size={25} fill={data?.mine?.liked ? "currentColor" : "none"} />
+        <span>{data?.likes ? data.likes : "Curtir"}</span>
+      </button>
+      <button onClick={onComments} aria-label={`Comentários de ${name}`}>
+        <MessageCircle size={25} />
+        <span>{data?.commentCount ? data.commentCount : "Comentar"}</span>
+      </button>
+      {error && (
+        <span className="social-error" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
 
 export function GoogleReviewInvite({ url }: { url?: string }) {
   if (!url || !isGoogleReviewUrl(url)) return null;
@@ -45,7 +132,7 @@ export function ProductFeedbackModal({
         if (!open) onClose();
       }}
       title={product?.name || "Avaliações"}
-      description="Opiniões de quem recebeu este prato."
+      description="Curta e converse sobre este prato, mesmo antes de pedir."
     >
       {product && (
         <ProductFeedback
@@ -77,6 +164,7 @@ function ProductFeedback({
     setLoading(true);
     setError("");
     try {
+      await requestJson(`/api/restaurants/${restaurantId}/session`, {});
       const next = await requestJson<FeedbackData>(endpoint);
       setData(next);
       setLiked(next.mine?.liked || false);
@@ -86,29 +174,39 @@ function ProductFeedback({
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, restaurantId]);
   useEffect(() => {
     queueMicrotask(() => void load());
   }, [load]);
-  async function save(nextLiked: boolean, nextComment: string) {
-    if (!data?.eligibleOrderId || busy) return;
+  async function save(
+    nextLiked: boolean,
+    nextComment: string,
+    likeOnly = false,
+  ) {
+    if (!data?.enabled || busy) return;
     setBusy(true);
     setMessage("");
     setError("");
     try {
       await requestJson(endpoint, {
-        order_id: data.eligibleOrderId,
         liked: nextLiked,
         comment: nextComment,
       });
       // Preserve the confirmed result even if refreshing public counts fails.
       setLiked(nextLiked);
-      setComment(nextComment);
-      setData({ ...data, mine: { liked: nextLiked, comment: nextComment } });
+      if (!likeOnly) setComment(nextComment);
+      setData({
+        ...data,
+        mine: { ...data.mine, liked: nextLiked, comment: nextComment },
+      });
       setMessage(
-        nextLiked || nextComment
-          ? "Avaliação salva no cardápio."
-          : "Sua avaliação foi removida.",
+        likeOnly
+          ? nextLiked
+            ? "Curtida registrada."
+            : "Curtida removida."
+          : nextLiked || nextComment
+            ? "Avaliação salva no cardápio."
+            : "Sua avaliação foi removida.",
       );
       try {
         setData(await requestJson<FeedbackData>(endpoint));
@@ -149,7 +247,7 @@ function ProductFeedback({
               {data.commentCount === 1 ? "comentário" : "comentários"}
             </span>
           </div>
-          {data.eligibleOrderId ? (
+          {data.enabled ? (
             <form
               className="form-stack feedback-form"
               onSubmit={(event) => {
@@ -157,15 +255,14 @@ function ProductFeedback({
                 void save(liked, comment.trim());
               }}
             >
-              <h3>Como estava seu prato?</h3>
+              <h3>O que achou deste prato?</h3>
               <button
                 type="button"
                 className={`button ${liked ? "button-primary" : "button-outline"}`}
                 aria-pressed={liked}
                 disabled={busy}
                 onClick={() => {
-                  setLiked(!liked);
-                  setMessage("");
+                  void save(!liked, data.mine?.comment || "", true);
                 }}
               >
                 <Heart
@@ -175,6 +272,12 @@ function ProductFeedback({
                 />
                 {liked ? "Curti este prato" : "Curtir prato"}
               </button>
+              {data.mine?.commentHidden && (
+                <p className="notice">
+                  Seu comentário foi ocultado pelo restaurante e não aparece no
+                  cardápio.
+                </p>
+              )}
               <label className="form-label">
                 Seu comentário (opcional)
                 <textarea
@@ -217,8 +320,7 @@ function ProductFeedback({
             </form>
           ) : (
             <p className="feedback-locked">
-              Depois que a equipe marcar seu pedido como entregue, você poderá
-              curtir e comentar os pratos que pediu neste navegador.
+              O restaurante desativou as curtidas e os comentários.
             </p>
           )}
           <GoogleReviewInvite url={data.googleReviewUrl} />
@@ -226,18 +328,20 @@ function ProductFeedback({
             className="feedback-comments"
             aria-label="Comentários dos clientes"
           >
-            <h3>Quem provou, conta</h3>
+            <h3>Conversa sobre o prato</h3>
             {!data.comments.length ? (
               <p>Ainda não há comentários sobre este prato.</p>
             ) : (
               <>
-                <p className="field-help">
-                  Até 20 comentários mais recentes · pedidos entregues
-                </p>
+                <p className="field-help">Até 20 comentários mais recentes</p>
                 {data.comments.map((item) => (
                   <article key={item.id} className="feedback-comment">
                     <div>
-                      <strong>Cliente · pedido entregue</strong>
+                      <strong>
+                        {item.verifiedPurchase
+                          ? "Cliente · pedido entregue"
+                          : "Visitante"}
+                      </strong>
                       <time dateTime={item.updated_at}>
                         {new Date(item.updated_at).toLocaleDateString("pt-BR")}
                       </time>

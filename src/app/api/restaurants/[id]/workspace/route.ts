@@ -119,7 +119,7 @@ export async function GET(
           .limit(10000),
         supabase
           .from("product_feedback")
-          .select("id,product_id,liked,comment,updated_at,products(name)")
+          .select("id,product_id,liked,comment,comment_hidden,updated_at,products(name)")
           .eq("restaurant_id", id)
           .or("liked.eq.true,comment.neq.")
           .order("updated_at", { ascending: false })

@@ -34,11 +34,13 @@ export default async function Page({
       </p>
       <h2>Curtidas e comentários</h2>
       <p>
-        Avaliações são opcionais e ficam vinculadas a um pedido entregue. Os
+        Curtidas e comentários são opcionais e não exigem um pedido. São vinculados
+        à sessão deste navegador, com duração de até 12 horas. Os
         comentários aparecem publicamente no cardápio sem seu nome ou telefone.
         Você pode editar ou remover sua avaliação neste navegador enquanto a
         sessão estiver válida. Depois disso, solicite a alteração à equipe pelo
-        contato abaixo. O convite para avaliar no Google abre um serviço
+        contato abaixo. O restaurante pode ocultar comentários e desativar as
+        interações. O convite para avaliar no Google abre um serviço
         externo; nenhum comentário do cardápio é publicado lá automaticamente.
       </p>
       <h2>Fale com o restaurante</h2>
