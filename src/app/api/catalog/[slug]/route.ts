@@ -1,7 +1,8 @@
+import { logFailure, withRequestLogging } from "@/lib/observability/logger";
 import { readCatalog } from "@/lib/catalog";
 import { noStore } from "@/lib/server-security";
 
-export async function GET(
+async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -19,10 +20,13 @@ export async function GET(
         { status: 404, headers: noStore },
       );
     return Response.json(catalog, { headers: noStore });
-  } catch {
+  } catch (error) {
+    logFailure(error, "supabase.catalog");
     return Response.json(
       { error: "Não foi possível atualizar o cardápio." },
       { status: 503, headers: noStore },
     );
   }
 }
+
+export const GET = withRequestLogging("/api/catalog/[slug]", handleGET);

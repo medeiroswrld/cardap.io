@@ -1,7 +1,8 @@
+import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
-export async function GET(
+async function handleGET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -22,3 +23,8 @@ export async function GET(
     return apiError(error);
   }
 }
+
+export const GET = withRequestLogging(
+  "/api/restaurants/[id]/photo-associations",
+  handleGET,
+);

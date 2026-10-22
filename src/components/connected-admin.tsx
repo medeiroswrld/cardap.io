@@ -33,6 +33,7 @@ import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
 import { MediaPicker } from "./media-picker";
 import { VideoUploader, uploadProductVideo } from "./video-uploader";
+import { createVideoCover } from "@/lib/video-cover";
 import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderChoices } from "./order-choices";
@@ -647,13 +648,16 @@ function Products({
               let productSaved = false;
               try {
                 let photo = edit.photo_url;
-                if (file && !file.type.startsWith("video/")) {
+                const photoFile = file?.type.startsWith("video/")
+                  ? await createVideoCover(file)
+                  : file;
+                if (photoFile) {
                   const client = browserClient();
-                  const path = `${data.restaurant.id}/${crypto.randomUUID()}.${file.type.split("/")[1]}`;
+                  const path = `${data.restaurant.id}/${crypto.randomUUID()}.${photoFile.type.split("/")[1]}`;
                   const { error } = await client.storage
                     .from("restaurant-media")
-                    .upload(path, file, {
-                      contentType: file.type,
+                    .upload(path, photoFile, {
+                      contentType: photoFile.type,
                       upsert: false,
                     });
                   if (error)

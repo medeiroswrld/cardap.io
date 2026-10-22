@@ -1,8 +1,9 @@
+import { withRequestLogging } from "@/lib/observability/logger";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { serviceClient, serverClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -51,3 +52,8 @@ export async function POST(
     return apiError(error);
   }
 }
+
+export const POST = withRequestLogging(
+  "/api/restaurants/[id]/views",
+  handlePOST,
+);

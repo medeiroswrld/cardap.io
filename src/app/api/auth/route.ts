@@ -1,3 +1,5 @@
+import { withRequestLogging } from "@/lib/observability/logger";
+import { logFailure, setLogUser } from "@/lib/observability/logger";
 import { z } from "zod";
 import { serverClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
@@ -6,13 +8,14 @@ const schema = z.object({
   email: z.email().optional(),
   password: z.string().min(8).max(128).optional(),
 });
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     checkOrigin(request);
     const input = schema.parse(await request.json());
     const client = await serverClient();
     if (input.action === "logout") {
-      await client.auth.signOut();
+      const { error } = await client.auth.signOut();
+      if (error) throw new Error("AUTH_UNAVAILABLE");
       return Response.json({ ok: true }, { headers: noStore });
     }
     if (!input.email) throw new Error("EMAIL_REQUIRED");
@@ -20,7 +23,8 @@ export async function POST(request: Request) {
       const { error } = await client.auth.resetPasswordForEmail(input.email, {
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm?next=/redefinir-senha`,
       });
-      if (error && error.code !== "user_not_found")
+      if (error && error.code !== "user_not_found") {
+        logFailure(new Error("AUTH_UNAVAILABLE"), "supabase.auth");
         return Response.json(
           {
             error:
@@ -28,6 +32,7 @@ export async function POST(request: Request) {
           },
           { status: 503, headers: noStore },
         );
+      }
       return Response.json(
         {
           ok: true,
@@ -51,7 +56,10 @@ export async function POST(request: Request) {
             email: input.email,
             password: input.password,
           });
-    if (result.error)
+    if (result.error) {
+      if (!result.error.status || result.error.status >= 500)
+        throw new Error("AUTH_UNAVAILABLE");
+      logFailure(new Error("AUTH_REJECTED"), "supabase.auth");
       return Response.json(
         {
           error:
@@ -59,6 +67,8 @@ export async function POST(request: Request) {
         },
         { status: 400, headers: noStore },
       );
+    }
+    if (result.data.user) setLogUser(result.data.user.id);
     return Response.json(
       { ok: true, confirmation: input.action === "signup" },
       { headers: noStore },
@@ -67,3 +77,5 @@ export async function POST(request: Request) {
     return apiError(error);
   }
 }
+
+export const POST = withRequestLogging("/api/auth", handlePOST);

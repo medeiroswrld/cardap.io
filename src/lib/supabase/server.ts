@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { hasRequestContext, logger, setLogUser } from "../observability/logger";
 export function isConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -23,7 +24,14 @@ export async function serverClient() {
               jar.set(name, value, options),
             );
           } catch {
-            /* Server components cannot set cookies; route handlers own auth mutations. */
+            // Read-only Server Components are expected; API cookie failure is not.
+            if (hasRequestContext()) {
+              logger.error("auth.cookie_write_failed", {
+                operation: "supabase.auth",
+                errorCode: "COOKIE_WRITE_FAILED",
+              });
+              throw new Error("COOKIE_WRITE_FAILED");
+            }
           }
         },
       },
@@ -45,13 +53,23 @@ export async function requireMember(restaurantId: string, owner = false) {
     data: { user },
     error,
   } = await supabase.auth.getUser();
+  if (error && (!error.status || error.status >= 500))
+    throw new Error("AUTH_UNAVAILABLE");
   if (error || !user) throw new Error("UNAUTHORIZED");
-  const { data: member } = await supabase
+  setLogUser(user.id);
+  const { data: member, error: membershipError } = await supabase
     .from("restaurant_members")
     .select("role")
     .eq("restaurant_id", restaurantId)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
+  if (membershipError) {
+    logger.error("dependency.failed", {
+      operation: "supabase.membership",
+      errorCode: "DATABASE_ERROR",
+    });
+    throw new Error("DATABASE_ERROR");
+  }
   if (!member || (owner && member.role !== "owner"))
     throw new Error("FORBIDDEN");
   return { supabase, user, role: member.role };

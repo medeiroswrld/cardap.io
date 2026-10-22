@@ -16,7 +16,9 @@ export default async function Page({
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED")
       redirect("/login");
-    notFound();
+    if (error instanceof Error && error.message === "FORBIDDEN") notFound();
+    // Infrastructure errors must reach Next instrumentation, not masquerade as 404.
+    throw new Error("DATABASE_ERROR");
   }
   return <ConnectedAdmin id={id} />;
 }

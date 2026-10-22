@@ -1,9 +1,10 @@
 import "server-only";
+import { logger } from "./observability/logger";
 import { createClient } from "@supabase/supabase-js";
 import { isConfigured } from "./supabase/server";
 import type { Catalog } from "./connected-types";
 export async function readCatalog(slug: string): Promise<Catalog | null> {
-  if (!isConfigured()) return null;
+  if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
   const client = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -14,10 +15,13 @@ export async function readCatalog(slug: string): Promise<Catalog | null> {
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
-  if (error)
-    throw new Error(
-      "Não foi possível carregar o restaurante. Tente novamente em instantes.",
-    );
+  if (error) {
+    logger.error("dependency.failed", {
+      operation: "supabase.catalog",
+      errorCode: "DATABASE_ERROR",
+    });
+    throw new Error("DATABASE_ERROR");
+  }
   if (!restaurant) return null;
   const [categories, products, media, tables, options, optionLinks] =
     await Promise.all([
@@ -63,10 +67,13 @@ export async function readCatalog(slug: string): Promise<Catalog | null> {
     [categories, products, media, tables, options, optionLinks].some(
       (r) => r.error,
     )
-  )
-    throw new Error(
-      "O cardápio está temporariamente indisponível. Tente novamente.",
-    );
+  ) {
+    logger.error("dependency.failed", {
+      operation: "supabase.catalog",
+      errorCode: "DATABASE_ERROR",
+    });
+    throw new Error("DATABASE_ERROR");
+  }
   return {
     restaurant,
     options: options.data,

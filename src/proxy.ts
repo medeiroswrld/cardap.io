@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { logProxyFailure } from "./lib/observability/logger";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   if (
@@ -23,7 +24,13 @@ export async function proxy(request: NextRequest) {
       },
     },
   );
-  await supabase.auth.getUser();
+  try {
+    const { error } = await supabase.auth.getUser();
+    if (error && (!error.status || error.status >= 500)) logProxyFailure();
+  } catch {
+    logProxyFailure();
+    // Route/page authorization still runs. Do not propagate provider messages.
+  }
   return response;
 }
 export const config = {

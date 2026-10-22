@@ -1,4 +1,5 @@
 import "server-only";
+import { logger } from "./observability/logger";
 const base = () => {
   if (
     !process.env.CLOUDFLARE_ACCOUNT_ID ||
@@ -24,6 +25,11 @@ export async function createVideoUpload(creator: string) {
     cache: "no-store",
     signal: AbortSignal.timeout(10000),
   });
+  if (!response.ok)
+    logger.error("dependency.failed", {
+      operation: "cloudflare.upload",
+      status: response.status,
+    });
   if ([401, 403].includes(response.status))
     throw new Error("STREAM_AUTH_FAILED");
   if (!response.ok) throw new Error("STREAM_UPLOAD_FAILED");
@@ -39,6 +45,11 @@ export async function getVideoStatus(uid: string) {
     cache: "no-store",
     signal: AbortSignal.timeout(10000),
   });
+  if (!response.ok)
+    logger.error("dependency.failed", {
+      operation: "cloudflare.status",
+      status: response.status,
+    });
   if ([401, 403].includes(response.status))
     throw new Error("STREAM_AUTH_FAILED");
   if (!response.ok) throw new Error("STREAM_STATUS_FAILED");

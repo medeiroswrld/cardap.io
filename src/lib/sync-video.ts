@@ -1,4 +1,5 @@
 import "server-only";
+import { logger } from "./observability/logger";
 import { getVideoStatus } from "./cloudflare";
 import { serviceClient } from "./supabase/server";
 import {
@@ -27,7 +28,9 @@ export async function syncVideoAsset(
     const service = serviceClient();
     const storage = service.storage.from(VIDEO_BUCKET);
     const { data: file, error } = await storage.info(path);
-    if (error || !file) throw new Error("VIDEO_UPLOAD_INCOMPLETE");
+    if (error && String(error.statusCode) !== "404")
+      throw new Error("VIDEO_STORAGE_UNAVAILABLE");
+    if (!file) throw new Error("VIDEO_UPLOAD_INCOMPLETE");
     const duration = Number(asset.duration_seconds);
     const valid =
       Number(file.size) > 0 &&
@@ -35,6 +38,11 @@ export async function syncVideoAsset(
       VIDEO_TYPES.includes(file.contentType as (typeof VIDEO_TYPES)[number]) &&
       duration > 0 &&
       duration <= VIDEO_MAX_SECONDS;
+    if (!valid)
+      logger.warn("video.rejected", {
+        operation: "supabase.storage",
+        errorCode: "INVALID_VIDEO",
+      });
     const changes = {
       state: valid ? "ready" : "failed",
       playback_url: valid ? storage.getPublicUrl(path).data.publicUrl : null,
@@ -55,6 +63,11 @@ export async function syncVideoAsset(
     Boolean(remote.playback?.hls) &&
     remote.duration > 0;
   const state = failed ? "failed" : ready ? "ready" : "processing";
+  if (failed)
+    logger.warn("video.rejected", {
+      operation: "cloudflare.status",
+      errorCode: "INVALID_VIDEO",
+    });
   const changes = {
     state,
     duration_seconds: remote.duration || null,

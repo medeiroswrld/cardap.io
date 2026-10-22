@@ -1,9 +1,11 @@
+import { logFailure, withRequestLogging } from "@/lib/observability/logger";
+import { errorCode, errorStatus } from "@/lib/observability/core";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 type Context = { params: Promise<{ id: string; orderId: string }> };
-export async function GET(_request: Request, { params }: Context) {
+async function handleGET(_request: Request, { params }: Context) {
   try {
     const { id, orderId } = await params;
     z.uuid().parse(id);
@@ -11,13 +13,14 @@ export async function GET(_request: Request, { params }: Context) {
     const token = (await cookies()).get(`guest_${id}`)?.value;
     if (!token) throw new Error("GUEST_SESSION_EXPIRED");
     const client = serviceClient();
-    const { data: session } = await client
+    const { data: session, error: sessionError } = await client
       .from("guest_sessions")
       .select("id")
       .eq("restaurant_id", id)
       .eq("token_hash", hash(token))
       .gt("expires_at", new Date().toISOString())
-      .single();
+      .maybeSingle();
+    if (sessionError) throw sessionError;
     if (!session) throw new Error("GUEST_SESSION_EXPIRED");
     const { data, error } = await client
       .from("orders")
@@ -28,19 +31,21 @@ export async function GET(_request: Request, { params }: Context) {
       .eq("guest_session_id", session.id)
       .eq("id", orderId)
       .single();
-    if (error || !data)
+    if (error && error.code !== "PGRST116") throw error;
+    if (!data)
       return Response.json(
         { error: "Pedido não encontrado." },
         { status: 404, headers: noStore },
       );
-    const { data: restaurant } =
+    const { data: restaurant, error: restaurantError } =
       data.status === "entregue"
         ? await client
             .from("restaurants")
             .select("google_review_url,feedback_enabled")
             .eq("id", id)
             .single()
-        : { data: null };
+        : { data: null, error: null };
+    if (restaurantError) logFailure(restaurantError, "supabase.orders");
     return Response.json(
       {
         ...data,
@@ -53,7 +58,7 @@ export async function GET(_request: Request, { params }: Context) {
     return apiError(error);
   }
 }
-export async function PATCH(request: Request, { params }: Context) {
+async function handlePATCH(request: Request, { params }: Context) {
   try {
     checkOrigin(request);
     const { id, orderId } = await params;
@@ -76,16 +81,29 @@ export async function PATCH(request: Request, { params }: Context) {
       p_reason: body.reason || null,
       p_estimate: body.estimate || null,
     });
-    if (error)
+    if (error) {
+      if (errorStatus(errorCode(error)) >= 500) throw error;
+      logFailure(error, "supabase.orders");
       return Response.json(
         {
           error:
             "O pedido mudou ou a transição não é permitida. Atualize e tente novamente.",
         },
-        { status: 409, headers: noStore },
+        { status: errorStatus(errorCode(error)), headers: noStore },
       );
+    }
     return Response.json(data, { headers: noStore });
   } catch (error) {
     return apiError(error);
   }
 }
+
+export const GET = withRequestLogging(
+  "/api/restaurants/[id]/orders/[orderId]",
+  handleGET,
+);
+
+export const PATCH = withRequestLogging(
+  "/api/restaurants/[id]/orders/[orderId]",
+  handlePATCH,
+);

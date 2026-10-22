@@ -1,5 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { errorCode, errorStatus } from "./observability/core";
+import { logFailure } from "./observability/logger";
+import { RateLimitError } from "./rate-limit-identity";
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export function checkOrigin(request: Request) {
@@ -12,37 +15,38 @@ export function checkOrigin(request: Request) {
 }
 export const noStore = { "Cache-Control": "private, no-store, max-age=0" };
 export function apiError(error: unknown) {
-  const message = error instanceof Error ? error.message : "REQUEST_FAILED";
-  const status =
-    message === "UNAUTHORIZED" || message === "GUEST_SESSION_EXPIRED"
-      ? 401
-      : message === "FORBIDDEN" || message === "ORIGIN_REJECTED"
-        ? 403
-        : message.includes("configurad") ||
-            message === "APP_URL_REQUIRED" ||
-            message === "STREAM_AUTH_FAILED" ||
-            message === "VIDEO_STORAGE_UNAVAILABLE"
-          ? 503
-          : 400;
+  const message = errorCode(error);
+  const status = errorStatus(message);
+  logFailure(error);
   return Response.json(
     {
       error:
-        message === "VIDEO_STORAGE_UNAVAILABLE"
-          ? "O armazenamento de vídeos está indisponível. Tente novamente em instantes."
-          : message === "VIDEO_UPLOAD_INCOMPLETE"
-            ? "O envio do vídeo ainda não foi confirmado. Verifique sua conexão e tente novamente."
-            : message === "STREAM_AUTH_FAILED"
-              ? "O serviço de vídeos recusou o acesso. Confira a configuração do Cloudflare Stream antes de reenviar."
-              : status === 503
-                ? "Integração ainda não configurada."
-                : message === "GUEST_SESSION_EXPIRED"
-                  ? "Sua sessão de pedidos expirou ou pertence a outro navegador. Fale com a equipe para acompanhar o pedido."
-                  : status === 401
-                    ? "Entre na sua conta para continuar."
-                    : status === 403
-                      ? "Acesso não permitido."
-                      : "Não foi possível concluir a solicitação. Confira os dados e tente novamente.",
+        message === "RATE_LIMITED"
+          ? "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe."
+          : message === "VIDEO_STORAGE_UNAVAILABLE"
+            ? "O armazenamento de vídeos está indisponível. Tente novamente em instantes."
+            : message === "VIDEO_UPLOAD_INCOMPLETE"
+              ? "O envio do vídeo ainda não foi confirmado. Verifique sua conexão e tente novamente."
+              : message === "STREAM_AUTH_FAILED"
+                ? "O serviço de vídeos recusou o acesso. Confira a configuração do Cloudflare Stream antes de reenviar."
+                : status === 503
+                  ? "Serviço temporariamente indisponível. Tente novamente em instantes."
+                  : status >= 500
+                    ? "Ocorreu uma falha interna. Tente novamente em instantes."
+                    : message === "GUEST_SESSION_EXPIRED"
+                      ? "Sua sessão de pedidos expirou ou pertence a outro navegador. Fale com a equipe para acompanhar o pedido."
+                      : status === 401
+                        ? "Entre na sua conta para continuar."
+                        : status === 403
+                          ? "Acesso não permitido."
+                          : "Não foi possível concluir a solicitação. Confira os dados e tente novamente.",
     },
-    { status, headers: noStore },
+    {
+      status,
+      headers:
+        error instanceof RateLimitError
+          ? { ...noStore, "Retry-After": String(error.retryAfter) }
+          : noStore,
+    },
   );
 }

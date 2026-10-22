@@ -1,8 +1,11 @@
+import { withRequestLogging } from "@/lib/observability/logger";
+import { logger } from "@/lib/observability/logger";
+import { errorCode } from "@/lib/observability/core";
 import { syncVideoAsset } from "@/lib/sync-video";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
-export async function GET(
+async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -84,8 +87,11 @@ export async function GET(
         pending.map(async (asset) => {
           try {
             Object.assign(asset, await syncVideoAsset(id, asset));
-          } catch {
-            /* Keep the last status. The editor exposes retry errors. */
+          } catch (error) {
+            logger.warn("video.sync_deferred", {
+              operation: "video.sync",
+              errorCode: errorCode(error),
+            });
           }
         }),
       );
@@ -119,7 +125,9 @@ export async function GET(
           .limit(10000),
         supabase
           .from("product_feedback")
-          .select("id,product_id,liked,comment,comment_hidden,updated_at,products(name)")
+          .select(
+            "id,product_id,liked,comment,comment_hidden,updated_at,products(name)",
+          )
           .eq("restaurant_id", id)
           .or("liked.eq.true,comment.neq.")
           .order("updated_at", { ascending: false })
@@ -154,3 +162,8 @@ export async function GET(
     return apiError(error);
   }
 }
+
+export const GET = withRequestLogging(
+  "/api/restaurants/[id]/workspace",
+  handleGET,
+);

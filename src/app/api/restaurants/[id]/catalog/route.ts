@@ -1,3 +1,4 @@
+import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { requireMember } from "@/lib/supabase/server";
@@ -80,7 +81,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("revoke_marketing"), id: z.uuid() }),
 ]);
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -182,3 +183,8 @@ export async function POST(
     return apiError(error);
   }
 }
+
+export const POST = withRequestLogging(
+  "/api/restaurants/[id]/catalog",
+  handlePOST,
+);

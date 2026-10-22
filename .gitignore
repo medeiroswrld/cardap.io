@@ -12,3 +12,6 @@ lint-report.json
 *.log
 
 playwright/.auth/
+
+.tools/
+pilot-media/

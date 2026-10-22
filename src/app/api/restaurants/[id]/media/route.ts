@@ -1,3 +1,4 @@
+import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { syncVideoAsset } from "@/lib/sync-video";
@@ -9,7 +10,7 @@ import {
   STORAGE_VIDEO_PREFIX,
 } from "@/lib/video-config";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -25,12 +26,13 @@ export async function POST(
         duration: z.number().positive().max(VIDEO_MAX_SECONDS),
       })
       .parse(await request.json());
-    const { data: product } = await supabase
+    const { data: product, error: productError } = await supabase
       .from("products")
       .select("id")
       .eq("id", productId)
       .eq("restaurant_id", id)
       .single();
+    if (productError && productError.code !== "PGRST116") throw productError;
     if (!product) throw new Error("FORBIDDEN");
     const service = serviceClient();
     const assetId = crypto.randomUUID();
@@ -61,7 +63,7 @@ export async function POST(
     return apiError(error);
   }
 }
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -72,12 +74,13 @@ export async function PATCH(
     const { assetId } = z
       .object({ assetId: z.uuid() })
       .parse(await request.json());
-    const { data: asset } = await supabase
+    const { data: asset, error: assetError } = await supabase
       .from("product_media")
       .select("*")
       .eq("id", assetId)
       .eq("restaurant_id", id)
       .single();
+    if (assetError && assetError.code !== "PGRST116") throw assetError;
     if (!asset?.provider_asset_id) throw new Error("FORBIDDEN");
     const { state } = await syncVideoAsset(id, asset);
     return Response.json({ state }, { headers: noStore });
@@ -85,3 +88,13 @@ export async function PATCH(
     return apiError(error);
   }
 }
+
+export const POST = withRequestLogging(
+  "/api/restaurants/[id]/media",
+  handlePOST,
+);
+
+export const PATCH = withRequestLogging(
+  "/api/restaurants/[id]/media",
+  handlePATCH,
+);

@@ -25,6 +25,7 @@ for (const file of [
   "007_product_options.sql",
   "008_product_feedback.sql",
   "009_social_feedback.sql",
+  "010_pilot_rate_limits.sql",
 ]) {
   const sql = readFileSync(
     new URL("../supabase/migrations/" + file, import.meta.url),
@@ -848,8 +849,14 @@ await ok(
       /FORBIDDEN/,
     );
     await login(staff);
-    await rejected(() => db.query("select moderate_feedback($1,$2,true)", [a,fid]), /FORBIDDEN/);
-    await rejected(() => db.query("select set_feedback_enabled($1,false)",[a]), /FORBIDDEN/);
+    await rejected(
+      () => db.query("select moderate_feedback($1,$2,true)", [a, fid]),
+      /FORBIDDEN/,
+    );
+    await rejected(
+      () => db.query("select set_feedback_enabled($1,false)", [a]),
+      /FORBIDDEN/,
+    );
     await login(ownerA);
     await db.query("select moderate_feedback($1,$2,true)", [a, fid]);
     await root();
@@ -907,6 +914,95 @@ await ok(
     assert.equal((await feedback()).googleReviewUrl, "");
   },
 );
+
+await ok(
+  "limiter is private and accepts only fixed actions and hashed subjects",
+  async () => {
+    await login(ownerA);
+    await rejected(
+      () =>
+        db.query("select consume_public_rate_limit($1,'order',$2)", [
+          a,
+          "f".repeat(64),
+        ]),
+      /permission denied/,
+    );
+    await root();
+    await db.exec("set role anon");
+    await rejected(
+      () => db.query("select * from public_rate_limits"),
+      /permission denied/,
+    );
+    await root();
+    await rejected(
+      () =>
+        db.query("select consume_public_rate_limit($1,'custom',$2)", [
+          a,
+          "f".repeat(64),
+        ]),
+      /INVALID_INPUT/,
+    );
+    await rejected(
+      () =>
+        db.query(
+          "select consume_public_rate_limit($1,'order','private@example.test')",
+          [a],
+        ),
+      /INVALID_INPUT/,
+    );
+  },
+);
+await ok(
+  "shared table limit survives separate calls and does not leak across tenants",
+  async () => {
+    const consume = async (tenant, subject = "f".repeat(64)) =>
+      (
+        await db.query(
+          "select consume_public_rate_limit($1,'order_table',$2) as result",
+          [tenant, subject],
+        )
+      ).rows[0].result;
+    await db.exec("set role service_role");
+    for (let i = 0; i < 12; i++) assert.equal((await consume(a)).allowed, true);
+    const denied = await consume(a);
+    assert.equal(denied.allowed, false);
+    assert.ok(denied.retryAfter >= 1 && denied.retryAfter <= 600);
+    assert.equal((await consume(b)).allowed, true);
+    assert.equal((await consume(a, "e".repeat(64))).allowed, true);
+    await root();
+    const count = (
+      await db.query(
+        "select count(*)::int as n from public_rate_limits where restaurant_id=$1 and subject_hash=$2",
+        [a, "f".repeat(64)],
+      )
+    ).rows[0].n;
+    assert.equal(count, 1);
+  },
+);
+await ok(
+  "limiter clears stale pseudonyms and permits a new window",
+  async () => {
+    await db.query(
+      "update public_rate_limits set window_start=window_start-interval '2 hours',expires_at=expires_at-interval '2 hours'",
+    );
+    const result = (
+      await db.query(
+        "select consume_public_rate_limit($1,'order_table',$2) as result",
+        [a, "f".repeat(64)],
+      )
+    ).rows[0].result;
+    assert.equal(result.allowed, true);
+    assert.equal(
+      (
+        await db.query(
+          "select count(*)::int as n from public_rate_limits where expires_at < now()-interval '1 hour'",
+        )
+      ).rows[0].n,
+      0,
+    );
+  },
+);
+
 await db.close();
 console.log(
   `${count} database checks passed. Supabase Auth, Storage, Realtime and pgcrypto still require hosted validation.`,

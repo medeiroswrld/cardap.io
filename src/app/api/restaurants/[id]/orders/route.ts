@@ -1,5 +1,8 @@
+import { logFailure, withRequestLogging } from "@/lib/observability/logger";
+import { errorCode, errorStatus } from "@/lib/observability/core";
 import { cookies } from "next/headers";
 import { z } from "zod";
+import { enforcePublicLimit } from "@/lib/rate-limit";
 import { serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 const schema = z.object({
@@ -30,7 +33,7 @@ const schema = z.object({
     .min(1)
     .max(50),
 });
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -40,6 +43,8 @@ export async function POST(
     const payload = schema.parse(await request.json());
     const token = (await cookies()).get(`guest_${id}`)?.value;
     if (!token) throw new Error("UNAUTHORIZED");
+    await enforcePublicLimit(request, id, "order");
+    await enforcePublicLimit(request, id, "order_table", payload.table_id);
     const { data, error } = await serviceClient().rpc("place_guest_order", {
       p_restaurant: id,
       p_token_hash: hash(token),
@@ -47,24 +52,13 @@ export async function POST(
       p_payload: payload,
     });
     if (error) {
-      const code = error.message.includes("PRICE_CHANGED")
-        ? "PRICE_CHANGED"
-        : error.message.includes("OPTIONS_CHANGED")
-          ? "OPTIONS_CHANGED"
-          : error.message.includes("IDEMPOTENCY_CONFLICT")
-            ? "IDEMPOTENCY_CONFLICT"
-            : error.message.includes("UNAVAILABLE")
-              ? "UNAVAILABLE"
-              : error.message.includes("CLOSED")
-                ? "CLOSED"
-                : "ORDER_REJECTED";
+      const code = errorCode(error);
+      if (errorStatus(code) >= 500) throw error;
+      logFailure(error, "supabase.orders");
       return Response.json(
         { error: code },
         {
-          status:
-            code === "PRICE_CHANGED" || code === "IDEMPOTENCY_CONFLICT"
-              ? 409
-              : 400,
+          status: errorStatus(code),
           headers: noStore,
         },
       );
@@ -74,3 +68,8 @@ export async function POST(
     return apiError(error);
   }
 }
+
+export const POST = withRequestLogging(
+  "/api/restaurants/[id]/orders",
+  handlePOST,
+);
