@@ -48,3 +48,37 @@ test("HSTS only for HTTPS production builds", () => {
   assert.equal(header(list, "Referrer-Policy"), "strict-origin-when-cross-origin");
   assert.equal(header(list, "Permissions-Policy"), "camera=(), microphone=(), geolocation=(), payment=()");
 });
+
+function fakeSupabase(result) {
+  const chain = {
+    from: () => chain,
+    select: () => chain,
+    eq: () => chain,
+    single: async () => result,
+  };
+  return chain;
+}
+function cacheModule() {
+  const calls = [];
+  const warnings = [];
+  const load = loader({
+    "next/cache": { revalidateTag: (...args) => calls.push(args) },
+    "./observability/logger": { logger: { warn: (...a) => warnings.push(a) } },
+  });
+  return { mod: load("src/lib/catalog-cache.ts"), calls, warnings };
+}
+
+test("catalog invalidation expires the restaurant slug tag immediately", async () => {
+  const { mod, calls } = cacheModule();
+  assert.equal(mod.catalogTag("casa-x"), "catalog:casa-x");
+  await mod.invalidateCatalog(fakeSupabase({ data: { slug: "casa-x" }, error: null }), "id");
+  assert.deepEqual(calls, [["catalog:casa-x", { expire: 0 }]]);
+});
+
+test("catalog invalidation never fails the mutation that already succeeded", async () => {
+  const { mod, calls, warnings } = cacheModule();
+  await mod.invalidateCatalog(fakeSupabase({ data: null, error: { code: "X" } }), "id");
+  assert.deepEqual(calls, []);
+  assert.equal(warnings[0][0], "dependency.failed");
+  assert.equal(warnings[0][1].operation, "supabase.catalog");
+});

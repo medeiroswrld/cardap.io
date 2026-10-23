@@ -1,6 +1,7 @@
 import { setLogUser, withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { serverClient } from "@/lib/supabase/server";
+import { invalidateCatalogSlug } from "@/lib/catalog-cache";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 async function handlePOST(request: Request) {
   try {
@@ -28,6 +29,8 @@ async function handlePOST(request: Request) {
       p_slug: body.slug,
     });
     if (error) throw error;
+    // A visit before creation may have cached "not found" for this slug.
+    invalidateCatalogSlug(body.slug);
     return Response.json({ id: data }, { headers: noStore });
   } catch (error) {
     return apiError(error);

@@ -1,10 +1,11 @@
 import "server-only";
 import { logger } from "./observability/logger";
 import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 import { isConfigured } from "./supabase/server";
+import { catalogTag } from "./catalog-cache";
 import type { Catalog } from "./connected-types";
-export async function readCatalog(slug: string): Promise<Catalog | null> {
-  if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
+async function fetchCatalog(slug: string): Promise<Catalog | null> {
   const client = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -83,4 +84,13 @@ export async function readCatalog(slug: string): Promise<Catalog | null> {
     media: media.data,
     tables: tables.data,
   } as Catalog;
+}
+
+// Short shared cache for the public menu; invalidated by owner mutations.
+export function readCatalog(slug: string): Promise<Catalog | null> {
+  if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
+  return unstable_cache(() => fetchCatalog(slug), ["catalog", slug], {
+    revalidate: 60,
+    tags: [catalogTag(slug)],
+  })();
 }

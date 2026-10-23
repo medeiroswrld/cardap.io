@@ -1,6 +1,7 @@
 import "server-only";
 import { logger } from "./observability/logger";
 import { getVideoStatus } from "./cloudflare";
+import { invalidateCatalog } from "./catalog-cache";
 import { serviceClient } from "./supabase/server";
 import {
   STORAGE_VIDEO_PREFIX,
@@ -54,6 +55,8 @@ export async function syncVideoAsset(
       .eq("id", asset.id)
       .eq("restaurant_id", restaurantId);
     if (result.error) throw result.error;
+    if (changes.state === "ready")
+      await invalidateCatalog(service, restaurantId);
     return changes;
   }
   const remote = await getVideoStatus(asset.provider_asset_id);
@@ -79,5 +82,7 @@ export async function syncVideoAsset(
     .eq("id", asset.id)
     .eq("restaurant_id", restaurantId);
   if (error) throw error;
+  if (changes.state === "ready")
+    await invalidateCatalog(serviceClient(), restaurantId);
   return changes;
 }

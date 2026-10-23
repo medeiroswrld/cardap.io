@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
+import { invalidateCatalog } from "@/lib/catalog-cache";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
@@ -178,6 +179,9 @@ async function handlePOST(
       });
       if (error) throw error;
     }
+    // Marketing revocations and comment moderation are not part of the public catalog.
+    if (body.action !== "revoke_marketing" && body.action !== "moderate_feedback")
+      await invalidateCatalog(supabase, id);
     return Response.json({ ok: true }, { headers: noStore });
   } catch (error) {
     return apiError(error);
