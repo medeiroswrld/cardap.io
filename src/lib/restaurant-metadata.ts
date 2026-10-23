@@ -13,6 +13,8 @@ export function restaurantMetadata(
   return {
     title,
     description,
+    // Table links (/r/<slug>?mesa=N) must not be indexed as duplicates.
+    alternates: { canonical: `/r/${catalog.restaurant.slug}` },
     robots: { index: true, follow: true },
     openGraph: { title, description, type: "website", locale: "pt_BR", images },
     twitter: {

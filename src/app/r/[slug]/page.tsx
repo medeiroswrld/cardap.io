@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MenuApp } from "@/components/menu-app";
 import { readCatalog } from "@/lib/catalog";
+import { isCatalogSlug } from "@/lib/catalog-cache";
 import { DemoProvider } from "@/components/demo-provider";
 import { ConnectedMenuProvider } from "@/components/connected-menu-provider";
 import { DEMO_METADATA, restaurantMetadata } from "@/lib/restaurant-metadata";
@@ -13,6 +14,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   if (slug === "demo") return DEMO_METADATA;
+  if (!isCatalogSlug(slug)) return {};
   try {
     const catalog = await readCatalog(slug);
     return catalog ? restaurantMetadata(catalog) : {};
@@ -33,6 +35,7 @@ export default async function Page({
         <MenuApp />
       </DemoProvider>
     );
+  if (!isCatalogSlug(slug)) notFound();
   const catalog = await readCatalog(slug);
   if (!catalog) notFound();
   return (

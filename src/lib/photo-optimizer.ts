@@ -13,7 +13,7 @@ function encode(canvas: HTMLCanvasElement, type: string) {
 export async function optimizePhoto(file: File): Promise<File> {
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   } catch {
     throw new Error(
       "Não foi possível ler a foto. Escolha outro arquivo JPG, PNG ou WebP.",
@@ -30,14 +30,18 @@ export async function optimizePhoto(file: File): Promise<File> {
     const context = canvas.getContext("2d");
     if (!context)
       throw new Error("Não foi possível preparar a foto neste navegador.");
-    // Transparent PNGs would turn black in the JPEG fallback.
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     let blob = await encode(canvas, "image/webp");
     // Browsers without WebP encoding silently return PNG; use JPEG instead.
-    if (!blob || blob.type !== "image/webp")
+    // JPEG has no alpha (transparent pixels would turn black), so the white
+    // background is painted only on this fallback path; WebP keeps its alpha.
+    if (!blob || blob.type !== "image/webp") {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       blob = await encode(canvas, "image/jpeg");
+    }
     if (!blob) throw new Error("Não foi possível preparar a foto.");
     const alreadyFine =
       scale === 1 &&

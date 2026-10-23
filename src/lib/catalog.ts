@@ -89,7 +89,8 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
 // Short shared cache for the public menu; invalidated by owner mutations.
 export function readCatalog(slug: string): Promise<Catalog | null> {
   if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
-  return unstable_cache(() => fetchCatalog(slug), ["catalog", slug], {
+  // Bump "v1" whenever the Catalog shape changes so old cached entries are ignored.
+  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v1", slug], {
     revalidate: 60,
     tags: [catalogTag(slug)],
   })();

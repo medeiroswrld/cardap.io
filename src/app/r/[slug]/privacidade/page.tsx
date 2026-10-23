@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readCatalog } from "@/lib/catalog";
+import { isCatalogSlug } from "@/lib/catalog-cache";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
@@ -8,6 +9,7 @@ export default async function Page({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  if (!isCatalogSlug(slug)) notFound();
   const catalog = await readCatalog(slug);
   if (!catalog) notFound();
   const r = catalog.restaurant;

@@ -51,9 +51,21 @@ async function listProducts(service) {
       .order("id")
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error("Não foi possível listar os produtos.");
+    // Keep paging until an empty page: a project max_rows below PAGE_SIZE must not truncate.
+    if (data.length === 0) return rows;
     rows.push(...data);
-    if (data.length < PAGE_SIZE) return rows;
   }
+}
+
+// Read-only counts (no urls, names or ids) of content the new CSP can affect.
+async function countLegacyVideos(service) {
+  const { count, error } = await service
+    .from("product_media")
+    .select("id", { count: "exact", head: true })
+    .eq("state", "ready")
+    .not("provider_asset_id", "like", "storage:%");
+  if (error) throw new Error("Não foi possível contar os vídeos legados.");
+  return count ?? 0;
 }
 
 class ProductError extends Error {
@@ -70,7 +82,13 @@ async function main() {
   const service = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
-  const plan = planPhotoConversions(await listProducts(service), url);
+  const products = await listProducts(service);
+  const plan = planPhotoConversions(products, url);
+  const publicPrefix = `${new URL(url).origin}/storage/v1/object/public/${BUCKET}/`;
+  const externalPhotos = products.filter(
+    (row) => typeof row.photo_url === "string" && !row.photo_url.startsWith(publicPrefix),
+  ).length;
+  const legacyVideos = await countLegacyVideos(service);
   process.stdout.write(`${plan.length} foto(s) para converter${apply ? "" : " (simulação)"}\n`);
   const root = path.resolve(".tools");
   mkdirSync(root, { recursive: true });
@@ -142,6 +160,12 @@ async function main() {
     rmSync(dir, { recursive: true, force: true });
   }
   process.stdout.write(`Concluído: ${converted} convertida(s), ${skipped} ignorada(s), ${failed} com falha\n`);
+  process.stdout.write(
+    `Fotos fora do bucket restaurant-media (bloqueadas pela nova política de segurança, não convertidas): ${externalPhotos}\n`,
+  );
+  process.stdout.write(
+    `Vídeos legados da Cloudflare prontos (exigem CLOUDFLARE_ACCOUNT_ID no build): ${legacyVideos}\n`,
+  );
   if (failed > 0) process.exitCode = 1;
 }
 

@@ -81,13 +81,33 @@ test("catalog invalidation never fails the mutation that already succeeded", asy
   assert.deepEqual(calls, []);
   assert.equal(warnings[0][0], "dependency.failed");
   assert.equal(warnings[0][1].operation, "supabase.catalog");
+  assert.equal(warnings[0][1].errorCode, "DATABASE_ERROR");
+});
+
+test("catalog invalidation swallows unexpected throws and logs the warning", async () => {
+  const { mod, calls, warnings } = cacheModule();
+  const throwing = fakeSupabase(null);
+  throwing.single = async () => {
+    throw new Error("boom");
+  };
+  await assert.doesNotReject(mod.invalidateCatalog(throwing, "id"));
+  assert.deepEqual(calls, []);
+  assert.equal(warnings[0][0], "dependency.failed");
+  assert.equal(warnings[0][1].errorCode, "DATABASE_ERROR");
+});
+
+test("catalog slug validation matches the public route rule", () => {
+  const { mod } = cacheModule();
+  assert.equal(mod.isCatalogSlug("casa-x1"), true);
+  for (const bad of ["", "Casa", "a b", "a/b", "x".repeat(81)])
+    assert.equal(mod.isCatalogSlug(bad), false);
 });
 
 const meta = loader()("src/lib/restaurant-metadata.ts");
 
 test("restaurant metadata uses its name and first product photo", () => {
   const result = meta.restaurantMetadata({
-    restaurant: { name: "Casa X" },
+    restaurant: { name: "Casa X", slug: "casa-x" },
     products: [
       { photo_url: null },
       { photo_url: "https://abc.supabase.co/storage/v1/object/public/restaurant-media/r/1.webp" },
@@ -100,11 +120,12 @@ test("restaurant metadata uses its name and first product photo", () => {
     { url: "https://abc.supabase.co/storage/v1/object/public/restaurant-media/r/1.webp" },
   ]);
   assert.equal(result.twitter.card, "summary_large_image");
+  assert.deepEqual(result.alternates, { canonical: "/r/casa-x" });
   assert.deepEqual(result.robots, { index: true, follow: true });
 });
 
 test("restaurant without photos gets a text-only card", () => {
-  const result = meta.restaurantMetadata({ restaurant: { name: "Casa Y" }, products: [] });
+  const result = meta.restaurantMetadata({ restaurant: { name: "Casa Y", slug: "casa-y" }, products: [] });
   assert.equal(result.openGraph.images, undefined);
   assert.equal(result.twitter.card, "summary");
   assert.deepEqual(meta.DEMO_METADATA.robots, { index: false, follow: false });

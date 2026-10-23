@@ -1,5 +1,6 @@
 import { logFailure, withRequestLogging } from "@/lib/observability/logger";
 import { readCatalog } from "@/lib/catalog";
+import { isCatalogSlug } from "@/lib/catalog-cache";
 import { noStore } from "@/lib/server-security";
 
 async function handleGET(
@@ -7,7 +8,7 @@ async function handleGET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  if (!/^[a-z0-9-]{1,80}$/.test(slug))
+  if (!isCatalogSlug(slug))
     return Response.json(
       { error: "Cardápio não encontrado." },
       { status: 404, headers: noStore },
