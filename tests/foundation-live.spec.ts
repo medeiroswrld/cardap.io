@@ -60,7 +60,11 @@ test("Supabase real: cache do cardápio, invalidação e prévia do link", async
       (await (await page.request.get(`/api/catalog/${slug}`)).json()).products[0].price_cents;
     expect(await price()).toBe(2500);
     // Direct DB write bypasses invalidation: the cached catalog must still answer.
-    await owner.from("products").update({ price_cents: 2600 }).eq("id", product.id);
+    const directWrite = await owner
+      .from("products").update({ price_cents: 2600 }).eq("id", product.id).select("id");
+    if (directWrite.error) throw directWrite.error;
+    expect(directWrite.data).toHaveLength(1);
+    // Meaningful against a production build (next start); next dev may not cache.
     expect(await price()).toBe(2500);
 
     await page.goto("/login");
@@ -75,7 +79,16 @@ test("Supabase real: cache do cardápio, invalidação e prévia do link", async
     expect(save.status()).toBe(200);
     expect(await price()).toBe(2700);
   } finally {
-    if (tenant) await service.from("restaurants").delete().eq("id", tenant);
-    if (userId) await service.auth.admin.deleteUser(userId);
+    try {
+      if (tenant) {
+        const { error } = await service.from("restaurants").delete().eq("id", tenant);
+        if (error) console.error("Test tenant cleanup failed", tenant, error.code);
+      }
+    } finally {
+      if (userId) {
+        const { error } = await service.auth.admin.deleteUser(userId);
+        if (error) console.error("Test account cleanup failed", userId, error.code);
+      }
+    }
   }
 });
