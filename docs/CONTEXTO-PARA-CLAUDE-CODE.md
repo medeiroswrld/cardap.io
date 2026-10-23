@@ -4,6 +4,8 @@ Atualizado em 21/10/2026. Documento de transferência de contexto: ideia, produt
 
 Complemento de 22/10/2026: veja `docs/piloto.md` para limites compartilhados no Postgres (migration 010), configuração de segredos na Vercel e preparação de vídeos; veja `docs/observability.md` para o logger Pino com campos restritos. Novos uploads na gestão geram capa JPEG no navegador. A rotação das credenciais expostas continua pendente. As descrições abaixo refletem o levantamento original; confirme o deployment ativo antes de assumir que um ajuste local já está publicado.
 
+Complemento de 23/10/2026 (branch `melhorias/a-fundacao`): cabeçalhos de segurança/CSP em `src/lib/security-headers.ts` (terceiros como Pixel/GA4 precisam ser liberados ali); `DemoProvider` restrito às rotas de demonstração; metadados e prévia de link por restaurante; catálogo público cacheado por 60 s com invalidação nas mutações do dono (`src/lib/catalog-cache.ts`); fotos novas convertidas para WebP ≤1080 px no navegador; script `npm run optimize:photos` para as antigas. Passos manuais em `docs/checklist-fundacao.md`.
+
 ## 1. O que estamos construindo
 
 Cardap.io é uma aplicação web para restaurantes, hamburguerias e estabelecimentos semelhantes. Une um cardápio visual com experiência de Reels, pedidos feitos pelo cliente na mesa, gestão operacional, métricas de interesse nos pratos e interações sociais.

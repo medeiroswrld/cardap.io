@@ -52,6 +52,8 @@ Revisar imagem, áudio e duração antes de enviar. Nenhum vídeo real do restau
 npm run test:database
 npm run test:observability
 npm run test:media
+npm run test:foundation
+npm run test:photos
 npm run lint
 npm run typecheck
 npm run build -- --webpack
