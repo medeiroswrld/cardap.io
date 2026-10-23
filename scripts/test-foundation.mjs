@@ -1,0 +1,50 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { loader } from "./lib/ts-loader.mjs";
+
+const security = loader()("src/lib/security-headers.ts");
+const base = {
+  supabaseUrl: "https://abc.supabase.co",
+  legacyStream: false,
+  dev: false,
+  https: true,
+};
+const header = (list, key) => list.find((h) => h.key === key)?.value;
+
+test("CSP allows only this site and the configured Supabase project", () => {
+  const csp = security.contentSecurityPolicy(base);
+  assert.match(csp, /default-src 'self'/);
+  assert.match(csp, /connect-src 'self' https:\/\/abc\.supabase\.co wss:\/\/abc\.supabase\.co/);
+  assert.match(csp, /media-src 'self' blob: https:\/\/abc\.supabase\.co/);
+  assert.match(csp, /img-src 'self' data: blob: https:\/\/abc\.supabase\.co/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.doesNotMatch(csp, /unsafe-eval/);
+  assert.doesNotMatch(csp, /cloudflarestream/);
+});
+
+test("development adds eval and HMR websockets; legacy stream adds Cloudflare", () => {
+  const csp = security.contentSecurityPolicy({ ...base, dev: true, legacyStream: true });
+  assert.match(csp, /script-src 'self' 'unsafe-inline' 'unsafe-eval'/);
+  assert.match(csp, /connect-src [^;]* ws:/);
+  assert.match(csp, /media-src [^;]*https:\/\/\*\.cloudflarestream\.com/);
+});
+
+test("invalid or missing Supabase URL never produces a wildcard origin", () => {
+  for (const supabaseUrl of [undefined, "not a url"]) {
+    const csp = security.contentSecurityPolicy({ ...base, supabaseUrl });
+    assert.match(csp, /connect-src 'self';/);
+    assert.doesNotMatch(csp, /\*(?!\.cloudflarestream)/);
+  }
+});
+
+test("HSTS only for HTTPS production builds", () => {
+  assert.ok(header(security.securityHeaders(base), "Strict-Transport-Security"));
+  assert.equal(header(security.securityHeaders({ ...base, https: false }), "Strict-Transport-Security"), undefined);
+  assert.equal(header(security.securityHeaders({ ...base, dev: true }), "Strict-Transport-Security"), undefined);
+  const list = security.securityHeaders(base);
+  assert.equal(header(list, "X-Frame-Options"), "DENY");
+  assert.equal(header(list, "X-Content-Type-Options"), "nosniff");
+  assert.equal(header(list, "Referrer-Policy"), "strict-origin-when-cross-origin");
+  assert.equal(header(list, "Permissions-Policy"), "camera=(), microphone=(), geolocation=(), payment=()");
+});
