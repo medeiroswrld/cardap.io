@@ -1,6 +1,6 @@
 # Cardap.io — contexto completo para continuidade no Claude Code
 
-Atualizado em 21/10/2026. Documento de transferência de contexto: ideia, produto, decisões do fundador, implementação e pendências. Não contém credenciais. Leia o código e o estado do Git antes de modificar qualquer coisa; o projeto já existe e tem usuários/dados de teste em serviços reais.
+Atualizado em 21/10/2026 (complemento em 23/10/2026). Documento de transferência de contexto: ideia, produto, decisões do fundador, implementação e pendências. Não contém credenciais. Leia o código e o estado do Git antes de modificar qualquer coisa; o projeto já existe e tem usuários/dados de teste em serviços reais.
 
 Complemento de 22/10/2026: veja `docs/piloto.md` para limites compartilhados no Postgres (migration 010), configuração de segredos na Vercel e preparação de vídeos; veja `docs/observability.md` para o logger Pino com campos restritos. Novos uploads na gestão geram capa JPEG no navegador. A rotação das credenciais expostas continua pendente. As descrições abaixo refletem o levantamento original; confirme o deployment ativo antes de assumir que um ajuste local já está publicado.
 

@@ -44,7 +44,7 @@ Aplicados em `next.config.ts` (`headers()`) para todas as rotas:
 
 ## 4. Cache do catálogo público
 
-- `readCatalog(slug)` passa a ser cacheado no servidor por até 60 segundos, com tag por restaurante (`catalog:<restaurantId>`) e por slug.
+- `readCatalog(slug)` passa a ser cacheado no servidor por até 60 segundos, com tag por slug (`catalog:<slug>`); o slug é imutável, então a invalidação busca o slug pelo id do restaurante.
 - Invalidam a tag do restaurante após sucesso: `POST /api/restaurants/[id]/catalog` em todas as ações exceto `revoke_marketing` e `moderate_feedback` (que não alteram o catálogo público), e `PATCH /api/restaurants/[id]/media` (publicação de vídeo). `workspace` é somente leitura; `subscribe`, pedidos, sessões e métricas não invalidam.
 - Dados que mudam por pedido ou sessão (status do pedido, sessão de visitante, interações sociais) não entram no cache.
 - O mecanismo exato (API de cache do Next 16 instalado) é escolhido no plano após leitura de `node_modules/next/dist/docs/`, conforme `AGENTS.md`.
