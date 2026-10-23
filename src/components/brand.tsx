@@ -1,30 +1,38 @@
 "use client";
 import { Flame } from "lucide-react";
 import Link from "next/link";
-import { useDemo } from "./demo-provider";
+import { useContext } from "react";
+import { DemoContext } from "./demo-provider";
 export function Brand({ compact = false }: { compact?: boolean }) {
-  const { state, slug } = useDemo();
+  // Outside a menu (e.g. login) there is no restaurant: show the platform.
+  const context = useContext(DemoContext);
+  const name = context?.state.settings.name ?? "Cardap.io";
   return (
     <Link
-      href={`/r/${slug}`}
+      href={context ? `/r/${context.slug}` : "/"}
       className="brand"
-      aria-label={`${state.settings.name} — início`}
+      aria-label={`${name} — início`}
     >
       <span className="brand-icon">
         <Flame size={27} strokeWidth={1.8} />
       </span>
       <span>
         <span className="brand-name">
-          {state.settings.name.toLocaleLowerCase("pt-BR")}
-          <span className="brand-period">.</span>
+          {name.toLocaleLowerCase("pt-BR")}
+          {context && <span className="brand-period">.</span>}
         </span>
-        {!compact && <small>{state.settings.subtitle}</small>}
+        {!compact && (
+          <small>
+            {context?.state.settings.subtitle ??
+              "Cardápio digital com pedidos na mesa"}
+          </small>
+        )}
       </span>
     </Link>
   );
 }
 export function DemoBanner() {
-  const { mode } = useDemo();
+  const mode = useContext(DemoContext)?.mode;
   if (mode !== "demo") return null;
   return (
     <div className="demo-banner">
