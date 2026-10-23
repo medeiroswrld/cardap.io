@@ -42,3 +42,9 @@ test("demo continua com dados e banner próprios", async ({ page }) => {
   await page.goto("/r/demo/pedidos");
   await expect(page.getByText("Modo demonstração")).toBeVisible();
 });
+
+test("demo não é indexada e tem título próprio", async ({ page }) => {
+  await page.goto("/r/demo");
+  await expect(page).toHaveTitle("Demonstração · Cardap.io");
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+});

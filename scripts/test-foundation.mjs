@@ -82,3 +82,30 @@ test("catalog invalidation never fails the mutation that already succeeded", asy
   assert.equal(warnings[0][0], "dependency.failed");
   assert.equal(warnings[0][1].operation, "supabase.catalog");
 });
+
+const meta = loader()("src/lib/restaurant-metadata.ts");
+
+test("restaurant metadata uses its name and first product photo", () => {
+  const result = meta.restaurantMetadata({
+    restaurant: { name: "Casa X" },
+    products: [
+      { photo_url: null },
+      { photo_url: "https://abc.supabase.co/storage/v1/object/public/restaurant-media/r/1.webp" },
+      { photo_url: "https://abc.supabase.co/other.webp" },
+    ],
+  });
+  assert.equal(result.title, "Casa X · Cardápio");
+  assert.equal(result.description, "Veja o cardápio de Casa X, escolha e peça direto da mesa.");
+  assert.deepEqual(result.openGraph.images, [
+    { url: "https://abc.supabase.co/storage/v1/object/public/restaurant-media/r/1.webp" },
+  ]);
+  assert.equal(result.twitter.card, "summary_large_image");
+  assert.deepEqual(result.robots, { index: true, follow: true });
+});
+
+test("restaurant without photos gets a text-only card", () => {
+  const result = meta.restaurantMetadata({ restaurant: { name: "Casa Y" }, products: [] });
+  assert.equal(result.openGraph.images, undefined);
+  assert.equal(result.twitter.card, "summary");
+  assert.deepEqual(meta.DEMO_METADATA.robots, { index: false, follow: false });
+});
