@@ -34,6 +34,7 @@ import { Modal } from "./ui/dialog";
 import { MediaPicker } from "./media-picker";
 import { VideoUploader, uploadProductVideo } from "./video-uploader";
 import { createVideoCover } from "@/lib/video-cover";
+import { optimizePhoto } from "@/lib/photo-optimizer";
 import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderChoices } from "./order-choices";
@@ -648,8 +649,10 @@ function Products({
               let productSaved = false;
               try {
                 let photo = edit.photo_url;
-                const photoFile = file?.type.startsWith("video/")
-                  ? await createVideoCover(file)
+                const photoFile = file
+                  ? file.type.startsWith("video/")
+                    ? await createVideoCover(file)
+                    : await optimizePhoto(file)
                   : file;
                 if (photoFile) {
                   const client = browserClient();

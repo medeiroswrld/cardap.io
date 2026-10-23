@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { resolveDemoVideo } from "@/lib/demo-media";
+import { PHOTO_SELECT_MAX_MB } from "@/lib/photo-optimizer";
 import {
   VIDEO_MAX_BYTES,
   VIDEO_MAX_SECONDS,
@@ -97,7 +98,7 @@ export function MediaPicker({
                 ? VIDEO_MAX_BYTES / 1024 / 1024
                 : demo
                   ? 1
-                  : 5;
+                  : PHOTO_SELECT_MAX_MB;
               if (selected.size > max * 1024 * 1024)
                 throw new Error(
                   `Escolha ${videoFile ? "um vídeo" : "uma foto"} de até ${max} MB.`,
@@ -119,8 +120,9 @@ export function MediaPicker({
         </p>
       )}
       <p className="field-help">
-        Fotos JPG, PNG ou WebP até {demo ? 1 : 5} MB. Vídeos MP4 (H.264) ou WebM
-        até 45 segundos e 20 MB.
+        Fotos JPG, PNG ou WebP até {demo ? 1 : PHOTO_SELECT_MAX_MB} MB
+        {demo ? "" : ", otimizadas automaticamente"}. Vídeos MP4 (H.264) ou
+        WebM até 45 segundos e 20 MB.
       </p>
       {demo && (
         <p className="field-help">

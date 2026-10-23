@@ -14,7 +14,8 @@
     "test:observability": "node --test scripts/test-observability.mjs",
     "test:foundation": "node --test scripts/test-foundation.mjs",
     "prepare:media": "node scripts/prepare-pilot-media.mjs",
-    "test:media": "node --test scripts/test-pilot-media.mjs"
+    "test:media": "node --test scripts/test-pilot-media.mjs",
+    "test:photos": "node --test scripts/test-photos.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "5.3.0",
