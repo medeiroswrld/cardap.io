@@ -1,43 +1,7 @@
-import { PGlite } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
-const db = new PGlite();
+import { createTestDatabase } from "./lib/test-db.mjs";
+const db = await createTestDatabase();
 let count = 0;
-// Supabase-owned schemas/roles are represented locally; business SQL is unchanged.
-await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
- create schema auth;create schema storage;create schema extensions;
- create table auth.users(id uuid primary key);
- create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
- create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
- create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);alter table storage.objects enable row level security;
- create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;
- -- Test-only digest stand-in: PGlite lacks pgcrypto. Cryptography is not tested here.
- create function extensions.digest(text,text) returns bytea language sql immutable as $$select convert_to(md5($1),'UTF8')$$;
- grant usage on schema public,auth,storage to anon,authenticated,service_role;
-`);
-for (const file of [
-  "001_foundation.sql",
-  "002_connected_management.sql",
-  "003_video_observations.sql",
-  "004_cart_associations.sql",
-  "005_video_storage.sql",
-  "006_photo_observations.sql",
-  "007_product_options.sql",
-  "008_product_feedback.sql",
-  "009_social_feedback.sql",
-  "010_pilot_rate_limits.sql",
-]) {
-  const sql = readFileSync(
-    new URL("../supabase/migrations/" + file, import.meta.url),
-    "utf8",
-  )
-    .replace("create extension if not exists pgcrypto;", "")
-    .replace(
-      "alter publication supabase_realtime add table public.orders;",
-      "",
-    );
-  await db.exec(sql);
-}
 const a = "10000000-0000-4000-8000-000000000001",
   b = "10000000-0000-4000-8000-000000000002",
   ownerA = "20000000-0000-4000-8000-000000000001",
