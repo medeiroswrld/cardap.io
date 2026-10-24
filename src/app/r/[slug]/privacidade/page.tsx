@@ -21,6 +21,11 @@ export default async function Page({
         Nome, telefone, mesa e itens são usados para preparar e atender o
         pedido. O telefone informado não é verificado.
       </p>
+      <p>
+        Em pedidos para entrega, o endereço informado (rua, número, complemento,
+        referência e bairro) é usado apenas para entregar o pedido e fica visível
+        somente para a equipe do restaurante e para você, neste navegador.
+      </p>
       <h2>Ofertas são opcionais</h2>
       <p>
         A autorização de marketing é separada do pedido. A equipe registra a

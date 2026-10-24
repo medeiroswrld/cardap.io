@@ -6,6 +6,8 @@ Complemento de 22/10/2026: veja `docs/piloto.md` para limites compartilhados no 
 
 Complemento de 23/10/2026 (branch `melhorias/a-fundacao`): cabeçalhos de segurança/CSP em `src/lib/security-headers.ts` (terceiros como Pixel/GA4 precisam ser liberados ali); `DemoProvider` restrito às rotas de demonstração; metadados e prévia de link por restaurante; catálogo público cacheado por 60 s com invalidação nas mutações do dono (`src/lib/catalog-cache.ts`); fotos novas convertidas para WebP ≤1080 px no navegador; script `npm run optimize:photos` para as antigas. Passos manuais em `docs/checklist-fundacao.md`.
 
+Complemento de 24/10/2026 (branch `melhorias/g-pedidos-online`): pedidos online de retirada e entrega. Migration `supabase/migrations/011_online_orders.sql` (**precisa ser aplicada no Supabase hospedado antes do deploy desta branch**); tipos de pedido `mesa`/`retirada`/`entrega`; novos status `aguardando_aceite`, `recusado` e `saiu_para_entrega`; tabelas `delivery_zones` (taxa e estimativa por bairro) e `order_addresses`; flags `pickup_enabled`/`delivery_enabled`/`delivery_min_order_cents` no restaurante; escopo de limite `order_online`. `src/lib/order-flow.ts` espelha a RPC `advance_order`; regras puras em `src/lib/online-order.ts`, `order-alerts.ts`, `order-board.ts` e `fulfillment-draft.ts`. Cliente: `fulfillment-fields.tsx`, checkout em `menu-app.tsx`, acompanhamento em `connected-tracking.tsx`. Gestão: `order-board.tsx`, `delivery-settings.tsx` e alerta de novo pedido (`use-order-alerts.ts`). Testes: `npm run test:online` e `scripts/test-online-orders.mjs` (dentro de `test:database`); fluxo hospedado opt-in em `tests/online-orders-live.spec.ts`. Pagamento online, agendamento e integração com marketplaces continuam fora de escopo.
+
 ## 1. O que estamos construindo
 
 Cardap.io é uma aplicação web para restaurantes, hamburguerias e estabelecimentos semelhantes. Une um cardápio visual com experiência de Reels, pedidos feitos pelo cliente na mesa, gestão operacional, métricas de interesse nos pratos e interações sociais.
@@ -371,7 +373,7 @@ Não apresentar o produto como SaaS acabado. Prioridades:
 9. **Escala de mídia:** orçamento/franquias por restaurante, armazenamento acumulado, tráfego, limpeza segura de versões sem uso e eventual processamento dedicado. Não prometer armazenamento ilimitado/grátis.
 10. **SaaS comercial:** planos, limites, cobrança, convites de equipe, onboarding assistido e domínio/marca. Validar preços com restaurantes antes de fixar o modelo.
 
-Fora do MVP atual: delivery, integração com PDV, pagamentos online, disparos automáticos de WhatsApp, previsão por IA, aplicativo nativo, editor de vídeo, painel de agência e combos complexos. Essas possibilidades não são requisitos já aprovados para implementação imediata.
+Fora do MVP atual: integração com PDV, pagamentos online, agendamento, integração com marketplaces, disparos automáticos de WhatsApp, previsão por IA, aplicativo nativo, editor de vídeo, painel de agência e combos complexos. Essas possibilidades não são requisitos já aprovados para implementação imediata.
 
 ## 18. Como continuar sem perder a intenção do produto
 

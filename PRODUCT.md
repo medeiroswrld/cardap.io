@@ -52,7 +52,9 @@ Evidência da versão inicial com compra obrigatória (19/10/2026): 41 testes SQ
 Um cardápio que facilita escolher e pedir, com vídeos que o restaurante consegue manter atualizados. Vídeo, NFC e métricas já existem no mercado; não apresentar esses recursos como exclusividade. O piloto deve testar facilidade de publicação, uso pela equipe e qualidade do pedido.
 
 ## Limites do MVP
-Sem delivery, integração com PDV, cobrança automática da assinatura, campanhas automáticas de WhatsApp, previsão de preparo por IA, aplicativo nativo, painel de agência ou editor de vídeo. Adicionais simples com preço por unidade e retirada de ingredientes sem desconto fazem parte do MVP; regras complexas de complementos e combos ficam para uma segunda etapa. Observações livres continuam disponíveis sem cobrança adicional.
+Sem integração com PDV, cobrança automática da assinatura, campanhas automáticas de WhatsApp, previsão de preparo por IA, aplicativo nativo, painel de agência ou editor de vídeo. Adicionais simples com preço por unidade e retirada de ingredientes sem desconto fazem parte do MVP; regras complexas de complementos e combos ficam para uma segunda etapa. Observações livres continuam disponíveis sem cobrança adicional.
+
+Pedidos para retirada e entrega (pagamento na entrega/retirada, taxa por bairro, aceite pelo restaurante) fazem parte do produto desde 24/10/2026; pagamento online, agendamento e integração com marketplaces continuam fora.
 
 ## Princípios
 Preço e ação de pedir sempre legíveis. Dados de restaurantes separados. Métricas observadas, sem alegar causalidade sobre vendas. Pedido só aparece como enviado após persistência confirmada. Marketing é opcional e separado da identificação para atendimento.

@@ -53,6 +53,7 @@ npm run test:database
 npm run test:observability
 npm run test:media
 npm run test:foundation
+npm run test:online
 npm run test:photos
 npm run lint
 npm run typecheck
