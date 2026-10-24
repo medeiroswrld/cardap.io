@@ -88,21 +88,64 @@ test("alert repeats while there are pending orders, unless muted", () => {
 
 test("draft converts reais to cents and keeps change only for cash", () => {
   const draftLib = load("src/lib/fulfillment-draft.ts");
-  const options = { pickup: true, delivery: true, minimum: 2000, zones: [{ id: "z1" }] };
+  const zones = [{ id: "z1", fee_cents: 700 }];
+  const options = { pickup: true, delivery: true, minimum: 2000, zones };
   const base = draftLib.initialDraft(options);
   assert.equal(base.fulfillment, "retirada");
   assert.equal(draftLib.initialDraft({ ...options, pickup: false }).fulfillment, "entrega");
-  assert.equal(base.zoneId, "z1");
+  assert.equal(base.zoneId, "", "no zone is pre-selected");
   assert.deepEqual(
-    draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: "100,50" }),
+    draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: "100,50" }, zones),
     { fulfillment: "retirada", payment: "dinheiro", changeFor: 10050 },
   );
-  assert.equal(draftLib.draftToChoice({ ...base, payment: "pix", changeFor: "100" }).changeFor, null);
-  assert.equal(draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: " " }).changeFor, null);
-  const delivery = draftLib.draftToChoice({ ...base, fulfillment: "entrega", street: "Rua A", number: "10" });
+  assert.equal(draftLib.draftToChoice({ ...base, payment: "pix", changeFor: "100" }, zones).changeFor, null);
+  assert.equal(draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: " " }, zones).changeFor, null);
+  const entrega = { ...base, fulfillment: "entrega", street: "Rua A", number: "10" };
+  assert.throws(() => draftLib.draftToChoice(entrega, zones), /Escolha o bairro/);
+  const delivery = draftLib.draftToChoice({ ...entrega, zoneId: "z1" }, zones);
   assert.equal(delivery.fulfillment, "entrega");
   assert.equal(delivery.address.zoneId, "z1");
   assert.equal(delivery.address.street, "Rua A");
+  assert.equal(delivery.expectedFee, 700, "the fee shown is sent for confirmation");
+});
+
+test("change accepts common Brazilian formats and rejects anything else", () => {
+  const draftLib = load("src/lib/fulfillment-draft.ts");
+  assert.equal(draftLib.parseChangeFor(""), null);
+  assert.equal(draftLib.parseChangeFor("  "), null);
+  assert.equal(draftLib.parseChangeFor("50"), 5000);
+  assert.equal(draftLib.parseChangeFor("50,00"), 5000);
+  assert.equal(draftLib.parseChangeFor("50.5"), 5050);
+  assert.equal(draftLib.parseChangeFor("R$ 50"), 5000);
+  assert.equal(draftLib.parseChangeFor("R$50,90"), 5090);
+  assert.equal(draftLib.parseChangeFor("1.000,00"), 100000);
+  assert.equal(draftLib.parseChangeFor("1.000"), 100000);
+  for (const bad of ["abc", "50,", "50,000", "1,000.00", "-50", "0", "5 0", "50 reais", "1.00.0", "Infinity"])
+    assert.throws(() => draftLib.parseChangeFor(bad), /Informe o troco em reais, por exemplo 50 ou 50,00\./, bad);
+});
+
+test("checkout draft follows refreshed options", () => {
+  const draftLib = load("src/lib/fulfillment-draft.ts");
+  const options = { pickup: true, delivery: true, minimum: 0, zones: [{ id: "z1", fee_cents: 500 }] };
+  const draft = { ...draftLib.initialDraft(options), fulfillment: "entrega", zoneId: "z1" };
+  assert.equal(draftLib.reconcileDraft(draft, options), draft, "unchanged draft keeps identity");
+  assert.equal(draftLib.reconcileDraft(draft, { ...options, zones: [{ id: "z2", fee_cents: 500 }] }).zoneId, "");
+  assert.equal(draftLib.unavailableModeMessage(draft, options), "");
+  assert.match(draftLib.unavailableModeMessage(draft, { ...options, delivery: false, zones: [] }), /entrega deixou de estar disponível/);
+  assert.match(
+    draftLib.unavailableModeMessage({ ...draft, fulfillment: "retirada" }, { ...options, pickup: false }),
+    /retirada deixou de estar disponível/,
+  );
+});
+
+test("one-to-one embeds normalize arrays and missing values", () => {
+  const embed = load("src/lib/embed.ts");
+  assert.equal(embed.firstOrNull([]), null);
+  assert.deepEqual(embed.firstOrNull([{ street: "Rua A" }]), { street: "Rua A" });
+  assert.deepEqual(embed.firstOrNull({ street: "Rua A" }), { street: "Rua A" });
+  assert.equal(embed.firstOrNull(null), null);
+  assert.equal(embed.firstOrNull(undefined), null);
+  assert.deepEqual(embed.withOrderAddress({ id: "o1", order_addresses: [] }), { id: "o1", order_addresses: null });
 });
 
 test("online options require at least one usable mode", () => {

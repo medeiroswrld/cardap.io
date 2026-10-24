@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DemoContext, type Checkout } from "./demo-provider";
 import { catalogState, type Catalog } from "@/lib/connected-types";
 import type { BagItem, DemoState } from "@/lib/types";
-import { requestJson } from "@/lib/client-api";
+import { ApiRequestError, apiErrorMessages, requestJson } from "@/lib/client-api";
 import { ensureGuestSession } from "@/lib/guest-session";
 import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
@@ -196,6 +196,7 @@ export function ConnectedMenuProvider({
         fulfillment: "entrega",
         payment_method: data.online.payment,
         change_for_cents: data.online.changeFor,
+        expected_fee_cents: data.online.expectedFee,
         address: {
           zone_id: a.zoneId,
           street: a.street.trim(),
@@ -224,14 +225,32 @@ export function ConnectedMenuProvider({
     } catch {}
     const key =
       saved?.fingerprint === fingerprint ? saved.key : crypto.randomUUID();
-    localStorage.setItem(pendingKey, JSON.stringify({ fingerprint, key }));
-    const { order } = await requestJson<{ order: { id: string } }>(
-      base + "/orders",
-      {
-        key,
-        ...body,
-      },
-    );
+    // Private mode or a full quota only loses retry dedupe; it never blocks the order.
+    try {
+      localStorage.setItem(pendingKey, JSON.stringify({ fingerprint, key }));
+    } catch {}
+    let order: { id: string };
+    try {
+      ({ order } = await requestJson<{ order: { id: string } }>(
+        base + "/orders",
+        {
+          key,
+          ...body,
+        },
+      ));
+    } catch (error) {
+      if (
+        data.online?.fulfillment === "entrega" &&
+        error instanceof ApiRequestError &&
+        error.message.startsWith(apiErrorMessages.PRICE_CHANGED)
+      )
+        throw new ApiRequestError(
+          "Um preço ou a taxa de entrega mudou. Escolha o bairro novamente e confira a sacola para ver o valor atual.",
+          error.status,
+          error.requestId,
+        );
+      throw error;
+    }
     // The server has confirmed: local storage failure must not turn success into a retry.
     try {
       localStorage.removeItem(pendingKey);

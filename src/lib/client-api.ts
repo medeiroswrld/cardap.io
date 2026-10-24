@@ -8,6 +8,24 @@ export class ApiRequestError extends Error {
     this.name = "ApiRequestError";
   }
 }
+export const apiErrorMessages: Record<string, string> = {
+  PRICE_CHANGED:
+    "Um preço mudou. Remova o item da sacola e adicione novamente para conferir o valor atual.",
+  OPTIONS_CHANGED:
+    "Um ingrediente ou adicional mudou. Remova o item da sacola e escolha novamente.",
+  UNAVAILABLE:
+    "Um produto não está mais disponível. Revise sua sacola.",
+  CLOSED: "O restaurante não está recebendo pedidos agora.",
+  PICKUP_DISABLED: "Este restaurante não está aceitando pedidos para retirada agora.",
+  DELIVERY_DISABLED: "Este restaurante não está fazendo entregas agora.",
+  INVALID_ZONE: "Escolha um bairro atendido pela entrega.",
+  INVALID_ADDRESS: "Confira rua e número do endereço de entrega.",
+  BELOW_MINIMUM: "O pedido ainda não atingiu o valor mínimo para entrega.",
+  INVALID_PAYMENT: "Escolha como vai pagar na entrega ou retirada.",
+  INVALID_CHANGE: "O troco precisa ser para um valor igual ou maior que o total, e só vale para dinheiro.",
+  RATE_LIMITED:
+    "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
+};
 export async function requestJson<T>(
   url: string,
   body?: unknown,
@@ -37,28 +55,9 @@ export async function requestJson<T>(
   });
   if (!response.ok) {
     throw new ApiRequestError(
-      (
-        {
-          PRICE_CHANGED:
-            "Um preço mudou. Remova o item da sacola e adicione novamente para conferir o valor atual.",
-          OPTIONS_CHANGED:
-            "Um ingrediente ou adicional mudou. Remova o item da sacola e escolha novamente.",
-          UNAVAILABLE:
-            "Um produto não está mais disponível. Revise sua sacola.",
-          CLOSED: "O restaurante não está recebendo pedidos agora.",
-          PICKUP_DISABLED: "Este restaurante não está aceitando pedidos para retirada agora.",
-          DELIVERY_DISABLED: "Este restaurante não está fazendo entregas agora.",
-          INVALID_ZONE: "Escolha um bairro atendido pela entrega.",
-          INVALID_ADDRESS: "Confira rua e número do endereço de entrega.",
-          BELOW_MINIMUM: "O pedido ainda não atingiu o valor mínimo para entrega.",
-          INVALID_PAYMENT: "Escolha como vai pagar na entrega ou retirada.",
-          INVALID_CHANGE: "O troco precisa ser para um valor igual ou maior que o total, e só vale para dinheiro.",
-          RATE_LIMITED:
-            "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
-        } as Record<string, string>
-      )[data.error] ||
-        data.error ||
-        "Não foi possível concluir. Tente novamente.",
+      (typeof data.error === "string" && Object.hasOwn(apiErrorMessages, data.error)
+        ? apiErrorMessages[data.error]
+        : data.error) || "Não foi possível concluir. Tente novamente.",
       response.status,
       requestId,
     );

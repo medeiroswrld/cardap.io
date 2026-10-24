@@ -27,7 +27,7 @@ import {
   GlassWater,
   X,
 } from "lucide-react";
-import { useDemo } from "./demo-provider";
+import { useDemo, type OnlineChoice } from "./demo-provider";
 import { Brand, DemoBanner } from "./brand";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
@@ -36,8 +36,17 @@ import { ImmersiveMenu } from "./immersive-menu";
 import { ProductFeedbackModal } from "./product-feedback";
 import { money } from "@/lib/utils";
 import { isValidChange, missingForMinimum, orderTotals } from "@/lib/online-order";
-import { draftToChoice, initialDraft } from "@/lib/fulfillment-draft";
-import { FulfillmentFields } from "./fulfillment-fields";
+import {
+  draftToChoice,
+  initialDraft,
+  reconcileDraft,
+  unavailableModeMessage,
+} from "@/lib/fulfillment-draft";
+import {
+  FulfillmentFields,
+  FulfillmentTotals,
+  MinimumNotice,
+} from "./fulfillment-fields";
 import type { Product } from "@/lib/types";
 const categoryIcons: Record<string, typeof Hamburger> = {
   burger: Hamburger,
@@ -910,8 +919,15 @@ function ProductDetail({
 function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
   const router = useRouter();
   const { state, checkout, mode, slug, online } = useDemo();
-  const useOnline = !!online && !hasTable;
+  // The flow is fixed when the checkout opens; a catalog refresh must not
+  // silently turn an online order into a table order (or vice versa).
+  const [useOnline] = useState(() => !!online && !hasTable);
   const [draft, setDraft] = useState(() => (online ? initialDraft(online) : null));
+  if (draft && online) {
+    const reconciled = reconcileDraft(draft, online);
+    if (reconciled !== draft) setDraft(reconciled);
+  }
+  const onlineGone = useOnline && !online;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [chosenTable, setChosenTable] = useState(table);
@@ -929,7 +945,14 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
         setBusy(true);
         setError("");
         try {
-          if (useOnline && online && draft) {
+          let choice: OnlineChoice | undefined;
+          if (useOnline) {
+            if (!online || !draft)
+              throw new Error(
+                "Este restaurante deixou de aceitar pedidos para retirada e entrega agora.",
+              );
+            const unavailable = unavailableModeMessage(draft, online);
+            if (unavailable) throw new Error(unavailable);
             if (
               draft.fulfillment === "entrega" &&
               missingForMinimum(total, online.minimum) > 0
@@ -942,7 +965,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
               (draft.street.trim().length < 3 || draft.number.trim().length < 1)
             )
               throw new Error("Confira rua e número do endereço de entrega.");
-            const choice = draftToChoice(draft);
+            choice = draftToChoice(draft, online.zones);
             const zone =
               online.zones.find((z) => z.id === draft.zoneId) ?? null;
             if (
@@ -964,7 +987,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             table: chosenTable,
             consent,
             key: key.current,
-            online: useOnline && draft ? draftToChoice(draft) : undefined,
+            online: choice,
           });
           router.push(`/r/${slug}/pedido/${order.id}`);
         } catch (error) {
@@ -1005,7 +1028,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             onChange={(e) => setPhone(e.target.value)}
           />
         </label>
-        {!(useOnline && draft) && (
+        {!useOnline && (
           <label className="form-label">
             Mesa
             <select
@@ -1021,13 +1044,14 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
           </label>
         )}
       </div>
+      {onlineGone && (
+        <p className="notice small" role="alert">
+          Este restaurante deixou de aceitar pedidos para retirada e entrega
+          agora.
+        </p>
+      )}
       {useOnline && draft && online && (
-        <FulfillmentFields
-          options={online}
-          draft={draft}
-          onChange={setDraft}
-          subtotal={total}
-        />
+        <FulfillmentFields options={online} draft={draft} onChange={setDraft} />
       )}
       <div className="checkout-summary">
         {state.bag.map((i, index) => (
@@ -1044,13 +1068,20 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             <strong>{money(i.quantity * i.price)}</strong>
           </div>
         ))}
-        {!useOnline && (
-          <div className="total-row">
-            <span>Total • pagamento no local</span>
-            <strong>{money(total)}</strong>
-          </div>
+        {useOnline && draft && online ? (
+          <FulfillmentTotals options={online} draft={draft} subtotal={total} />
+        ) : (
+          !useOnline && (
+            <div className="total-row">
+              <span>Total • pagamento no local</span>
+              <strong>{money(total)}</strong>
+            </div>
+          )
         )}
       </div>
+      {useOnline && draft && online && (
+        <MinimumNotice options={online} draft={draft} subtotal={total} />
+      )}
       <label className="checkbox-label">
         <input
           type="checkbox"
@@ -1075,7 +1106,11 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
           {error}
         </div>
       )}
-      <Button type="submit" className="full-width" disabled={busy}>
+      <Button
+        type="submit"
+        className="full-width"
+        disabled={busy || onlineGone}
+      >
         {busy
           ? "Salvando pedido…"
           : mode === "demo"

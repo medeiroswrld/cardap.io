@@ -35,6 +35,7 @@ export type OnlineChoice =
       fulfillment: "entrega";
       payment: PaymentMethod;
       changeFor: number | null;
+      expectedFee: number;
       address: {
         zoneId: string;
         street: string;

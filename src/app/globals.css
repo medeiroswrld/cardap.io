@@ -5052,26 +5052,31 @@ body:has(.immersive-shell) .toast {
   }
 }
 
-/* Online order choices: 44px tap targets and visible keyboard focus. */
-.choice-group legend {
+/* Online order choices (checkout only): 44px tap targets and visible keyboard focus. */
+.fulfillment-choice legend {
   font-size: 15px;
 }
-.choice-group .checkbox-label {
+.fulfillment-choice .checkbox-label {
   min-height: 44px;
   align-items: center;
   padding: 8px 4px;
   font-size: 14px;
   line-height: 1.4;
 }
-.choice-group .checkbox-label input[type="radio"] {
+.fulfillment-choice .checkbox-label input[type="radio"] {
   width: 22px;
   height: 22px;
   min-height: 22px;
   flex: none;
   margin: 0;
 }
-.choice-group .checkbox-label:has(input:focus-visible) {
+.fulfillment-choice .checkbox-label:has(input:focus-visible) {
   outline: 2px solid var(--brand, currentColor);
   outline-offset: 2px;
   border-radius: 8px;
+}
+.fulfillment-fields input:not([type="radio"]):focus-visible,
+.fulfillment-fields select:focus-visible {
+  outline: 2px solid var(--brand, currentColor);
+  outline-offset: 2px;
 }
