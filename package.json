@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
+    "test:online": "node --test scripts/test-online.mjs",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs",
