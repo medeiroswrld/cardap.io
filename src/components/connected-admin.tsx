@@ -128,18 +128,24 @@ export function ConnectedAdmin({ id }: { id: string }) {
   ) {
     setBusy(true);
     try {
-      await requestJson(
-        `/api/restaurants/${id}/orders/${order.id}`,
-        { status, expected_status: order.status, reason, estimate },
-        "PATCH",
-      );
+      try {
+        await requestJson(
+          `/api/restaurants/${id}/orders/${order.id}`,
+          { status, expected_status: order.status, reason, estimate },
+          "PATCH",
+        );
+      } catch (err) {
+        // Someone else may have moved the order: show the current board.
+        await refresh();
+        throw err;
+      }
       await refresh();
       setToast("Pedido atualizado.");
     } finally {
       setBusy(false);
     }
   }
-  const alerts = useOrderAlerts(data?.orders ?? []);
+  const alerts = useOrderAlerts(data?.orders);
   const owner = data?.role === "owner";
   const allowed = pages.filter(
     (p) => owner || p[0] === "pedidos" || p[0] === "resumo",

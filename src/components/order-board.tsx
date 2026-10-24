@@ -13,6 +13,7 @@ import {
 import { boardColumns, columnTitle, modalKind } from "@/lib/order-board";
 import { whatsappConfirmationLink } from "@/lib/online-order";
 import { money } from "@/lib/utils";
+import { ApiRequestError } from "@/lib/client-api";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
 import { OrderChoices } from "./order-choices";
@@ -39,10 +40,20 @@ export function OrderBoard({
   const [status, setStatus] = useState<OrderStatus>("em_preparo");
   const [error, setError] = useState("");
   const [history, setHistory] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState("");
+  // The order changed elsewhere (realtime or another device) while the modal
+  // was open: close it so nobody confirms an action on a stale status.
+  const current = selected ? orders.find((o) => o.id === selected.id) : undefined;
+  if (selected && !submitting && current?.status !== selected.status) {
+    setSelected(null);
+    setNotice("Este pedido já foi atualizado por outra pessoa. A lista foi atualizada.");
+  }
   const columns = boardColumns(orders, history);
   const kind = selected ? modalKind(selected.status, status) : "confirm";
   const open = (order: RealOrder, to: OrderStatus) => {
     setError("");
+    setNotice("");
     setSelected(order);
     setStatus(to);
   };
@@ -58,6 +69,11 @@ export function OrderBoard({
           Tempo real com reconciliação a cada 15 segundos
         </span>
       </div>
+      {notice && (
+        <p role="alert" className="notice">
+          {notice}
+        </p>
+      )}
       <div className="kanban connected-kanban">
         {columns.map((column) => (
           <section key={column} className="kanban-column">
@@ -213,6 +229,7 @@ export function OrderBoard({
             onSubmit={async (e) => {
               e.preventDefault();
               const form = new FormData(e.currentTarget);
+              setSubmitting(true);
               try {
                 await change(
                   selected,
@@ -224,7 +241,13 @@ export function OrderBoard({
                 );
                 setSelected(null);
               } catch (err) {
-                setError((err as Error).message);
+                if (err instanceof ApiRequestError && err.status === 409) {
+                  // Stale status: the board was refreshed; the action no longer applies.
+                  setSelected(null);
+                  setNotice(err.message);
+                } else setError((err as Error).message);
+              } finally {
+                setSubmitting(false);
               }
             }}
           >

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ALERT_REPEAT_MS, pendingCount, shouldPlayAlert } from "@/lib/order-alerts";
+import { pendingCount, shouldPlayAlert } from "@/lib/order-alerts";
 import type { RealOrder } from "@/lib/connected-types";
 
 const MUTE_KEY = "gestao:alertas:mudo";
@@ -20,8 +20,35 @@ function chime(context: AudioContext) {
   }
 }
 
+// Prefer an existing service worker registration (required on Android Chrome);
+// never registers one. Any failure is swallowed: alerts must not break the board.
+function notify(title: string) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+  } catch {
+    return;
+  }
+  const fallback = () => {
+    try {
+      new Notification(title);
+    } catch {}
+  };
+  const workers = navigator.serviceWorker;
+  if (!workers) return fallback();
+  workers
+    .getRegistration()
+    .then((registration) =>
+      registration ? registration.showNotification(title) : fallback(),
+    )
+    .catch(fallback);
+}
+
+// Checks often so the repeat follows ALERT_REPEAT_MS closely; the rule itself is pure.
+const TICK_MS = 1000;
+
 // Browsers block audio until a user gesture, so alerts start with "Ativar alertas".
-export function useOrderAlerts(orders: RealOrder[]) {
+// `orders` is undefined until the first load, so existing orders never chime as new.
+export function useOrderAlerts(orders: RealOrder[] | undefined) {
   const audio = useRef<AudioContext | null>(null);
   const seen = useRef<Set<string> | null>(null);
   const lastPlayed = useRef<number | null>(null);
@@ -33,13 +60,59 @@ export function useOrderAlerts(orders: RealOrder[]) {
       return false;
     }
   });
-  const pending = pendingCount(orders);
+  const pending = orders ? pendingCount(orders) : 0;
+  const live = useRef({ pending, enabled, muted });
+  // Declared first so the effects below always read this render's values.
+  useEffect(() => {
+    live.current = { pending, enabled, muted };
+  }, [pending, enabled, muted]);
 
-  const enable = useCallback(async () => {
-    audio.current ??= new AudioContext();
-    await audio.current.resume();
-    if ("Notification" in window && Notification.permission === "default")
-      await Notification.requestPermission();
+  const play = useCallback((fresh: string[]) => {
+    const { pending, enabled, muted } = live.current;
+    const now = Date.now();
+    if (
+      !enabled ||
+      !shouldPlayAlert({ pending, newOrderIds: fresh, lastPlayedAt: lastPlayed.current, now, muted })
+    )
+      return;
+    lastPlayed.current = now;
+    if (audio.current)
+      try {
+        chime(audio.current);
+      } catch {}
+    if (document.hidden) notify(pending ? `${pending} pedido(s) aguardando aceite` : "Novo pedido");
+  }, []);
+
+  // New data: only ids not seen before count as new orders.
+  useEffect(() => {
+    if (!orders) return;
+    const ids = orders.map((o) => o.id);
+    if (seen.current === null) {
+      seen.current = new Set(ids); // first load is not "new"
+      return;
+    }
+    const fresh = ids.filter((id) => !seen.current!.has(id));
+    fresh.forEach((id) => seen.current!.add(id));
+    if (fresh.length) play(fresh);
+  }, [orders, play]);
+
+  // One timer for the whole session; data refreshes do not reset the cadence.
+  useEffect(() => {
+    const timer = setInterval(() => play([]), TICK_MS);
+    return () => clearInterval(timer);
+  }, [play]);
+
+  // Runs inside the click: permission is requested before any await, and a
+  // failure in one part (audio or notifications) still enables the other.
+  const enable = useCallback(() => {
+    try {
+      if ("Notification" in window && Notification.permission === "default")
+        Promise.resolve(Notification.requestPermission()).catch(() => {});
+    } catch {}
+    try {
+      audio.current ??= new AudioContext();
+      audio.current.resume().catch(() => {});
+    } catch {}
     setEnabled(true);
   }, []);
 
@@ -51,33 +124,6 @@ export function useOrderAlerts(orders: RealOrder[]) {
       return !value;
     });
   }, []);
-
-  const check = useCallback(() => {
-    const ids = orders.map((o) => o.id);
-    if (seen.current === null) {
-      seen.current = new Set(ids); // first load is not "new"
-      return;
-    }
-    const fresh = ids.filter((id) => !seen.current!.has(id));
-    fresh.forEach((id) => seen.current!.add(id));
-    const now = Date.now();
-    if (
-      enabled &&
-      audio.current &&
-      shouldPlayAlert({ pending, newOrderIds: fresh, lastPlayedAt: lastPlayed.current, now, muted })
-    ) {
-      chime(audio.current);
-      lastPlayed.current = now;
-      if (document.hidden && "Notification" in window && Notification.permission === "granted")
-        new Notification(pending ? `${pending} pedido(s) aguardando aceite` : "Novo pedido");
-    }
-  }, [orders, pending, enabled, muted]);
-
-  useEffect(() => {
-    check();
-    const timer = setInterval(check, ALERT_REPEAT_MS);
-    return () => clearInterval(timer);
-  }, [check]);
 
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\) Novo pedido · /, "");

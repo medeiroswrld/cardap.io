@@ -38,8 +38,20 @@ export function DeliverySettings({ data, save, busy }: { data: Workspace; save: 
           <li key={zone.id}>
             <strong>{zone.name}</strong> · {money(zone.fee_cents)} · ~{zone.estimate_minutes} min
             {!zone.active && " · pausado"}{" "}
-            <Button variant="ghost" disabled={busy} onClick={() => setDraft(zone)}>Editar</Button>
-            <Button variant="ghost" disabled={busy} onClick={() => void saveZone({ ...zone, active: !zone.active })}>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              aria-label={`Editar bairro ${zone.name}`}
+              onClick={() => setDraft(zone)}
+            >
+              Editar
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              aria-label={`${zone.active ? "Pausar" : "Reativar"} bairro ${zone.name}`}
+              onClick={() => void saveZone({ ...zone, active: !zone.active })}
+            >
               {zone.active ? "Pausar" : "Reativar"}
             </Button>
           </li>
@@ -62,8 +74,12 @@ export function DeliverySettings({ data, save, busy }: { data: Workspace; save: 
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
+            // The form does not edit "active": keep the current value, which may
+            // have been paused/reactivated after this draft was opened.
+            const current = zones.find((z) => z.id === draft.id);
             void saveZone({
               ...draft,
+              active: current?.active ?? draft.active,
               name: String(form.get("name")).trim(),
               fee_cents: Math.round(Number(String(form.get("fee")).replace(",", ".")) * 100),
               estimate_minutes: Number(form.get("estimate")),
@@ -84,7 +100,12 @@ export function DeliverySettings({ data, save, busy }: { data: Workspace; save: 
               <input name="estimate" type="number" min={5} max={240} required defaultValue={draft.estimate_minutes} />
             </label>
           </div>
-          <Button type="submit" disabled={busy}>Salvar bairro</Button>
+          <div className="connected-toolbar">
+            <Button type="submit" disabled={busy}>Salvar bairro</Button>
+            <Button variant="outline" disabled={busy} onClick={() => setDraft(null)}>
+              Cancelar
+            </Button>
+          </div>
         </form>
       )}
       {error && <p role="alert" className="form-error">{error}</p>}
