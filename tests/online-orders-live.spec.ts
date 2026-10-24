@@ -85,7 +85,7 @@ test("Supabase real: pedido de entrega do checkout ao aceite e entrega", async (
     if (settings.error) throw settings.error;
     const zone = await owner.rpc("save_delivery_zone", {
       p_restaurant: tenant,
-      p_id: null,
+      p_id: randomUUID(),
       p_name: "Centro",
       p_fee: 700,
       p_estimate: 40,
@@ -104,7 +104,7 @@ test("Supabase real: pedido de entrega do checkout ao aceite e entrega", async (
     await customer.getByRole("button", { name: /Abrir sacola com/ }).click();
     await customer.getByRole("button", { name: "Revisar pedido", exact: true }).click();
     await customer.getByRole("radio", { name: "Entrega" }).check();
-    await customer.getByLabel("Bairro").selectOption({ index: 0 });
+    await customer.getByLabel("Bairro").selectOption({ index: 1 }); // index 0 is "Escolha o bairro"
     await customer.getByLabel("Rua", { exact: true }).fill("Rua das Flores");
     await customer.getByLabel("Número", { exact: true }).fill("123");
     await customer.getByRole("radio", { name: "Dinheiro" }).check();

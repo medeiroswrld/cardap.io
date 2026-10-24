@@ -11,6 +11,14 @@ Em 22/10/2026, a migration 010 foi aplicada no Supabase e as duas variáveis aba
 
 Sem a migration ou a configuração do limitador, as escritas protegidas retornam 503. Não publicar o código antes das etapas 1 e 2. Reutilizar uma sessão válida continua funcionando sem consumir a cota de novas sessões.
 
+## Pedidos para retirada e entrega
+
+1. Aplicar `supabase/migrations/011_online_orders.sql` no projeto de produção **antes** de publicar o código destes pedidos. O código novo lê colunas e tabelas criadas pela 011 (`fulfillment`, `delivery_zones`, `order_addresses`) e falha sem elas.
+2. Publicar o código e testar um pedido de mesa, um de retirada e um de entrega em um restaurante de teste.
+3. Depois que existirem pedidos online, a 011 não pode ser revertida sem perder dados (pedidos sem mesa, endereços): corrigir apenas para frente, com uma nova migration.
+
+Quando retirada ou entrega estiverem ligadas nas configurações, o link do cardápio e qualquer QR **sem** `?mesa=` abrem o fluxo de retirada/entrega, sem escolha de mesa. Os QR das mesas precisam incluir `?mesa=N` (os gerados em "QR das mesas" já incluem); conferir QR impressos ou links antigos antes de ligar os pedidos online.
+
 ## Limites compartilhados
 
 O Postgres conta tentativas de forma atômica em janelas fixas de dez minutos, separadas por restaurante:
