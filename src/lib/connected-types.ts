@@ -1,5 +1,6 @@
 import type { Category, Product, Settings } from "./types";
 import { isRestaurantOpen } from "./opening-hours";
+import type { Fulfillment, OrderStatus, PaymentMethod } from "./order-flow";
 export type RestaurantRow = {
   id: string;
   name: string;
@@ -14,6 +15,24 @@ export type RestaurantRow = {
   retention_days: number;
   google_review_url: string;
   feedback_enabled: boolean;
+  pickup_enabled: boolean;
+  delivery_enabled: boolean;
+  delivery_min_order_cents: number;
+};
+export type DeliveryZone = {
+  id: string;
+  name: string;
+  fee_cents: number;
+  estimate_minutes: number;
+  active: boolean;
+  position: number;
+};
+export type OrderAddress = {
+  zone_name: string;
+  street: string;
+  number: string;
+  complement: string;
+  reference: string;
 };
 export type CategoryRow = {
   id: string;
@@ -59,11 +78,17 @@ export type TableRow = { id: string; number: number; active: boolean };
 export type RealOrder = {
   id: string;
   number: number;
-  table_id: string;
+  table_id: string | null;
   customer_name?: string;
   customer_phone?: string;
   total_cents: number;
-  status: "recebido" | "em_preparo" | "pronto" | "entregue" | "cancelado";
+  status: OrderStatus;
+  fulfillment: Fulfillment;
+  delivery_fee_cents: number;
+  payment_method: PaymentMethod | null;
+  change_for_cents: number | null;
+  order_addresses: OrderAddress | null;
+  first_order?: boolean;
   created_at: string;
   estimate_minutes: number | null;
   cancellation_reason: string | null;
@@ -109,6 +134,7 @@ export type Workspace = {
   products: ProductRow[];
   media: MediaRow[];
   tables: TableRow[];
+  zones: DeliveryZone[];
   orders: RealOrder[];
   contacts: RealContact[];
   photoMetrics: {
@@ -136,6 +162,7 @@ export type Catalog = {
   products: ProductRow[];
   media: MediaRow[];
   tables: TableRow[];
+  zones: DeliveryZone[];
 };
 export function catalogState(catalog: Catalog): {
   products: Product[];

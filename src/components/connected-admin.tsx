@@ -418,7 +418,7 @@ function Orders({
                             setError("");
                             setSelected(order);
                             setStatus(
-                              statusFlow[statusFlow.indexOf(order.status) + 1],
+                              statusFlow[statusFlow.indexOf(order.status as Status) + 1],
                             );
                           }}
                         >

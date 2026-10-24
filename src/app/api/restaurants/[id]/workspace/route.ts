@@ -21,6 +21,7 @@ async function handleGET(
       orders,
       options,
       optionLinks,
+      zones,
     ] = await Promise.all([
       supabase.from("restaurants").select("*").eq("id", id).single(),
       supabase
@@ -47,7 +48,7 @@ async function handleGET(
       supabase
         .from("orders")
         .select(
-          "*,dining_tables(number),order_items(*),order_status_events(status,created_at)",
+          "*,dining_tables(number),order_addresses(zone_name,street,number,complement,reference),order_items(*),order_status_events(status,created_at)",
         )
         .eq("restaurant_id", id)
         .order("created_at", { ascending: false })
@@ -61,6 +62,11 @@ async function handleGET(
         .from("product_option_links")
         .select("product_id,option_id")
         .eq("restaurant_id", id),
+      supabase
+        .from("delivery_zones")
+        .select("*")
+        .eq("restaurant_id", id)
+        .order("position"),
     ]);
     if (
       [
@@ -72,9 +78,26 @@ async function handleGET(
         orders,
         options,
         optionLinks,
+        zones,
       ].some((r) => r.error)
     )
       throw new Error("DATABASE_ERROR");
+    const pendingOnline = (orders.data || []).filter(
+      (o) => o.status === "aguardando_aceite",
+    );
+    await Promise.all(
+      pendingOnline.map(async (order) => {
+        const { count, error } = await supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("restaurant_id", id)
+          .eq("customer_phone", order.customer_phone)
+          .neq("status", "recusado")
+          .lt("created_at", order.created_at);
+        if (error) throw new Error("DATABASE_ERROR");
+        order.first_order = count === 0;
+      }),
+    );
     if (role === "owner") {
       const pending = (media.data || [])
         .filter(
@@ -150,6 +173,7 @@ async function handleGET(
         products: products.data,
         media: media.data,
         tables: tables.data,
+        zones: zones.data,
         orders: orders.data,
         contacts,
         metrics,

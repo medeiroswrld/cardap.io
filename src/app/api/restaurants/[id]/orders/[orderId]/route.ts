@@ -25,7 +25,7 @@ async function handleGET(_request: Request, { params }: Context) {
     const { data, error } = await client
       .from("orders")
       .select(
-        "id,number,table_id,status,total_cents,created_at,estimate_minutes,cancellation_reason,dining_tables(number),order_items(*),order_status_events(status,created_at)",
+        "id,number,table_id,status,fulfillment,delivery_fee_cents,payment_method,change_for_cents,total_cents,created_at,estimate_minutes,cancellation_reason,dining_tables(number),order_addresses(zone_name,street,number,complement,reference),order_items(*),order_status_events(status,created_at)",
       )
       .eq("restaurant_id", id)
       .eq("guest_session_id", session.id)
@@ -67,8 +67,22 @@ async function handlePATCH(request: Request, { params }: Context) {
     const { supabase } = await requireMember(id);
     const body = z
       .object({
-        status: z.enum(["em_preparo", "pronto", "entregue", "cancelado"]),
-        expected_status: z.enum(["recebido", "em_preparo", "pronto"]),
+        status: z.enum([
+          "recebido",
+          "em_preparo",
+          "pronto",
+          "saiu_para_entrega",
+          "entregue",
+          "recusado",
+          "cancelado",
+        ]),
+        expected_status: z.enum([
+          "aguardando_aceite",
+          "recebido",
+          "em_preparo",
+          "pronto",
+          "saiu_para_entrega",
+        ]),
         reason: z.string().max(300).optional(),
         estimate: z.number().int().min(1).max(180).optional(),
       })

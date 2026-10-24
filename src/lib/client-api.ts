@@ -46,6 +46,13 @@ export async function requestJson<T>(
           UNAVAILABLE:
             "Um produto não está mais disponível. Revise sua sacola.",
           CLOSED: "O restaurante não está recebendo pedidos agora.",
+          PICKUP_DISABLED: "Este restaurante não está aceitando pedidos para retirada agora.",
+          DELIVERY_DISABLED: "Este restaurante não está fazendo entregas agora.",
+          INVALID_ZONE: "Escolha um bairro atendido pela entrega.",
+          INVALID_ADDRESS: "Confira rua e número do endereço de entrega.",
+          BELOW_MINIMUM: "O pedido ainda não atingiu o valor mínimo para entrega.",
+          INVALID_PAYMENT: "Escolha como vai pagar na entrega ou retirada.",
+          INVALID_CHANGE: "O troco precisa ser para um valor maior que o total, e só vale para dinheiro.",
           RATE_LIMITED:
             "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
         } as Record<string, string>

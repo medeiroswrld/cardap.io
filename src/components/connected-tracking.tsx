@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Utensils } from "lucide-react";
 import type { RealOrder } from "@/lib/connected-types";
-import { statusNames, statusFlow } from "@/lib/types";
+import { statusNames, statusFlow, type Status } from "@/lib/types";
 import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
 import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
@@ -91,7 +91,7 @@ export function ConnectedTracking({
         <article className="panel connected-order" key={order.id}>
           <div className="panel-heading">
             <h2>Pedido #{order.number}</h2>
-            <span className="status-pill">{statusNames[order.status]}</span>
+            <span className="status-pill">{statusNames[order.status as Status]}</span>
           </div>
           <p>
             Mesa {order.dining_tables?.number} ·{" "}
@@ -105,7 +105,7 @@ export function ConnectedTracking({
                 <li
                   key={status}
                   className={
-                    index <= statusFlow.indexOf(order.status) ? "complete" : ""
+                    index <= statusFlow.indexOf(order.status as Status) ? "complete" : ""
                   }
                 >
                   <Check size={17} />

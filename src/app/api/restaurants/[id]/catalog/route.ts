@@ -79,6 +79,18 @@ const schema = z.discriminatedUnion("action", [
       )
       .max(28),
     tables: z.number().int().min(1).max(100),
+    pickup_enabled: z.boolean(),
+    delivery_enabled: z.boolean(),
+    delivery_min_order_cents: z.number().int().min(0).max(1000000),
+  }),
+  z.object({
+    action: z.literal("save_delivery_zone"),
+    id: z.uuid(),
+    name: z.string().trim().min(2).max(80),
+    fee_cents: z.number().int().min(0).max(100000),
+    estimate_minutes: z.number().int().min(5).max(240),
+    active: z.boolean(),
+    position: z.number().int().min(0).max(10000),
   }),
   z.object({ action: z.literal("revoke_marketing"), id: z.uuid() }),
 ]);
@@ -170,6 +182,17 @@ async function handlePOST(
         p_restaurant: id,
         p_settings: values,
         p_tables: tables,
+      });
+      if (error) throw error;
+    } else if (body.action === "save_delivery_zone") {
+      const { error } = await supabase.rpc("save_delivery_zone", {
+        p_restaurant: id,
+        p_id: body.id,
+        p_name: body.name,
+        p_fee: body.fee_cents,
+        p_estimate: body.estimate_minutes,
+        p_active: body.active,
+        p_position: body.position,
       });
       if (error) throw error;
     } else if (body.action === "revoke_marketing") {

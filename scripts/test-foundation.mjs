@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { loader } from "./lib/ts-loader.mjs";
+
+const require = createRequire(import.meta.url);
 
 const security = loader()("src/lib/security-headers.ts");
 const base = {
@@ -129,4 +132,20 @@ test("restaurant without photos gets a text-only card", () => {
   assert.equal(result.openGraph.images, undefined);
   assert.equal(result.twitter.card, "summary");
   assert.deepEqual(meta.DEMO_METADATA.robots, { index: false, follow: false });
+});
+
+const orderSchema = loader({ zod: require("zod") })("src/lib/order-payload.ts");
+
+test("order payload: table orders unchanged, online orders need payment and address", () => {
+  const item = { product_id: "40000000-0000-4000-8000-000000000001", quantity: 1, expected_price: 2500, note: "" };
+  const base = { key: "50000000-0000-4000-8000-000000000001", name: "Ana", phone: "11988887777", marketing_consent: false, items: [item] };
+  const table = { ...base, table_id: "60000000-0000-4000-8000-000000000001" };
+  assert.equal(orderSchema.orderPayload.parse(table).fulfillment, "mesa");
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "mesa" }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "retirada" }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "retirada", payment_method: "pix" }).success, true);
+  const address = { zone_id: "90000000-0000-4000-8000-000000000001", street: "Rua A", number: "10", complement: "", reference: "" };
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "dinheiro" }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "dinheiro", change_for_cents: 10000, address }).success, true);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "pix", address, table_id: table.table_id }).success, false);
 });

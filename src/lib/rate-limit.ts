@@ -8,7 +8,7 @@ import {
 import { logger } from "./observability/logger";
 
 type Action =
-  "session" | "order" | "order_table" | "feedback" | "feedback_session";
+  "session" | "order" | "order_table" | "order_online" | "feedback" | "feedback_session";
 export async function enforcePublicLimit(
   request: Request,
   restaurant: string,

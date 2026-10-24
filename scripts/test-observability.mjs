@@ -181,6 +181,7 @@ test("error classification never serializes messages and distinguishes business 
     ["INVALID_SETTINGS", 400],
     ["DATABASE_ERROR", 500],
     ["STREAM_AUTH_FAILED", 503],
+    ...["PICKUP_DISABLED","DELIVERY_DISABLED","INVALID_ZONE","INVALID_ADDRESS","BELOW_MINIMUM","INVALID_PAYMENT","INVALID_CHANGE"].map((c) => [c, 400]),
   ])
     assert.equal(core.errorStatus(core.errorCode(new Error(message))), status);
   const { z } = require("zod");
