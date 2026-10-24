@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Clock3, Utensils } from "lucide-react";
 import type { RealOrder } from "@/lib/connected-types";
-import { statusNames, statusFlow, type Status } from "@/lib/types";
+import {
+  customerSteps,
+  fulfillmentLabel,
+  paymentNames,
+  statusLabel,
+} from "@/lib/order-flow";
 import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
 import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
@@ -65,9 +70,16 @@ export function ConnectedTracking({
       <Link href={`/r/${slug}`} className="back-link">
         <ArrowLeft size={18} /> Voltar ao cardápio
       </Link>
-      <span className="eyebrow">Da cozinha para sua mesa</span>
+      <span className="eyebrow">
+        {orders.some((o) => o.fulfillment !== "mesa")
+          ? "Da cozinha para você"
+          : "Da cozinha para sua mesa"}
+      </span>
       <h1>{id ? "Acompanhe seu pedido" : "Meus pedidos"}</h1>
-      <p>Atualização automática a cada 5 segundos. Pagamento no local.</p>
+      <p>
+        Atualização automática a cada 5 segundos.
+        {orders.some((o) => o.fulfillment !== "mesa") ? "" : " Pagamento no local."}
+      </p>
       {loading && <p role="status">Buscando seu pedido…</p>}
       {error && (
         <div className="notice" role="alert">
@@ -91,28 +103,53 @@ export function ConnectedTracking({
         <article className="panel connected-order" key={order.id}>
           <div className="panel-heading">
             <h2>Pedido #{order.number}</h2>
-            <span className="status-pill">{statusNames[order.status as Status]}</span>
+            <span className="status-pill">{statusLabel(order.status, order.fulfillment)}</span>
           </div>
           <p>
-            Mesa {order.dining_tables?.number} ·{" "}
-            {new Date(order.created_at).toLocaleString("pt-BR")}
+            {fulfillmentLabel({
+              fulfillment: order.fulfillment,
+              table: order.dining_tables?.number,
+              zone: order.order_addresses?.zone_name,
+            })}{" "}
+            · {new Date(order.created_at).toLocaleString("pt-BR")}
           </p>
-          {order.status === "cancelado" ? (
-            <div className="notice">Cancelado: {order.cancellation_reason}</div>
+          {order.status === "cancelado" || order.status === "recusado" ? (
+            <div className="notice">
+              {order.status === "recusado" ? "Recusado" : "Cancelado"}:{" "}
+              {order.cancellation_reason}
+            </div>
           ) : (
             <ol className="connected-steps">
-              {statusFlow.map((status, index) => (
+              {customerSteps(order.fulfillment).map((status, index, steps) => (
                 <li
                   key={status}
                   className={
-                    index <= statusFlow.indexOf(order.status as Status) ? "complete" : ""
+                    index <= steps.indexOf(order.status) ? "complete" : ""
                   }
                 >
                   <Check size={17} />
-                  {statusNames[status]}
+                  {statusLabel(status, order.fulfillment)}
                 </li>
               ))}
             </ol>
+          )}
+          {order.order_addresses && (
+            <p>
+              Entregar em {order.order_addresses.street},{" "}
+              {order.order_addresses.number}
+              {order.order_addresses.complement
+                ? ` (${order.order_addresses.complement})`
+                : ""}{" "}
+              · {order.order_addresses.zone_name}
+            </p>
+          )}
+          {order.payment_method && (
+            <p>
+              Pagamento: {paymentNames[order.payment_method]}
+              {order.change_for_cents
+                ? ` · troco para ${money(order.change_for_cents)}`
+                : ""}
+            </p>
           )}
           {order.estimate_minutes && (
             <p>
@@ -134,6 +171,12 @@ export function ConnectedTracking({
                 <strong>{money(item.quantity * item.unit_price_cents)}</strong>
               </div>
             ))}
+            {order.delivery_fee_cents > 0 && (
+              <div>
+                <span>Taxa de entrega</span>
+                <strong>{money(order.delivery_fee_cents)}</strong>
+              </div>
+            )}
             <div className="total-row">
               <span>Total</span>
               <strong>{money(order.total_cents)}</strong>

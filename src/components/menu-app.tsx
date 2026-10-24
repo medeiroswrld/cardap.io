@@ -35,6 +35,9 @@ import { ProductMedia } from "./product-media";
 import { ImmersiveMenu } from "./immersive-menu";
 import { ProductFeedbackModal } from "./product-feedback";
 import { money } from "@/lib/utils";
+import { isValidChange, missingForMinimum, orderTotals } from "@/lib/online-order";
+import { draftToChoice, initialDraft } from "@/lib/fulfillment-draft";
+import { FulfillmentFields } from "./fulfillment-fields";
 import type { Product } from "@/lib/types";
 const categoryIcons: Record<string, typeof Hamburger> = {
   burger: Hamburger,
@@ -54,6 +57,7 @@ export function MenuApp() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [table, setTable] = useState(mode === "demo" ? 4 : 1);
+  const [hasTable, setHasTable] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   useEffect(() => {
@@ -75,7 +79,10 @@ export function MenuApp() {
       const value = Number(
         new URLSearchParams(window.location.search).get("mesa"),
       );
-      if (value > 0 && Number.isInteger(value)) setTable(value);
+      if (value > 0 && Number.isInteger(value)) {
+        setTable(value);
+        setHasTable(true);
+      }
     });
   }, []);
   const categories = state.categories.filter(
@@ -544,7 +551,7 @@ export function MenuApp() {
         title="Falta pouco para matar a fome"
         description="Confira seus dados. O pagamento é feito no local."
       >
-        <Checkout table={table} />
+        <Checkout table={table} hasTable={hasTable} />
       </Modal>
       <Modal
         open={!!selected}
@@ -896,9 +903,11 @@ function ProductDetail({
     </div>
   );
 }
-function Checkout({ table }: { table: number }) {
+function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
   const router = useRouter();
-  const { state, checkout, mode, slug } = useDemo();
+  const { state, checkout, mode, slug, online } = useDemo();
+  const useOnline = !!online && !hasTable;
+  const [draft, setDraft] = useState(() => (online ? initialDraft(online) : null));
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [chosenTable, setChosenTable] = useState(table);
@@ -916,6 +925,29 @@ function Checkout({ table }: { table: number }) {
         setBusy(true);
         setError("");
         try {
+          if (useOnline && online && draft) {
+            if (
+              draft.fulfillment === "entrega" &&
+              missingForMinimum(total, online.minimum) > 0
+            )
+              throw new Error(
+                "O pedido ainda não atingiu o valor mínimo para entrega.",
+              );
+            const choice = draftToChoice(draft);
+            const zone =
+              online.zones.find((z) => z.id === draft.zoneId) ?? null;
+            if (
+              choice.changeFor !== null &&
+              !isValidChange(
+                choice.changeFor,
+                orderTotals(total, draft.fulfillment, zone).total,
+                choice.payment,
+              )
+            )
+              throw new Error(
+                "O troco precisa ser para um valor maior que o total.",
+              );
+          }
           if (!key.current) key.current = crypto.randomUUID();
           const order = await checkout({
             name,
@@ -923,6 +955,7 @@ function Checkout({ table }: { table: number }) {
             table: chosenTable,
             consent,
             key: key.current,
+            online: useOnline && draft ? draftToChoice(draft) : undefined,
           });
           router.push(`/r/${slug}/pedido/${order.id}`);
         } catch (error) {
@@ -963,20 +996,30 @@ function Checkout({ table }: { table: number }) {
             onChange={(e) => setPhone(e.target.value)}
           />
         </label>
-        <label className="form-label">
-          Mesa
-          <select
-            value={chosenTable}
-            onChange={(e) => setChosenTable(Number(e.target.value))}
-          >
-            {Array.from({ length: state.settings.tables }, (_, i) => (
-              <option key={i} value={i + 1}>
-                Mesa {String(i + 1).padStart(2, "0")}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!(useOnline && draft) && (
+          <label className="form-label">
+            Mesa
+            <select
+              value={chosenTable}
+              onChange={(e) => setChosenTable(Number(e.target.value))}
+            >
+              {Array.from({ length: state.settings.tables }, (_, i) => (
+                <option key={i} value={i + 1}>
+                  Mesa {String(i + 1).padStart(2, "0")}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
+      {useOnline && draft && online && (
+        <FulfillmentFields
+          options={online}
+          draft={draft}
+          onChange={setDraft}
+          subtotal={total}
+        />
+      )}
       <div className="checkout-summary">
         {state.bag.map((i, index) => (
           <div key={index}>
@@ -992,10 +1035,12 @@ function Checkout({ table }: { table: number }) {
             <strong>{money(i.quantity * i.price)}</strong>
           </div>
         ))}
-        <div className="total-row">
-          <span>Total • pagamento no local</span>
-          <strong>{money(total)}</strong>
-        </div>
+        {!useOnline && (
+          <div className="total-row">
+            <span>Total • pagamento no local</span>
+            <strong>{money(total)}</strong>
+          </div>
+        )}
       </div>
       <label className="checkbox-label">
         <input
@@ -1012,6 +1057,8 @@ function Checkout({ table }: { table: number }) {
       <p className="privacy-note">
         Seu nome e WhatsApp serão usados para atender este pedido. O número
         informado não é verificado.{" "}
+        {useOnline && draft?.fulfillment === "entrega" &&
+          "O endereço é usado apenas para entregar este pedido. "}
         <Link href="/privacidade">Entenda sua privacidade</Link>.
       </p>
       {error && (

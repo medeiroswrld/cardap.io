@@ -161,25 +161,52 @@ export function ConnectedMenuProvider({
       .catch(() => {});
   }
   async function checkout(data: Checkout) {
-    const table = catalog.tables.find(
-      (t) => t.active && t.number === data.table,
-    );
-    if (!table) throw new Error("Escolha uma mesa válida.");
-    await ensureGuestSession(catalog.restaurant.id);
-    const body = {
-      table_id: table.id,
+    const items = current.current.bag.map((i) => ({
+      product_id: i.productId,
+      quantity: i.quantity,
+      expected_price: i.price,
+      note: i.note,
+      removed_ingredients: [...(i.removedIngredients || [])].sort(),
+      option_ids: (i.addOns || []).map((o) => o.id).sort(),
+    }));
+    const customer = {
       name: data.name.trim(),
       phone: data.phone.replace(/\D/g, ""),
       marketing_consent: data.consent,
-      items: current.current.bag.map((i) => ({
-        product_id: i.productId,
-        quantity: i.quantity,
-        expected_price: i.price,
-        note: i.note,
-        removed_ingredients: [...(i.removedIngredients || [])].sort(),
-        option_ids: (i.addOns || []).map((o) => o.id).sort(),
-      })),
     };
+    let body: Record<string, unknown>;
+    if (!data.online) {
+      const table = catalog.tables.find(
+        (t) => t.active && t.number === data.table,
+      );
+      if (!table) throw new Error("Escolha uma mesa válida.");
+      body = { table_id: table.id, ...customer, items };
+    } else if (data.online.fulfillment === "retirada") {
+      body = {
+        fulfillment: "retirada",
+        payment_method: data.online.payment,
+        change_for_cents: data.online.changeFor,
+        ...customer,
+        items,
+      };
+    } else {
+      const a = data.online.address;
+      body = {
+        fulfillment: "entrega",
+        payment_method: data.online.payment,
+        change_for_cents: data.online.changeFor,
+        address: {
+          zone_id: a.zoneId,
+          street: a.street.trim(),
+          number: a.number.trim(),
+          complement: a.complement.trim(),
+          reference: a.reference.trim(),
+        },
+        ...customer,
+        items,
+      };
+    }
+    await ensureGuestSession(catalog.restaurant.id);
     const fingerprint = Array.from(
       new Uint8Array(
         await crypto.subtle.digest(
@@ -244,6 +271,18 @@ export function ConnectedMenuProvider({
         ready,
         session: "",
         error,
+        online:
+          catalog.restaurant.pickup_enabled ||
+          catalog.restaurant.delivery_enabled
+            ? {
+                pickup: catalog.restaurant.pickup_enabled,
+                delivery:
+                  catalog.restaurant.delivery_enabled &&
+                  catalog.zones.length > 0,
+                minimum: catalog.restaurant.delivery_min_order_cents,
+                zones: catalog.zones,
+              }
+            : undefined,
         update,
         add,
         checkout,

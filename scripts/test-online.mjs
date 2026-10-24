@@ -84,3 +84,22 @@ test("alert repeats while there are pending orders, unless muted", () => {
   assert.equal(alerts.shouldPlayAlert({ ...base, muted: true }), false);
   assert.equal(alerts.shouldPlayAlert({ ...base, lastPlayedAt: null, now: 1 }), true);
 });
+
+test("draft converts reais to cents and keeps change only for cash", () => {
+  const draftLib = load("src/lib/fulfillment-draft.ts");
+  const options = { pickup: true, delivery: true, minimum: 2000, zones: [{ id: "z1" }] };
+  const base = draftLib.initialDraft(options);
+  assert.equal(base.fulfillment, "retirada");
+  assert.equal(draftLib.initialDraft({ ...options, pickup: false }).fulfillment, "entrega");
+  assert.equal(base.zoneId, "z1");
+  assert.deepEqual(
+    draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: "100,50" }),
+    { fulfillment: "retirada", payment: "dinheiro", changeFor: 10050 },
+  );
+  assert.equal(draftLib.draftToChoice({ ...base, payment: "pix", changeFor: "100" }).changeFor, null);
+  assert.equal(draftLib.draftToChoice({ ...base, payment: "dinheiro", changeFor: " " }).changeFor, null);
+  const delivery = draftLib.draftToChoice({ ...base, fulfillment: "entrega", street: "Rua A", number: "10" });
+  assert.equal(delivery.fulfillment, "entrega");
+  assert.equal(delivery.address.zoneId, "z1");
+  assert.equal(delivery.address.street, "Rua A");
+});

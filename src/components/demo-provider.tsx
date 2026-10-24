@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { initialState } from "@/lib/fixtures";
+import type { PaymentMethod } from "@/lib/order-flow";
+import type { OnlineOptions } from "@/lib/fulfillment-draft";
 import {
   statusFlow,
   type DemoState,
@@ -25,7 +27,22 @@ export type Checkout = {
   table: number;
   consent: boolean;
   key: string;
+  online?: OnlineChoice;
 };
+export type OnlineChoice =
+  | { fulfillment: "retirada"; payment: PaymentMethod; changeFor: number | null }
+  | {
+      fulfillment: "entrega";
+      payment: PaymentMethod;
+      changeFor: number | null;
+      address: {
+        zoneId: string;
+        street: string;
+        number: string;
+        complement: string;
+        reference: string;
+      };
+    };
 type Context = {
   mode: "demo" | "connected";
   slug: string;
@@ -33,6 +50,7 @@ type Context = {
   ready: boolean;
   session: string;
   error: string;
+  online?: OnlineOptions;
   update: (fn: (state: DemoState) => DemoState) => void;
   add: (item: BagItem) => void;
   checkout: (data: Checkout) => { id: string } | Promise<{ id: string }>;
