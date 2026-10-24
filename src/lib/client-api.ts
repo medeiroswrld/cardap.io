@@ -52,7 +52,7 @@ export async function requestJson<T>(
           INVALID_ADDRESS: "Confira rua e número do endereço de entrega.",
           BELOW_MINIMUM: "O pedido ainda não atingiu o valor mínimo para entrega.",
           INVALID_PAYMENT: "Escolha como vai pagar na entrega ou retirada.",
-          INVALID_CHANGE: "O troco precisa ser para um valor maior que o total, e só vale para dinheiro.",
+          INVALID_CHANGE: "O troco precisa ser para um valor igual ou maior que o total, e só vale para dinheiro.",
           RATE_LIMITED:
             "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
         } as Record<string, string>

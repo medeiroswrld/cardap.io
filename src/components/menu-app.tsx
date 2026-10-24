@@ -46,7 +46,7 @@ const categoryIcons: Record<string, typeof Hamburger> = {
   dessert: IceCreamBowl,
 };
 export function MenuApp() {
-  const { state, ready, add, notify, mode, slug } = useDemo();
+  const { state, ready, add, notify, mode, slug, online } = useDemo();
   const [category, setCategory] = useState("todos");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"feed" | "list">("feed");
@@ -549,7 +549,11 @@ export function MenuApp() {
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         title="Falta pouco para matar a fome"
-        description="Confira seus dados. O pagamento é feito no local."
+        description={
+          online && !hasTable
+            ? "Confira seus dados. O pagamento é feito na entrega ou retirada."
+            : "Confira seus dados. O pagamento é feito no local."
+        }
       >
         <Checkout table={table} hasTable={hasTable} />
       </Modal>
@@ -933,6 +937,11 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
               throw new Error(
                 "O pedido ainda não atingiu o valor mínimo para entrega.",
               );
+            if (
+              draft.fulfillment === "entrega" &&
+              (draft.street.trim().length < 3 || draft.number.trim().length < 1)
+            )
+              throw new Error("Confira rua e número do endereço de entrega.");
             const choice = draftToChoice(draft);
             const zone =
               online.zones.find((z) => z.id === draft.zoneId) ?? null;
@@ -945,7 +954,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
               )
             )
               throw new Error(
-                "O troco precisa ser para um valor maior que o total.",
+                "O troco precisa ser para um valor igual ou maior que o total.",
               );
           }
           if (!key.current) key.current = crypto.randomUUID();

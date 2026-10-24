@@ -19,6 +19,25 @@ export type FulfillmentDraft = {
   reference: string;
 };
 
+// Online ordering is offered only when at least one mode is actually usable.
+export function onlineOptions(
+  restaurant: {
+    pickup_enabled: boolean;
+    delivery_enabled: boolean;
+    delivery_min_order_cents: number;
+  },
+  zones: DeliveryZone[],
+): OnlineOptions | undefined {
+  const delivery = restaurant.delivery_enabled && zones.length > 0;
+  if (!restaurant.pickup_enabled && !delivery) return undefined;
+  return {
+    pickup: restaurant.pickup_enabled,
+    delivery,
+    minimum: restaurant.delivery_min_order_cents,
+    zones,
+  };
+}
+
 export function initialDraft(options: OnlineOptions): FulfillmentDraft {
   return {
     fulfillment: options.pickup ? "retirada" : "entrega",

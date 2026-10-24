@@ -6,6 +6,7 @@ import { catalogState, type Catalog } from "@/lib/connected-types";
 import type { BagItem, DemoState } from "@/lib/types";
 import { requestJson } from "@/lib/client-api";
 import { ensureGuestSession } from "@/lib/guest-session";
+import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
 export function ConnectedMenuProvider({
   catalog: initialCatalog,
@@ -221,7 +222,8 @@ export function ConnectedMenuProvider({
     try {
       saved = JSON.parse(localStorage.getItem(pendingKey) || "null");
     } catch {}
-    const key = saved?.fingerprint === fingerprint ? saved.key : data.key;
+    const key =
+      saved?.fingerprint === fingerprint ? saved.key : crypto.randomUUID();
     localStorage.setItem(pendingKey, JSON.stringify({ fingerprint, key }));
     const { order } = await requestJson<{ order: { id: string } }>(
       base + "/orders",
@@ -271,18 +273,7 @@ export function ConnectedMenuProvider({
         ready,
         session: "",
         error,
-        online:
-          catalog.restaurant.pickup_enabled ||
-          catalog.restaurant.delivery_enabled
-            ? {
-                pickup: catalog.restaurant.pickup_enabled,
-                delivery:
-                  catalog.restaurant.delivery_enabled &&
-                  catalog.zones.length > 0,
-                minimum: catalog.restaurant.delivery_min_order_cents,
-                zones: catalog.zones,
-              }
-            : undefined,
+        online: onlineOptions(catalog.restaurant, catalog.zones),
         update,
         add,
         checkout,

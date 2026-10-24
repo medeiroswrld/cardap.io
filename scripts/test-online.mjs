@@ -103,3 +103,18 @@ test("draft converts reais to cents and keeps change only for cash", () => {
   assert.equal(delivery.address.zoneId, "z1");
   assert.equal(delivery.address.street, "Rua A");
 });
+
+test("online options require at least one usable mode", () => {
+  const draftLib = load("src/lib/fulfillment-draft.ts");
+  const r = (pickup_enabled, delivery_enabled) => ({ pickup_enabled, delivery_enabled, delivery_min_order_cents: 1500 });
+  const zones = [{ id: "z1" }];
+  assert.equal(draftLib.onlineOptions(r(false, false), zones), undefined);
+  assert.equal(draftLib.onlineOptions(r(false, true), []), undefined);
+  const pickupOnly = draftLib.onlineOptions(r(true, true), []);
+  assert.equal(pickupOnly.pickup, true);
+  assert.equal(pickupOnly.delivery, false);
+  const delivery = draftLib.onlineOptions(r(false, true), zones);
+  assert.equal(delivery.delivery, true);
+  assert.equal(delivery.pickup, false);
+  assert.equal(delivery.minimum, 1500);
+});
