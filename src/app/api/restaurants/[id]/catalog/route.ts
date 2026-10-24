@@ -1,4 +1,4 @@
-import { withRequestLogging } from "@/lib/observability/logger";
+import { logFailure, withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { invalidateCatalog } from "@/lib/catalog-cache";
@@ -199,6 +199,13 @@ async function handlePOST(
         p_active: body.active,
         p_position: body.position,
       });
+      if (error?.code === "23505") {
+        logFailure(error, "supabase.catalog");
+        return Response.json(
+          { error: "Já existe um bairro com esse nome." },
+          { status: 409, headers: noStore },
+        );
+      }
       if (error) throw error;
     } else if (body.action === "revoke_marketing") {
       const { error } = await supabase.rpc("revoke_marketing", {

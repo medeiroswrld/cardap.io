@@ -74,6 +74,7 @@ const delivery = (over = {}) => ({
   fulfillment: "entrega",
   payment_method: "dinheiro",
   change_for_cents: 10000,
+  expected_fee_cents: 700,
   address: { zone_id: zone, street: "Rua das Flores", number: "120", complement: "Apto 3", reference: "Portão azul" },
   items: items(2),
   ...over,
@@ -131,6 +132,12 @@ await ok("delivery adds the zone fee on the server and stores the address snapsh
   assert.equal(r.total_cents, 2500 * 2 + 700);
   const { rows } = await db.query("select zone_name,street,number from order_addresses where order_id=$1", [r.id]);
   assert.deepEqual(rows[0], { zone_name: "Centro", street: "Rua das Flores", number: "120" });
+  // PostgREST embeds one-to-one only when the FK columns match a unique key exactly.
+  const unique = await db.query(
+    `select 1 from pg_constraint where conrelid='public.order_addresses'::regclass and contype in ('p','u')
+     and (select array_agg(attname::text order by attname) from pg_attribute where attrelid=conrelid and attnum=any(conkey))=array['order_id','restaurant_id']`,
+  );
+  assert.equal(unique.rows.length, 1);
 });
 
 await ok("delivery rejects disabled modes, foreign or paused zones, bad address, minimum and change", async () => {
@@ -141,6 +148,10 @@ await ok("delivery rejects disabled modes, foreign or paused zones, bad address,
   await rejects(() => place(token, delivery({ items: items(1) })), "BELOW_MINIMUM");
   await rejects(() => place(token, delivery({ change_for_cents: 1000 })), "INVALID_CHANGE");
   await rejects(() => place(token, delivery({ payment_method: "cartao", change_for_cents: 10000 })), "INVALID_CHANGE");
+  await rejects(() => place(token, delivery({ expected_fee_cents: 500 })), "PRICE_CHANGED");
+  const withoutFee = { ...delivery() };
+  delete withoutFee.expected_fee_cents;
+  await rejects(() => place(token, withoutFee), "PRICE_CHANGED");
   await root();
   await db.query("update restaurants set delivery_enabled=false,pickup_enabled=false where id=$1", [a]);
   await rejects(() => place(token, delivery()), "DELIVERY_DISABLED");
@@ -211,6 +222,9 @@ await ok("anon reads only active zones; only the owner saves zones of their own 
   await rejects(() => db.query("select save_delivery_zone($1,$2,'Novo',100,20,true,0)", [a, crypto.randomUUID()]), "FORBIDDEN");
   await login(ownerB);
   await rejects(() => db.query("select save_delivery_zone($1,$2,'Invasão',100,20,true,0)", [b, zone]), "FORBIDDEN");
+  await root();
+  const untouched = await db.query("select restaurant_id,name from delivery_zones where id=$1", [zone]);
+  assert.deepEqual(untouched.rows[0], { restaurant_id: a, name: "Centro" });
   await login(ownerA);
   const id = crypto.randomUUID();
   await db.query("select save_delivery_zone($1,$2,'Jardins',900,50,true,2)", [a, id]);

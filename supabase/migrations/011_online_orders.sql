@@ -47,6 +47,8 @@ create table public.order_addresses (
   number text not null check (length(trim(number)) between 1 and 20),
   complement text not null default '' check (length(complement) <= 80),
   reference text not null default '' check (length(reference) <= 150),
+  -- Matches the composite FK exactly so PostgREST embeds the address as one object, not an array.
+  unique (restaurant_id, order_id),
   foreign key (restaurant_id, order_id) references public.orders(restaurant_id, id) on delete cascade,
   foreign key (restaurant_id, zone_id) references public.delivery_zones(restaurant_id, id)
 );
@@ -91,6 +93,8 @@ begin
   if jsonb_typeof(addr)<>'object' then raise exception 'INVALID_ADDRESS'; end if;
   select * into zone from delivery_zones where id=(addr->>'zone_id')::uuid and restaurant_id=p_restaurant and active for share;
   if not found then raise exception 'INVALID_ZONE'; end if;
+  -- The customer confirmed this fee in the checkout; a changed fee must be confirmed again.
+  if (p_payload->>'expected_fee_cents')::integer is distinct from zone.fee_cents then raise exception 'PRICE_CHANGED'; end if;
   if length(trim(coalesce(addr->>'street',''))) not between 3 and 150 or length(trim(coalesce(addr->>'number',''))) not between 1 and 20
    or length(coalesce(addr->>'complement',''))>80 or length(coalesce(addr->>'reference',''))>150 then raise exception 'INVALID_ADDRESS'; end if;
  end if;
@@ -201,7 +205,8 @@ begin
  if exists(select 1 from delivery_zones where id=p_id and restaurant_id<>p_restaurant) then raise exception 'FORBIDDEN'; end if;
  insert into delivery_zones(id,restaurant_id,name,fee_cents,estimate_minutes,active,position)
  values(p_id,p_restaurant,trim(p_name),p_fee,p_estimate,p_active,p_position)
- on conflict(id) do update set name=excluded.name,fee_cents=excluded.fee_cents,estimate_minutes=excluded.estimate_minutes,active=excluded.active,position=excluded.position;
+ on conflict(id) do update set name=excluded.name,fee_cents=excluded.fee_cents,estimate_minutes=excluded.estimate_minutes,active=excluded.active,position=excluded.position
+  where delivery_zones.restaurant_id=excluded.restaurant_id;
  return p_id;
 end $$;
 revoke all on function public.save_delivery_zone(uuid,uuid,text,integer,integer,boolean,integer) from public,anon;

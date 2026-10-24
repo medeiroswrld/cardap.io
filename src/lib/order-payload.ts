@@ -43,6 +43,8 @@ export const orderPayload = z.union([
       fulfillment: z.literal("entrega"),
       payment_method: payment,
       change_for_cents: change,
+      // Fee the customer saw; the database rejects the order if the zone fee changed.
+      expected_fee_cents: z.number().int().min(0).max(100000),
       address: z
         .object({
           zone_id: z.uuid(),

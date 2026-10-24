@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
+import { withOrderAddress } from "@/lib/embed";
 type Context = { params: Promise<{ id: string; orderId: string }> };
 async function handleGET(_request: Request, { params }: Context) {
   try {
@@ -48,7 +49,7 @@ async function handleGET(_request: Request, { params }: Context) {
     if (restaurantError) logFailure(restaurantError, "supabase.orders");
     return Response.json(
       {
-        ...data,
+        ...withOrderAddress(data),
         google_review_url: restaurant?.google_review_url || "",
         feedback_enabled: restaurant?.feedback_enabled ?? true,
       },
@@ -101,7 +102,9 @@ async function handlePATCH(request: Request, { params }: Context) {
       return Response.json(
         {
           error:
-            "O pedido mudou ou a transição não é permitida. Atualize e tente novamente.",
+            error.message === "STALE_ORDER"
+              ? "Este pedido já foi atualizado por outra pessoa. A lista foi atualizada."
+              : "O pedido mudou ou a transição não é permitida. Atualize e tente novamente.",
         },
         { status: errorStatus(errorCode(error)), headers: noStore },
       );

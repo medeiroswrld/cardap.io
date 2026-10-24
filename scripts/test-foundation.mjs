@@ -146,6 +146,15 @@ test("order payload: table orders unchanged, online orders need payment and addr
   assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "retirada", payment_method: "pix" }).success, true);
   const address = { zone_id: "90000000-0000-4000-8000-000000000001", street: "Rua A", number: "10", complement: "", reference: "" };
   assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "dinheiro" }).success, false);
-  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "dinheiro", change_for_cents: 10000, address }).success, true);
-  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "entrega", payment_method: "pix", address, table_id: table.table_id }).success, false);
+  const delivery = { ...base, fulfillment: "entrega", payment_method: "dinheiro", change_for_cents: 10000, expected_fee_cents: 700, address };
+  assert.equal(orderSchema.orderPayload.safeParse(delivery).success, true);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...delivery, expected_fee_cents: 0 }).success, true);
+  // The fee shown to the customer is required and re-checked by the database.
+  const withoutFee = { ...delivery };
+  delete withoutFee.expected_fee_cents;
+  assert.equal(orderSchema.orderPayload.safeParse(withoutFee).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...delivery, expected_fee_cents: -1 }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...delivery, expected_fee_cents: 7.5 }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "retirada", payment_method: "pix", expected_fee_cents: 0 }).success, false);
+  assert.equal(orderSchema.orderPayload.safeParse({ ...delivery, payment_method: "pix", change_for_cents: null, table_id: table.table_id }).success, false);
 });

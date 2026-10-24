@@ -5,6 +5,7 @@ import { syncVideoAsset } from "@/lib/sync-video";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
+import { withOrderAddress } from "@/lib/embed";
 async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -174,7 +175,7 @@ async function handleGET(
         media: media.data,
         tables: tables.data,
         zones: zones.data,
-        orders: orders.data,
+        orders: (orders.data || []).map(withOrderAddress),
         contacts,
         metrics,
         photoMetrics,
