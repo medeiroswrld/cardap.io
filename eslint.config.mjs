@@ -28,5 +28,9 @@ export default defineConfig([
     "next-env.d.ts",
     "playwright-report/**",
     "test-results/**",
+    // Generated agent tooling (trail init); not project code.
+    ".trail/**",
+    ".cursor/**",
+    ".gemini/**",
   ]),
 ]);
