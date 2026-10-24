@@ -20,11 +20,14 @@ async function handlePOST(
     if (payload.fulfillment === "mesa")
       await enforcePublicLimit(request, id, "order_table", payload.table_id);
     else await enforcePublicLimit(request, id, "order_online", hash(token));
+    // Table orders omit `fulfillment` so the idempotency fingerprint of
+    // pre-deploy pending orders still matches; the DB defaults it to 'mesa'.
+    const { fulfillment, ...rest } = payload;
     const { data, error } = await serviceClient().rpc("place_guest_order", {
       p_restaurant: id,
       p_token_hash: hash(token),
       p_key: payload.key,
-      p_payload: payload,
+      p_payload: fulfillment === "mesa" ? rest : payload,
     });
     if (error) {
       const code = errorCode(error);

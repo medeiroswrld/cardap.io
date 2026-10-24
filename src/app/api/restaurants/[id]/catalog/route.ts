@@ -79,9 +79,14 @@ const schema = z.discriminatedUnion("action", [
       )
       .max(28),
     tables: z.number().int().min(1).max(100),
-    pickup_enabled: z.boolean(),
-    delivery_enabled: z.boolean(),
-    delivery_min_order_cents: z.number().int().min(0).max(1000000),
+    pickup_enabled: z.boolean().optional(),
+    delivery_enabled: z.boolean().optional(),
+    delivery_min_order_cents: z
+      .number()
+      .int()
+      .min(0)
+      .max(1000000)
+      .optional(),
   }),
   z.object({
     action: z.literal("save_delivery_zone"),
