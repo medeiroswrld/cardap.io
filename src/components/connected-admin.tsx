@@ -27,7 +27,7 @@ import type {
   CategoryRow,
   RealOrder,
 } from "@/lib/connected-types";
-import { statusNames, statusFlow, type Status } from "@/lib/types";
+import type { OrderStatus } from "@/lib/order-flow";
 import { money } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
@@ -37,7 +37,9 @@ import { createVideoCover } from "@/lib/video-cover";
 import { optimizePhoto } from "@/lib/photo-optimizer";
 import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
-import { OrderChoices } from "./order-choices";
+import { OrderBoard } from "./order-board";
+import { DeliverySettings } from "./delivery-settings";
+import { useOrderAlerts } from "./use-order-alerts";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
 type Save = (body: unknown) => Promise<void>;
@@ -120,7 +122,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
   };
   async function change(
     order: RealOrder,
-    status: Status,
+    status: OrderStatus,
     reason?: string,
     estimate?: number,
   ) {
@@ -137,6 +139,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
       setBusy(false);
     }
   }
+  const alerts = useOrderAlerts(data?.orders ?? []);
   const owner = data?.role === "owner";
   const allowed = pages.filter(
     (p) => owner || p[0] === "pedidos" || p[0] === "resumo",
@@ -293,7 +296,30 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 </>
               )}
               {page === "pedidos" && (
-                <Orders orders={data.orders} busy={busy} change={change} />
+                <>
+                  <div className="connected-toolbar">
+                    {!alerts.enabled ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => void alerts.enable()}
+                      >
+                        Ativar alertas de pedido
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" onClick={alerts.toggleMute}>
+                        {alerts.muted
+                          ? "Ligar som dos alertas"
+                          : "Silenciar alertas"}
+                      </Button>
+                    )}
+                  </div>
+                  <OrderBoard
+                    orders={data.orders}
+                    busy={busy}
+                    change={change}
+                    restaurantName={data.restaurant.name}
+                  />
+                </>
               )}
               {owner && page === "produtos" && (
                 <Products data={data} save={save} busy={busy} />
@@ -305,7 +331,10 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <Categories data={data} save={save} busy={busy} />
               )}
               {owner && page === "configuracoes" && (
-                <SettingsForm data={data} save={save} busy={busy} />
+                <>
+                  <SettingsForm data={data} save={save} busy={busy} />
+                  <DeliverySettings data={data} save={save} busy={busy} />
+                </>
               )}
               {owner && page === "contatos" && (
                 <Contacts data={data} save={save} busy={busy} />
@@ -338,191 +367,6 @@ function Stat({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-function Orders({
-  orders,
-  busy,
-  change,
-}: {
-  orders: RealOrder[];
-  busy: boolean;
-  change: (
-    order: RealOrder,
-    status: Status,
-    reason?: string,
-    estimate?: number,
-  ) => Promise<void>;
-}) {
-  const [selected, setSelected] = useState<RealOrder | null>(null);
-  const [status, setStatus] = useState<Status>("em_preparo");
-  const [error, setError] = useState("");
-  const [history, setHistory] = useState(false);
-  const columns: Status[] = history
-    ? ["entregue", "cancelado"]
-    : ["recebido", "em_preparo", "pronto"];
-  return (
-    <>
-      <div className="connected-toolbar">
-        <Button variant="outline" onClick={() => setHistory(!history)}>
-          {history ? "Ver pedidos em aberto" : "Ver entregues e cancelados"}
-        </Button>
-        <span className="field-help">
-          Tempo real com reconciliação a cada 15 segundos
-        </span>
-      </div>
-      <div className="kanban connected-kanban">
-        {columns.map((column) => (
-          <section key={column} className="kanban-column">
-            <h2>
-              {statusNames[column]}{" "}
-              <span>{orders.filter((o) => o.status === column).length}</span>
-            </h2>
-            <div className="kanban-cards">
-              {orders
-                .filter((o) => o.status === column)
-                .map((order) => (
-                  <article className="order-card" key={order.id}>
-                    <div className="panel-heading">
-                      <strong>#{order.number}</strong>
-                      <span>Mesa {order.dining_tables?.number}</span>
-                    </div>
-                    <p>
-                      {order.customer_name} ·{" "}
-                      {new Date(order.created_at).toLocaleTimeString("pt-BR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                    <ul className="connected-items">
-                      {order.order_items.map((item) => (
-                        <li key={item.id}>
-                          {item.quantity}× {item.product_name}
-                          <OrderChoices
-                            removed={item.removed_ingredients}
-                            additions={item.add_ons}
-                          />
-                          {item.note && <small>{item.note}</small>}
-                        </li>
-                      ))}
-                    </ul>
-                    <strong>{money(order.total_cents)}</strong>
-                    {order.cancellation_reason && (
-                      <p className="notice">{order.cancellation_reason}</p>
-                    )}
-                    {!history && (
-                      <div className="connected-order-actions">
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setError("");
-                            setSelected(order);
-                            setStatus(
-                              statusFlow[statusFlow.indexOf(order.status as Status) + 1],
-                            );
-                          }}
-                        >
-                          {column === "recebido"
-                            ? "Iniciar preparo"
-                            : column === "em_preparo"
-                              ? "Marcar pronto"
-                              : "Confirmar entrega"}
-                        </Button>
-                        {column !== "pronto" && (
-                          <Button
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => {
-                              setError("");
-                              setSelected(order);
-                              setStatus("cancelado");
-                            }}
-                          >
-                            Cancelar pedido
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                ))}
-              {!orders.some((o) => o.status === column) && (
-                <div className="kanban-empty">
-                  <ShoppingBag />
-                  <p>Nenhum pedido nesta etapa.</p>
-                </div>
-              )}
-            </div>
-          </section>
-        ))}
-      </div>
-      <Modal
-        open={!!selected}
-        onOpenChange={(open) => {
-          if (!open && !busy) setSelected(null);
-        }}
-        title={
-          status === "cancelado"
-            ? "Cancelar pedido"
-            : `Pedido #${selected?.number}`
-        }
-        description="Confirme a atualização para avisar o cliente."
-      >
-        {selected && (
-          <form
-            className="form-stack"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const form = new FormData(e.currentTarget);
-              try {
-                await change(
-                  selected,
-                  status,
-                  String(form.get("reason") || "") || undefined,
-                  form.get("estimate")
-                    ? Number(form.get("estimate"))
-                    : undefined,
-                );
-                setSelected(null);
-              } catch (err) {
-                setError((err as Error).message);
-              }
-            }}
-          >
-            {status === "cancelado" ? (
-              <label className="form-label">
-                Motivo do cancelamento
-                <textarea
-                  name="reason"
-                  required
-                  minLength={3}
-                  maxLength={300}
-                />
-              </label>
-            ) : (
-              <>
-                <p>
-                  Atualizar para <strong>{statusNames[status]}</strong>.
-                </p>
-                {status === "em_preparo" && (
-                  <label className="form-label">
-                    Estimativa de preparo em minutos (opcional)
-                    <input type="number" name="estimate" min={1} max={180} />
-                  </label>
-                )}
-              </>
-            )}
-            {error && (
-              <p role="alert" className="form-error">
-                {error}
-              </p>
-            )}
-            <Button type="submit" disabled={busy}>
-              {busy ? "Atualizando…" : "Confirmar atualização"}
-            </Button>
-          </form>
-        )}
-      </Modal>
-    </>
   );
 }
 function Products({
@@ -1101,6 +945,11 @@ function SettingsForm({
             retention_days: Number(form.get("retention_days")),
             tables: Number(form.get("tables")),
             accepting_orders: form.has("accepting_orders"),
+            pickup_enabled: form.has("pickup_enabled"),
+            delivery_enabled: form.has("delivery_enabled"),
+            delivery_min_order_cents: Math.round(
+              Number(form.get("delivery_min") || 0) * 100,
+            ),
             opening_hours,
           });
           setError("");
@@ -1238,6 +1087,32 @@ function SettingsForm({
           defaultChecked={r.accepting_orders}
         />{" "}
         Habilitar pedidos nos horários acima
+      </label>
+      <label className="checkbox-label">
+        <input
+          name="pickup_enabled"
+          type="checkbox"
+          defaultChecked={r.pickup_enabled}
+        />{" "}
+        Aceitar pedidos para retirada
+      </label>
+      <label className="checkbox-label">
+        <input
+          name="delivery_enabled"
+          type="checkbox"
+          defaultChecked={r.delivery_enabled}
+        />{" "}
+        Aceitar pedidos para entrega
+      </label>
+      <label className="form-label">
+        Pedido mínimo para entrega (R$)
+        <input
+          name="delivery_min"
+          type="number"
+          min="0"
+          step="0.01"
+          defaultValue={r.delivery_min_order_cents / 100}
+        />
       </label>
       {error && (
         <p role="alert" className="form-error">

@@ -6,6 +6,7 @@ const load = loader();
 const flow = load("src/lib/order-flow.ts");
 const online = load("src/lib/online-order.ts");
 const alerts = load("src/lib/order-alerts.ts");
+const board = load("src/lib/order-board.ts");
 
 test("each fulfillment has its own customer steps", () => {
   assert.deepEqual(flow.customerSteps("mesa"), ["recebido", "em_preparo", "pronto", "entregue"]);
@@ -117,4 +118,23 @@ test("online options require at least one usable mode", () => {
   assert.equal(delivery.delivery, true);
   assert.equal(delivery.pickup, false);
   assert.equal(delivery.minimum, 1500);
+});
+
+test("board shows online-only columns only when they have orders", () => {
+  assert.deepEqual(board.boardColumns([], false), ["recebido", "em_preparo", "pronto"]);
+  assert.deepEqual(
+    board.boardColumns([{ status: "aguardando_aceite" }, { status: "saiu_para_entrega" }], false),
+    ["aguardando_aceite", "recebido", "em_preparo", "pronto", "saiu_para_entrega"],
+  );
+  assert.deepEqual(board.boardColumns([], true), ["entregue", "recusado", "cancelado"]);
+  assert.equal(board.columnTitle("aguardando_aceite"), "Aguardando aceite");
+  assert.equal(board.columnTitle("pronto"), "Pronto");
+});
+
+test("modal kind follows the action", () => {
+  assert.equal(board.modalKind("aguardando_aceite", "recebido"), "accept");
+  assert.equal(board.modalKind("aguardando_aceite", "recusado"), "refuse");
+  assert.equal(board.modalKind("em_preparo", "cancelado"), "cancel");
+  assert.equal(board.modalKind("recebido", "em_preparo"), "preparing");
+  assert.equal(board.modalKind("pronto", "saiu_para_entrega"), "confirm");
 });
