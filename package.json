@@ -10,7 +10,7 @@
     "test:online": "node --test scripts/test-online.mjs",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
-    "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs",
+    "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs && node scripts/test-crm.mjs",
     "check:connections": "node scripts/check-connections.mjs",
     "test:observability": "node --test scripts/test-observability.mjs",
     "test:foundation": "node --test scripts/test-foundation.mjs",

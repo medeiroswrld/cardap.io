@@ -13,6 +13,7 @@ export const MIGRATIONS = [
   "009_social_feedback.sql",
   "010_pilot_rate_limits.sql",
   "011_online_orders.sql",
+  "012_crm.sql",
 ];
 
 // Supabase-owned schemas/roles are represented locally; business SQL is unchanged.
