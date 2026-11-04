@@ -62,6 +62,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
   const router = useRouter();
   const [data, setData] = useState<Workspace | null>(null);
   const [page, setPage] = useState("resumo");
+  const [crmStamp, setCrmStamp] = useState(0);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
@@ -348,8 +349,8 @@ export function ConnectedAdmin({ id }: { id: string }) {
               )}
               {owner && page === "contatos" && (
                 <>
-                  <CustomersPanel restaurantId={id} save={save} />
-                  <CampaignPanel restaurantId={id} />
+                  <CustomersPanel restaurantId={id} save={save} onChanged={() => setCrmStamp((n) => n + 1)} />
+                  <CampaignPanel restaurantId={id} staleStamp={crmStamp} />
                 </>
               )}
               {owner && page === "metricas" && <Metrics data={data} />}

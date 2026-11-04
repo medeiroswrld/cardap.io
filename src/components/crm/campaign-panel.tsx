@@ -14,11 +14,13 @@ import {
   type CrmSegment,
 } from "@/lib/crm";
 
-export function CampaignPanel({ restaurantId }: { restaurantId: string }) {
+export function CampaignPanel({ restaurantId, staleStamp = 0 }: { restaurantId: string; staleStamp?: number }) {
   const [segment, setSegment] = useState<CrmSegment | "">("sumido");
   const [tag, setTag] = useState("");
   const [message, setMessage] = useState("Oi {nome}! Estamos com saudade. Que tal pedir hoje?");
-  const [rows, setRows] = useState<CampaignRow[] | null>(null);
+  const [built, setBuilt] = useState<{ rows: CampaignRow[]; stamp: number } | null>(null);
+  // Rows built before the last customer change (revoke/erase) are discarded.
+  const rows = built && built.stamp === staleStamp ? built.rows : null;
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +29,8 @@ export function CampaignPanel({ restaurantId }: { restaurantId: string }) {
     setError("");
     try {
       const params = new URLSearchParams({ segment, tag: tag.trim() });
-      setRows(await requestJson<CampaignRow[]>(`/api/restaurants/${restaurantId}/crm/campaign?${params}`));
+      const next = await requestJson<CampaignRow[]>(`/api/restaurants/${restaurantId}/crm/campaign?${params}`);
+      setBuilt({ rows: next, stamp: staleStamp });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -42,8 +45,10 @@ export function CampaignPanel({ restaurantId }: { restaurantId: string }) {
     const a = document.createElement("a");
     a.href = url;
     a.download = `campanha-${segment || "etiqueta"}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -80,6 +85,11 @@ export function CampaignPanel({ restaurantId }: { restaurantId: string }) {
       {error && (
         <p role="alert" className="form-error">
           {error}
+        </p>
+      )}
+      {built && !rows && (
+        <p role="status" className="field-help">
+          Houve alterações em clientes. Monte a lista de novo para refletir alterações.
         </p>
       )}
       {rows && (

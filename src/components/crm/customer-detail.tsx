@@ -1,14 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { Modal } from "../ui/dialog";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
-import { campaignLink, segmentLabel, type CrmDetail } from "@/lib/crm";
+import { CRM_MAX_TAGS, campaignLink, checkNewTag, segmentLabel, type CrmDetail } from "@/lib/crm";
 import { statusLabel, type Fulfillment, type OrderStatus } from "@/lib/order-flow";
 
 type Save = (body: unknown) => Promise<void>;
-type Run = (action: () => Promise<unknown>, after?: "reload" | "close") => Promise<void>;
+type Run = (action: () => Promise<unknown>, after?: "reload" | "close" | "keep") => Promise<boolean>;
 type Loaded = { key: string; detail?: CrmDetail; error?: string };
 const marketingText = { authorized: "Autorizado", not_authorized: "Não autorizado", revoked: "Revogado" } as const;
 const fulfillmentText: Record<Fulfillment, string> = { mesa: "Mesa", retirada: "Retirada", entrega: "Entrega" };
@@ -47,7 +47,7 @@ export function CustomerDetail({
   }, [base, key]);
 
   const detail = loaded?.detail;
-  const error = actionError || (loaded?.key === key ? (loaded.error ?? "") : "");
+  const error = loaded?.key === key ? (loaded.error ?? "") : "";
 
   const run: Run = async (action, after = "reload") => {
     setBusy(true);
@@ -56,11 +56,23 @@ export function CustomerDetail({
       await action();
       onChanged();
       if (after === "close") onClose();
-      else setReload((n) => n + 1);
+      else if (after === "reload") setReload((n) => n + 1);
+      return true;
     } catch (err) {
       setActionError((err as Error).message);
+      return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Marketing revocation patches the loaded detail in place so unsaved tag/note edits survive.
+  const revoke = async () => {
+    const done = await run(() => save({ action: "revoke_marketing", id: contactId }), "keep");
+    if (done) {
+      setLoaded((l) =>
+        l?.detail ? { ...l, detail: { ...l.detail, marketing_status: "revoked" } } : l,
+      );
     }
   };
 
@@ -72,7 +84,15 @@ export function CustomerDetail({
           {error}
         </p>
       )}
-      {detail && <DetailBody key={loaded.key} detail={detail} base={base} busy={busy} run={run} save={save} />}
+      {detail && <DetailBody
+          key={loaded.key}
+          detail={detail}
+          base={base}
+          busy={busy}
+          actionError={actionError}
+          run={run}
+          revoke={revoke}
+        />}
     </Modal>
   );
 }
@@ -81,26 +101,43 @@ function DetailBody({
   detail,
   base,
   busy,
+  actionError,
   run,
-  save,
+  revoke,
 }: {
   detail: CrmDetail;
   base: string;
   busy: boolean;
+  actionError: string;
   run: Run;
-  save: Save;
+  revoke: () => Promise<void>;
 }) {
   const [tags, setTags] = useState<string[]>(detail.tags);
   const [newTag, setNewTag] = useState("");
   const [notes, setNotes] = useState(detail.notes);
   const [erasing, setErasing] = useState(false);
   const [confirm, setConfirm] = useState("");
+  const [tagError, setTagError] = useState("");
+  const confirmRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (erasing) confirmRef.current?.focus();
+  }, [erasing]);
 
   const addTag = () => {
-    const value = newTag.trim().slice(0, 30);
-    if (!value || tags.some((t) => t.toLowerCase() === value.toLowerCase()) || tags.length >= 10) return;
+    const { value, error } = checkNewTag(tags, newTag);
+    setTagError(error);
+    if (!value || error) return;
     setTags([...tags, value]);
     setNewTag("");
+  };
+
+  const saveAll = () => {
+    const { value, error } = checkNewTag(tags, newTag);
+    setTagError(error);
+    if (error) return;
+    const finalTags = value ? [...tags, value] : tags;
+    void run(() => requestJson(base, { action: "save", tags: finalTags, notes }));
   };
 
   return (
@@ -164,7 +201,7 @@ function DetailBody({
         </ul>
       </div>
       <fieldset className="crm-tags">
-        <legend>Etiquetas ({tags.length}/10)</legend>
+        <legend>Etiquetas ({tags.length}/{CRM_MAX_TAGS})</legend>
         <ul>
           {tags.map((t) => (
             <li key={t}>
@@ -172,7 +209,10 @@ function DetailBody({
               <Button
                 variant="ghost"
                 aria-label={`Remover etiqueta ${t}`}
-                onClick={() => setTags(tags.filter((x) => x !== t))}
+                onClick={() => {
+                  setTags(tags.filter((x) => x !== t));
+                  setTagError("");
+                }}
               >
                 Remover
               </Button>
@@ -184,7 +224,10 @@ function DetailBody({
           <input
             maxLength={30}
             value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
+            onChange={(e) => {
+              setNewTag(e.target.value);
+              setTagError("");
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -193,18 +236,28 @@ function DetailBody({
             }}
           />
         </label>
-        <Button variant="outline" onClick={addTag} disabled={tags.length >= 10}>
+        <Button variant="outline" onClick={addTag}>
           Adicionar etiqueta
         </Button>
+        {tagError && (
+          <p role="alert" className="form-error">
+            {tagError}
+          </p>
+        )}
       </fieldset>
       <label className="form-label">
         Anotações ({notes.length}/2000)
         <textarea maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
       <p className="field-help">Não registre dados sensíveis (saúde, religião, política, documentos).</p>
-      <Button disabled={busy} onClick={() => void run(() => requestJson(base, { action: "save", tags, notes }))}>
+      <Button disabled={busy} onClick={saveAll}>
         {busy ? "Salvando…" : "Salvar etiquetas e anotações"}
       </Button>
+      {actionError && !erasing && (
+        <p role="alert" className="form-error">
+          {actionError}
+        </p>
+      )}
       <div className="connected-order-actions">
         <Button asChild variant="outline">
           <a href={campaignLink(detail.phone, "")} target="_blank" rel="noopener noreferrer">
@@ -215,12 +268,12 @@ function DetailBody({
           <Button
             variant="ghost"
             disabled={busy}
-            onClick={() => void run(() => save({ action: "revoke_marketing", id: detail.id }))}
+            onClick={() => void revoke()}
           >
             Revogar autorização de marketing
           </Button>
         )}
-        <Button variant="ghost" disabled={busy} onClick={() => setErasing(true)}>
+        <Button variant="destructive" disabled={busy} onClick={() => setErasing(true)}>
           Excluir dados do cliente
         </Button>
       </div>
@@ -238,10 +291,15 @@ function DetailBody({
           </p>
           <label className="form-label">
             Digite EXCLUIR para confirmar
-            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
+            <input ref={confirmRef} value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
           </label>
+          {actionError && (
+            <p role="alert" className="form-error">
+              {actionError}
+            </p>
+          )}
           <div className="connected-order-actions">
-            <Button type="submit" disabled={busy || confirm !== "EXCLUIR"}>
+            <Button type="submit" variant="destructive" disabled={busy || confirm !== "EXCLUIR"}>
               Excluir definitivamente
             </Button>
             <Button

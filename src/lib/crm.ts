@@ -136,3 +136,44 @@ export function customersCsv(rows: CampaignRow[]) {
   );
   return "﻿" + [header, ...lines].join("\r\n");
 }
+
+export const CRM_MAX_TAGS = 10;
+export const CRM_TAG_MAX_LENGTH = 30;
+
+// Validates a tag typed by the owner against the tags already on the customer.
+export function checkNewTag(tags: string[], raw: string): { value: string; error: string } {
+  const value = raw.trim().slice(0, CRM_TAG_MAX_LENGTH);
+  if (!value) return { value, error: "" };
+  if (tags.length >= CRM_MAX_TAGS) return { value, error: `Limite de ${CRM_MAX_TAGS} etiquetas atingido.` };
+  if (tags.some((t) => t.toLowerCase() === value.toLowerCase())) return { value, error: "Essa etiqueta já existe." };
+  return { value, error: "" };
+}
+
+const settingsRules: { key: Exclude<keyof CrmSettings, "vip_min_spent_cents">; label: string; min: number; max: number }[] = [
+  { key: "recurring_min_orders", label: "Recorrente: mínimo de pedidos", min: 2, max: 50 },
+  { key: "recurring_days", label: "Recorrente: dias", min: 7, max: 365 },
+  { key: "vip_min_orders", label: "VIP: mínimo de pedidos", min: 2, max: 100 },
+  { key: "vip_days", label: "VIP: dias", min: 7, max: 365 },
+  { key: "lapsed_days", label: "Sumido: dias sem pedir", min: 7, max: 365 },
+];
+
+// Parses raw form strings (vip_min_spent in reais) into settings; limits mirror the server.
+export function parseCrmSettings(
+  input: Record<string, string>,
+): { ok: true; values: CrmSettings } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  const out = {} as CrmSettings;
+  for (const { key, label, min, max } of settingsRules) {
+    const raw = (input[key] ?? "").trim();
+    const n = Number(raw);
+    if (!raw || !Number.isInteger(n) || n < min || n > max) {
+      errors.push(`${label}: informe um número inteiro de ${min} a ${max}.`);
+    } else out[key] = n;
+  }
+  const rawSpent = (input.vip_min_spent ?? "").trim().replace(",", ".");
+  const spent = Number(rawSpent);
+  if (!rawSpent || !Number.isFinite(spent) || spent < 0 || spent > 1_000_000) {
+    errors.push("VIP: gasto mínimo: informe um valor em reais de 0 a 1.000.000.");
+  } else out.vip_min_spent_cents = Math.round(spent * 100);
+  return errors.length ? { ok: false, errors } : { ok: true, values: out };
+}

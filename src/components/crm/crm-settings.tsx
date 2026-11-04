@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import { Button } from "../ui/button";
-import { DEFAULT_CRM_SETTINGS, settingsFromRestaurant, type CrmSettings as Settings } from "@/lib/crm";
+import { DEFAULT_CRM_SETTINGS, parseCrmSettings, settingsFromRestaurant, type CrmSettings as Settings } from "@/lib/crm";
 import type { Workspace } from "@/lib/connected-types";
 
 type Save = (body: unknown) => Promise<void>;
-const fields: [keyof Settings, string, number, number][] = [
+type Raw = Record<Exclude<keyof Settings, "vip_min_spent_cents"> | "vip_min_spent", string>;
+const fields: [Exclude<keyof Settings, "vip_min_spent_cents">, string, number, number][] = [
   ["recurring_min_orders", "Recorrente: mínimo de pedidos", 2, 50],
   ["recurring_days", "Recorrente: dentro de quantos dias", 7, 365],
   ["vip_min_orders", "VIP: mínimo de pedidos", 2, 100],
@@ -13,17 +14,36 @@ const fields: [keyof Settings, string, number, number][] = [
   ["lapsed_days", "Sumido: dias sem pedir", 7, 365],
 ];
 
+function toRaw(s: Settings): Raw {
+  return {
+    recurring_min_orders: String(s.recurring_min_orders),
+    recurring_days: String(s.recurring_days),
+    vip_min_orders: String(s.vip_min_orders),
+    vip_days: String(s.vip_days),
+    lapsed_days: String(s.lapsed_days),
+    vip_min_spent: String(s.vip_min_spent_cents / 100),
+  };
+}
+
 export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save; busy: boolean }) {
-  const [values, setValues] = useState<Settings>(() => settingsFromRestaurant(data.restaurant));
+  const [values, setValues] = useState<Raw>(() => toRaw(settingsFromRestaurant(data.restaurant)));
+  const [errors, setErrors] = useState<string[]>([]);
   const [error, setError] = useState("");
   return (
     <form
+      noValidate
       className="admin-panel connected-panel form-stack"
       onSubmit={async (e) => {
         e.preventDefault();
+        setError("");
+        const parsed = parseCrmSettings(values);
+        if (!parsed.ok) {
+          setErrors(parsed.errors);
+          return;
+        }
+        setErrors([]);
         try {
-          setError("");
-          await save({ action: "crm_settings", ...values });
+          await save({ action: "crm_settings", ...parsed.values });
         } catch (err) {
           setError((err as Error).message);
         }
@@ -36,30 +56,39 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
       <div className="crm-settings-grid">
         {fields.map(([key, label, min, max]) => (
           <label className="form-label" key={key}>
-            {label}
+            {label} ({min} a {max})
             <input
               type="number"
+              inputMode="numeric"
               min={min}
               max={max}
-              required
               value={values[key]}
-              onChange={(e) => setValues({ ...values, [key]: Number(e.target.value) })}
+              onChange={(e) => setValues({ ...values, [key]: e.target.value })}
             />
           </label>
         ))}
         <label className="form-label">
-          VIP: ou gasto mínimo (R$, 0 desliga)
+          VIP: ou gasto mínimo (R$ 0 a 1.000.000; 0 desliga)
           <input
             type="number"
+            inputMode="decimal"
             min={0}
             max={1000000}
             step="0.01"
-            required
-            value={values.vip_min_spent_cents / 100}
-            onChange={(e) => setValues({ ...values, vip_min_spent_cents: Math.round(Number(e.target.value) * 100) })}
+            value={values.vip_min_spent}
+            onChange={(e) => setValues({ ...values, vip_min_spent: e.target.value })}
           />
         </label>
       </div>
+      {errors.length > 0 && (
+        <div role="alert" className="form-error">
+          <ul>
+            {errors.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {error && (
         <p role="alert" className="form-error">
           {error}
@@ -69,7 +98,14 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
         <Button type="submit" disabled={busy}>
           Salvar regras
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => setValues(DEFAULT_CRM_SETTINGS)}>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={() => {
+            setValues(toRaw(DEFAULT_CRM_SETTINGS));
+            setErrors([]);
+          }}
+        >
           Restaurar padrão
         </Button>
       </div>

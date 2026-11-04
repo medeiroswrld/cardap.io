@@ -15,7 +15,15 @@ const sorts = [
 ] as const;
 type Result = { key: string; error?: string };
 
-export function CustomersPanel({ restaurantId, save }: { restaurantId: string; save: Save }) {
+export function CustomersPanel({
+  restaurantId,
+  save,
+  onChanged,
+}: {
+  restaurantId: string;
+  save: Save;
+  onChanged?: () => void;
+}) {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [segment, setSegment] = useState<CrmSegment | "">("");
@@ -48,6 +56,11 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
     requestJson<CrmList>(`/api/restaurants/${restaurantId}/crm?${query}`)
       .then((next) => {
         if (!alive) return;
+        const last = Math.max(1, Math.ceil(next.total / CRM_PAGE_SIZE));
+        if (page > last) {
+          setPage(last);
+          return;
+        }
         setData(next);
         setResult({ key });
       })
@@ -55,7 +68,7 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
     return () => {
       alive = false;
     };
-  }, [restaurantId, query, key]);
+  }, [restaurantId, query, key, page]);
 
   // Loading is derived: the latest answer belongs to a different request key.
   const loading = result?.key !== key;
@@ -76,6 +89,7 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
             type="button"
             className="crm-segment"
             aria-pressed={segment === seg}
+            aria-label={`${segmentNames[seg]}: ${data?.segments[seg] ?? "carregando"}`}
             onClick={() => {
               setSegment(segment === seg ? "" : seg);
               reset();
@@ -149,6 +163,7 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
       </p>
       <div className="crm-table-wrap">
         <table className="crm-table">
+          <caption className="crm-sr-only">Lista de clientes</caption>
           <thead>
             <tr>
               <th scope="col">Cliente</th>
@@ -163,7 +178,7 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
             {data?.customers.map((c) => (
               <tr key={c.id}>
                 <td>
-                  <button type="button" className="crm-link" onClick={() => setSelected(c.id)}>
+                  <button type="button" className="crm-link" aria-label={`${c.name}, ${c.phone}`} onClick={() => setSelected(c.id)}>
                     {c.name}
                   </button>
                   <small>{c.phone}</small>
@@ -180,13 +195,13 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
       </div>
       {data && data.customers.length === 0 && !loading && <p>Nenhum cliente encontrado com esses filtros.</p>}
       <nav className="crm-pages" aria-label="Paginação de clientes">
-        <Button variant="outline" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>
+        <Button variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>
           Anterior
         </Button>
         <span>
           Página {page} de {pages}
         </span>
-        <Button variant="outline" disabled={page >= pages || loading} onClick={() => setPage(page + 1)}>
+        <Button variant="outline" disabled={page >= pages} onClick={() => setPage(page + 1)}>
           Próxima
         </Button>
       </nav>
@@ -198,7 +213,10 @@ export function CustomersPanel({ restaurantId, save }: { restaurantId: string; s
           open
           save={save}
           onClose={() => setSelected(null)}
-          onChanged={() => setVersion((v) => v + 1)}
+          onChanged={() => {
+            setVersion((v) => v + 1);
+            onChanged?.();
+          }}
         />
       )}
     </section>

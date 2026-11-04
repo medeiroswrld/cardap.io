@@ -68,3 +68,24 @@ test("save/erase body and campaign/settings validation", () => {
   assert.equal(q.crmSettingsBody.safeParse({ action: "crm_settings", recurring_min_orders: 2, recurring_days: 60, vip_min_orders: 5, vip_min_spent_cents: 50000, vip_days: 90, lapsed_days: 30 }).success, true);
   assert.equal(q.crmSettingsBody.safeParse({ action: "crm_settings", recurring_min_orders: 1, recurring_days: 60, vip_min_orders: 5, vip_min_spent_cents: 50000, vip_days: 90, lapsed_days: 30 }).success, false);
 });
+
+test("checkNewTag rejects duplicates and the tag limit", () => {
+  assert.deepEqual(crm.checkNewTag(["a"], "  "), { value: "", error: "" });
+  assert.equal(crm.checkNewTag(["Vip"], "vip").error, "Essa etiqueta já existe.");
+  assert.ok(crm.checkNewTag(Array.from({ length: 10 }, (_, i) => `t${i}`), "x").error.includes("Limite"));
+  assert.deepEqual(crm.checkNewTag(["a"], " nova "), { value: "nova", error: "" });
+});
+
+test("parseCrmSettings validates ranges and converts reais to cents", () => {
+  const ok = { recurring_min_orders: "2", recurring_days: "60", vip_min_orders: "5", vip_days: "90", lapsed_days: "30", vip_min_spent: "500,50" };
+  const parsed = crm.parseCrmSettings(ok);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.values.vip_min_spent_cents, 50050);
+  assert.equal(crm.parseCrmSettings({ ...ok, recurring_days: "" }).ok, false);
+  assert.equal(crm.parseCrmSettings({ ...ok, recurring_days: "6" }).ok, false);
+  assert.equal(crm.parseCrmSettings({ ...ok, vip_min_orders: "1" }).ok, false);
+  assert.equal(crm.parseCrmSettings({ ...ok, lapsed_days: "7.5" }).ok, false);
+  assert.equal(crm.parseCrmSettings({ ...ok, vip_min_spent: "1000000.01" }).ok, false);
+  assert.equal(crm.parseCrmSettings({ ...ok, vip_min_spent: "0" }).ok, true);
+  assert.equal(crm.parseCrmSettings({ ...ok, vip_min_spent: "" }).ok, false);
+});
