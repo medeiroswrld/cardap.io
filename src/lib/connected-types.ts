@@ -18,6 +18,12 @@ export type RestaurantRow = {
   pickup_enabled: boolean;
   delivery_enabled: boolean;
   delivery_min_order_cents: number;
+  crm_recurring_min_orders: number;
+  crm_recurring_days: number;
+  crm_vip_min_orders: number;
+  crm_vip_min_spent_cents: number;
+  crm_vip_days: number;
+  crm_lapsed_days: number;
 };
 export type DeliveryZone = {
   id: string;
@@ -107,15 +113,6 @@ export type RealOrder = {
   }[];
   order_status_events: { status: string; created_at: string }[];
 };
-export type RealContact = {
-  id: string;
-  name: string;
-  phone: string;
-  verified: boolean;
-  marketing_status: "authorized" | "not_authorized" | "revoked";
-  first_seen_at: string;
-  last_seen_at: string;
-};
 export type Workspace = {
   restaurant: RestaurantRow;
   role: "owner" | "operations";
@@ -136,7 +133,6 @@ export type Workspace = {
   tables: TableRow[];
   zones: DeliveryZone[];
   orders: RealOrder[];
-  contacts: RealContact[];
   photoMetrics: {
     product_id: string;
     photo_url: string;

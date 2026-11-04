@@ -88,12 +88,17 @@ async function handleGET(
     );
     await Promise.all(
       pendingOnline.map(async (order) => {
+        // Phone is "" after CRM erasure: nothing to match, so not a first order.
+        if (order.customer_phone === "") {
+          order.first_order = false;
+          return;
+        }
         const { count, error } = await supabase
           .from("orders")
           .select("id", { count: "exact", head: true })
           .eq("restaurant_id", id)
           .eq("customer_phone", order.customer_phone)
-          .neq("status", "recusado")
+          .not("status", "in", "(recusado,cancelado)")
           .lt("created_at", order.created_at);
         if (error) throw new Error("DATABASE_ERROR");
         order.first_order = count === 0;
@@ -120,18 +125,11 @@ async function handleGET(
         }),
       );
     }
-    let contacts: unknown[] = [];
     let metrics: unknown[] = [];
     let photoMetrics: unknown[] = [];
     let feedback: unknown[] = [];
     if (role === "owner") {
-      const [c, m, photos, reviews] = await Promise.all([
-        supabase
-          .from("contacts")
-          .select("*")
-          .eq("restaurant_id", id)
-          .order("last_seen_at", { ascending: false })
-          .limit(500),
+      const [m, photos, reviews] = await Promise.all([
         supabase
           .from("video_view_sessions")
           .select(
@@ -157,9 +155,8 @@ async function handleGET(
           .order("updated_at", { ascending: false })
           .limit(200),
       ]);
-      if (c.error || m.error || photos.error || reviews.error)
+      if (m.error || photos.error || reviews.error)
         throw new Error("DATABASE_ERROR");
-      contacts = c.data;
       metrics = m.data;
       photoMetrics = photos.data;
       feedback = reviews.data;
@@ -176,7 +173,6 @@ async function handleGET(
         tables: tables.data,
         zones: zones.data,
         orders: (orders.data || []).map(withOrderAddress),
-        contacts,
         metrics,
         photoMetrics,
         feedback,

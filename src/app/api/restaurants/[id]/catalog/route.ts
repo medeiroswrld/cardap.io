@@ -2,6 +2,7 @@ import { logFailure, withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { invalidateCatalog } from "@/lib/catalog-cache";
+import { crmSettingsBody } from "@/lib/crm-query";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
@@ -98,6 +99,7 @@ const schema = z.discriminatedUnion("action", [
     position: z.number().int().min(0).max(10000),
   }),
   z.object({ action: z.literal("revoke_marketing"), id: z.uuid() }),
+  crmSettingsBody,
 ]);
 async function handlePOST(
   request: Request,
@@ -207,6 +209,11 @@ async function handlePOST(
         );
       }
       if (error) throw error;
+    } else if (body.action === "crm_settings") {
+      const { action: _, ...settings } = body;
+      void _;
+      const { error } = await supabase.rpc("crm_save_settings", { p_restaurant: id, p_settings: settings });
+      if (error) throw error;
     } else if (body.action === "revoke_marketing") {
       const { error } = await supabase.rpc("revoke_marketing", {
         p_restaurant: id,
@@ -214,8 +221,12 @@ async function handlePOST(
       });
       if (error) throw error;
     }
-    // Marketing revocations and comment moderation are not part of the public catalog.
-    if (body.action !== "revoke_marketing" && body.action !== "moderate_feedback")
+    // Marketing revocations, CRM settings and comment moderation are not part of the public catalog.
+    if (
+      body.action !== "revoke_marketing" &&
+      body.action !== "moderate_feedback" &&
+      body.action !== "crm_settings"
+    )
       await invalidateCatalog(supabase, id);
     return Response.json({ ok: true }, { headers: noStore });
   } catch (error) {

@@ -22,6 +22,7 @@ export const operations = [
   "supabase.catalog",
   "supabase.workspace",
   "supabase.orders",
+  "supabase.crm",
   "supabase.feedback",
   "supabase.onboarding",
   "supabase.media",
@@ -72,6 +73,7 @@ export const errorCodes = [
   "PRODUCT_NOT_FOUND",
   "AUTH_REJECTED",
   "INVALID_VIDEO",
+  "CUSTOMER_HAS_OPEN_ORDERS",
   "COOKIE_WRITE_FAILED",
   "23505",
   "42501",
@@ -113,6 +115,9 @@ const routes = new Set([
     "photo-associations",
     "subscribe",
     "products/[productId]/feedback",
+    "crm",
+    "crm/[contactId]",
+    "crm/campaign",
   ].map((part) => `/api/restaurants/[id]/${part}`),
 ]);
 export function safeAction(method: string, route: string) {
@@ -199,6 +204,7 @@ export function errorStatus(code: ErrorCode) {
       "PRICE_CHANGED",
       "OPTIONS_CHANGED",
       "IDEMPOTENCY_CONFLICT",
+      "CUSTOMER_HAS_OPEN_ORDERS",
     ].includes(code)
   )
     return 409;

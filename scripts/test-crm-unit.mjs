@@ -46,3 +46,25 @@ test("default settings and mapping from the restaurant row", () => {
   }).vip_days, 120);
   assert.deepEqual(crm.CRM_SEGMENTS, ["novo", "recorrente", "vip", "sumido", "sem_pedidos"]);
 });
+
+const q = loader()("src/lib/crm-query.ts");
+
+test("list query defaults, coercion and limits", () => {
+  assert.deepEqual(q.crmListQuery.parse({}), { sort: "last_order", page: 1 });
+  assert.equal(q.crmListQuery.parse({ page: "3", segment: "vip" }).page, 3);
+  assert.equal(q.crmListQuery.safeParse({ segment: "ouro" }).success, false);
+  assert.equal(q.crmListQuery.safeParse({ search: "x".repeat(81) }).success, false);
+  assert.equal(q.crmListQuery.safeParse({ sort: "phone" }).success, false);
+});
+
+test("save/erase body and campaign/settings validation", () => {
+  assert.equal(q.crmSaveBody.safeParse({ action: "save", tags: ["Vegana"], notes: "ok" }).success, true);
+  assert.equal(q.crmSaveBody.safeParse({ action: "save", tags: Array(11).fill("a"), notes: "" }).success, false);
+  assert.equal(q.crmSaveBody.safeParse({ action: "save", tags: [], notes: "x".repeat(2001) }).success, false);
+  assert.equal(q.crmSaveBody.safeParse({ action: "erase", confirm: "EXCLUIR" }).success, true);
+  assert.equal(q.crmSaveBody.safeParse({ action: "erase", confirm: "excluir" }).success, false);
+  assert.equal(q.crmCampaignQuery.safeParse({}).success, false);
+  assert.equal(q.crmCampaignQuery.safeParse({ tag: "Vegana" }).success, true);
+  assert.equal(q.crmSettingsBody.safeParse({ action: "crm_settings", recurring_min_orders: 2, recurring_days: 60, vip_min_orders: 5, vip_min_spent_cents: 50000, vip_days: 90, lapsed_days: 30 }).success, true);
+  assert.equal(q.crmSettingsBody.safeParse({ action: "crm_settings", recurring_min_orders: 1, recurring_days: 60, vip_min_orders: 5, vip_min_spent_cents: 50000, vip_days: 90, lapsed_days: 30 }).success, false);
+});

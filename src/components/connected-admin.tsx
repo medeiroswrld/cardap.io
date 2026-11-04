@@ -343,7 +343,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 </>
               )}
               {owner && page === "contatos" && (
-                <Contacts data={data} save={save} busy={busy} />
+                <Contacts />
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
               {owner && page === "avaliacoes" && (
@@ -1131,103 +1131,9 @@ function SettingsForm({
     </form>
   );
 }
-function Contacts({
-  data,
-  save,
-  busy,
-}: {
-  data: Workspace;
-  save: Save;
-  busy: boolean;
-}) {
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  return (
-    <>
-      <p className="notice">
-        Telefones informados pelos visitantes, sem verificação. Nenhuma mensagem
-        é enviada automaticamente.
-      </p>
-      <div className="connected-toolbar">
-        <input
-          aria-label="Buscar contatos"
-          placeholder="Nome ou telefone"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <span>{data.contacts.length} contatos recentes (até 500)</span>
-      </div>
-      {error && <p role="alert">{error}</p>}
-      <div className="admin-panel connected-table-wrap">
-        <table className="connected-table">
-          <thead>
-            <tr>
-              <th>Contato</th>
-              <th>WhatsApp</th>
-              <th>Marketing</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.contacts
-              .filter((c) =>
-                (c.name + " " + c.phone)
-                  .toLocaleLowerCase("pt-BR")
-                  .includes(query.toLocaleLowerCase("pt-BR")),
-              )
-              .map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>
-                    {c.phone}
-                    <small>
-                      {c.verified ? "Verificado" : "Não verificado"}
-                    </small>
-                  </td>
-                  <td>
-                    {
-                      {
-                        authorized: "Autorizado",
-                        not_authorized: "Não autorizado",
-                        revoked: "Revogado",
-                      }[c.marketing_status]
-                    }
-                  </td>
-                  <td>
-                    {c.marketing_status === "authorized" && (
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={async () => {
-                          try {
-                            await save({
-                              action: "revoke_marketing",
-                              id: c.id,
-                            });
-                          } catch (err) {
-                            setError((err as Error).message);
-                          }
-                        }}
-                      >
-                        Revogar autorização
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-        {!data.contacts.length && (
-          <div className="empty-state">
-            <Users />
-            <p>
-              Os contatos aparecerão após pedidos ou cadastros de novidades.
-            </p>
-          </div>
-        )}
-      </div>
-    </>
-  );
+// Temporary: Task 4 replaces this tab with the CRM UI.
+function Contacts() {
+  return null;
 }
 function Metrics({ data }: { data: Workspace }) {
   return <VideoMetrics data={data} />;

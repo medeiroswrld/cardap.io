@@ -23,6 +23,8 @@ export function apiError(error: unknown) {
       error:
         message === "RATE_LIMITED"
           ? "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe."
+          : message === "CUSTOMER_HAS_OPEN_ORDERS"
+            ? "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir os dados."
           : message === "VIDEO_STORAGE_UNAVAILABLE"
             ? "O armazenamento de vídeos está indisponível. Tente novamente em instantes."
             : message === "VIDEO_UPLOAD_INCOMPLETE"

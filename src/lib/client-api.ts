@@ -23,6 +23,8 @@ export const apiErrorMessages: Record<string, string> = {
   BELOW_MINIMUM: "O pedido ainda não atingiu o valor mínimo para entrega.",
   INVALID_PAYMENT: "Escolha como vai pagar na entrega ou retirada.",
   INVALID_CHANGE: "O troco precisa ser para um valor igual ou maior que o total, e só vale para dinheiro.",
+  CUSTOMER_HAS_OPEN_ORDERS:
+    "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir os dados.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
 };

@@ -351,7 +351,7 @@ test("every exported API method uses the wrapper with an allowlisted static rout
       }
     }
   }
-  assert.equal(count, 21);
+  assert.equal(count, 25);
 });
 
 test("rate-limit identity ignores untrusted forwarding and never stores raw identifiers", () => {
@@ -424,5 +424,13 @@ test("rate limiter is fail-closed and returns Retry-After on rejection", async (
   } finally {
     if (old === undefined) delete process.env.RATE_LIMIT_HASH_KEY;
     else process.env.RATE_LIMIT_HASH_KEY = old;
+  }
+});
+
+test("CRM routes are logged by template and open-orders conflict maps to 409", () => {
+  assert.equal(core.errorStatus(core.errorCode(new Error("CUSTOMER_HAS_OPEN_ORDERS"))), 409);
+  assert.equal(core.errorStatus(core.errorCode({ message: "INVALID_INPUT", code: "P0001" })), 400);
+  for (const route of ["crm", "crm/[contactId]", "crm/campaign"]) {
+    assert.notEqual(core.safeAction("GET", `/api/restaurants/[id]/${route}`), "server");
   }
 });
