@@ -105,7 +105,7 @@ export function firstName(name: string) {
 
 export function fillCampaignMessage(template: string, name: string) {
   return template
-    .replace(/\{nome\}/gi, firstName(name))
+    .replace(/\{nome\}/gi, () => firstName(name))
     .replace(/[ \t]+([,!.?])/g, "$1")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -113,11 +113,11 @@ export function fillCampaignMessage(template: string, name: string) {
 
 // Opens a chat started by the restaurant; nothing is sent automatically.
 export function campaignLink(phone: string, message: string) {
-  return `https://wa.me/55${phone}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/55${phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
 }
 
 function cell(value: string) {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const safe = /^[\t\r]|^\s*[=+\-@]/.test(value) ? `'${value}` : value;
   return /[;"\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
