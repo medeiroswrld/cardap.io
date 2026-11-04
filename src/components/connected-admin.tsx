@@ -39,6 +39,9 @@ import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderBoard } from "./order-board";
 import { DeliverySettings } from "./delivery-settings";
+import { CustomersPanel } from "./crm/customers-panel";
+import { CampaignPanel } from "./crm/campaign-panel";
+import { CrmSettings } from "./crm/crm-settings";
 import { useOrderAlerts } from "./use-order-alerts";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
@@ -51,7 +54,7 @@ const pages = [
   ["categorias", "Categorias", FolderOpen],
   ["metricas", "Métricas", BarChart3],
   ["avaliacoes", "Avaliações", MessageCircle],
-  ["contatos", "Contatos", Users],
+  ["contatos", "Clientes", Users],
   ["configuracoes", "Configurações", Settings],
   ["qr", "QR das mesas", QrCode],
 ] as const;
@@ -340,10 +343,14 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <>
                   <SettingsForm data={data} save={save} busy={busy} />
                   <DeliverySettings data={data} save={save} busy={busy} />
+                  <CrmSettings data={data} save={save} busy={busy} />
                 </>
               )}
               {owner && page === "contatos" && (
-                <Contacts />
+                <>
+                  <CustomersPanel restaurantId={id} save={save} />
+                  <CampaignPanel restaurantId={id} />
+                </>
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
               {owner && page === "avaliacoes" && (
@@ -1130,10 +1137,6 @@ function SettingsForm({
       </Button>
     </form>
   );
-}
-// Temporary: Task 4 replaces this tab with the CRM UI.
-function Contacts() {
-  return null;
 }
 function Metrics({ data }: { data: Workspace }) {
   return <VideoMetrics data={data} />;
