@@ -112,8 +112,11 @@ export function fillCampaignMessage(template: string, name: string) {
 }
 
 // Opens a chat started by the restaurant; nothing is sent automatically.
+export function chatLink(phone: string) {
+  return `https://wa.me/55${phone.replace(/\D/g, "")}`;
+}
 export function campaignLink(phone: string, message: string) {
-  return `https://wa.me/55${phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
+  return `${chatLink(phone)}?text=${encodeURIComponent(message)}`;
 }
 
 function cell(value: string) {
@@ -160,20 +163,21 @@ const settingsRules: { key: Exclude<keyof CrmSettings, "vip_min_spent_cents">; l
 // Parses raw form strings (vip_min_spent in reais) into settings; limits mirror the server.
 export function parseCrmSettings(
   input: Record<string, string>,
-): { ok: true; values: CrmSettings } | { ok: false; errors: string[] } {
-  const errors: string[] = [];
+): { ok: true; values: CrmSettings } | { ok: false; errors: Record<string, string> } {
+  // Keyed by input field so each message can be linked to its input.
+  const errors: Record<string, string> = {};
   const out = {} as CrmSettings;
   for (const { key, label, min, max } of settingsRules) {
     const raw = (input[key] ?? "").trim();
     const n = Number(raw);
     if (!raw || !Number.isInteger(n) || n < min || n > max) {
-      errors.push(`${label}: informe um número inteiro de ${min} a ${max}.`);
+      errors[key] = `${label}: informe um número inteiro de ${min} a ${max}.`;
     } else out[key] = n;
   }
   const rawSpent = (input.vip_min_spent ?? "").trim().replace(",", ".");
   const spent = Number(rawSpent);
   if (!rawSpent || !Number.isFinite(spent) || spent < 0 || spent > 1_000_000) {
-    errors.push("VIP: gasto mínimo: informe um valor em reais de 0 a 1.000.000.");
+    errors.vip_min_spent = "VIP: gasto mínimo: informe um valor em reais de 0 a 1.000.000.";
   } else out.vip_min_spent_cents = Math.round(spent * 100);
-  return errors.length ? { ok: false, errors } : { ok: true, values: out };
+  return Object.keys(errors).length ? { ok: false, errors } : { ok: true, values: out };
 }

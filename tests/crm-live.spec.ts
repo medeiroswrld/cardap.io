@@ -123,7 +123,7 @@ test("Supabase real: CRM de clientes, etiquetas, campanha e exclusão", async ({
     await expect(page).toHaveURL(/\/gestao\/[a-f0-9-]+$/, { timeout: 30000 });
 
     await page.getByRole("button", { name: "Clientes", exact: true }).click();
-    await expect(page.getByRole("button", { name: "VIP: 1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "1 VIP", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: `Ana VIP, ${vipPhone}` }).click();
     const dialog = page.getByRole("dialog");

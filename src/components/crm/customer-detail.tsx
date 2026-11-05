@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Modal } from "../ui/dialog";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
-import { CRM_MAX_TAGS, campaignLink, checkNewTag, segmentLabel, type CrmDetail } from "@/lib/crm";
+import { CRM_MAX_TAGS, chatLink, checkNewTag, segmentLabel, type CrmDetail } from "@/lib/crm";
 import { statusLabel, type Fulfillment, type OrderStatus } from "@/lib/order-flow";
 
 type Save = (body: unknown) => Promise<void>;
@@ -260,7 +260,7 @@ function DetailBody({
       )}
       <div className="connected-order-actions">
         <Button asChild variant="outline">
-          <a href={campaignLink(detail.phone, "")} target="_blank" rel="noopener noreferrer">
+          <a href={chatLink(detail.phone)} target="_blank" rel="noopener noreferrer">
             Conversar no WhatsApp
           </a>
         </Button>
@@ -282,12 +282,14 @@ function DetailBody({
           className="form-stack crm-erase"
           onSubmit={(e) => {
             e.preventDefault();
-            void run(() => requestJson(base, { action: "erase", confirm: "EXCLUIR" }), "close");
+            if (confirm !== "EXCLUIR") return;
+            void run(() => requestJson(base, { action: "erase", confirm }), "close");
           }}
         >
           <p role="alert">
-            Isto apaga etiquetas, anotações, endereços e o consentimento deste cliente e troca nome e telefone nos
-            pedidos por “Cliente removido”. Os valores dos pedidos continuam no caixa. Não é possível desfazer.
+            Isto apaga etiquetas, anotações, endereços e o consentimento deste cliente, apaga as observações dos
+            itens e os motivos de cancelamento dos pedidos dele e troca nome e telefone nos pedidos por “Cliente
+            removido”. Os valores dos pedidos continuam no caixa. Não é possível desfazer.
           </p>
           <label className="form-label">
             Digite EXCLUIR para confirmar

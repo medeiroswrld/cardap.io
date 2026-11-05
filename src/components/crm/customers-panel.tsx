@@ -28,6 +28,7 @@ export function CustomersPanel({
   const [debounced, setDebounced] = useState("");
   const [segment, setSegment] = useState<CrmSegment | "">("");
   const [tag, setTag] = useState("");
+  const [debouncedTag, setDebouncedTag] = useState("");
   const [marketing, setMarketing] = useState(false);
   const [sort, setSort] = useState<(typeof sorts)[number][0]>("last_order");
   const [page, setPage] = useState(1);
@@ -40,11 +41,15 @@ export function CustomersPanel({
     const timer = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedTag(tag.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [tag]);
 
   const query = new URLSearchParams({
     search: debounced,
     segment,
-    tag: tag.trim(),
+    tag: debouncedTag,
     marketing: marketing ? "1" : "",
     sort,
     page: String(page),
@@ -89,7 +94,7 @@ export function CustomersPanel({
             type="button"
             className="crm-segment"
             aria-pressed={segment === seg}
-            aria-label={`${segmentNames[seg]}: ${data?.segments[seg] ?? "carregando"}`}
+            aria-label={data ? `${data.segments[seg]} ${segmentNames[seg]}` : `${segmentNames[seg]} (carregando)`}
             onClick={() => {
               setSegment(segment === seg ? "" : seg);
               reset();

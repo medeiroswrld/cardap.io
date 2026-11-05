@@ -27,7 +27,7 @@ function toRaw(s: Settings): Raw {
 
 export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save; busy: boolean }) {
   const [values, setValues] = useState<Raw>(() => toRaw(settingsFromRestaurant(data.restaurant)));
-  const [errors, setErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   return (
     <form
@@ -41,7 +41,7 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
           setErrors(parsed.errors);
           return;
         }
-        setErrors([]);
+        setErrors({});
         try {
           await save({ action: "crm_settings", ...parsed.values });
         } catch (err) {
@@ -63,8 +63,15 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
               min={min}
               max={max}
               value={values[key]}
+              aria-invalid={errors[key] ? true : undefined}
+              aria-describedby={errors[key] ? `crm-setting-error-${key}` : undefined}
               onChange={(e) => setValues({ ...values, [key]: e.target.value })}
             />
+            {errors[key] && (
+              <span id={`crm-setting-error-${key}`} className="form-error">
+                {errors[key]}
+              </span>
+            )}
           </label>
         ))}
         <label className="form-label">
@@ -76,18 +83,21 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
             max={1000000}
             step="0.01"
             value={values.vip_min_spent}
+            aria-invalid={errors.vip_min_spent ? true : undefined}
+            aria-describedby={errors.vip_min_spent ? "crm-setting-error-vip_min_spent" : undefined}
             onChange={(e) => setValues({ ...values, vip_min_spent: e.target.value })}
           />
+          {errors.vip_min_spent && (
+            <span id="crm-setting-error-vip_min_spent" className="form-error">
+              {errors.vip_min_spent}
+            </span>
+          )}
         </label>
       </div>
-      {errors.length > 0 && (
-        <div role="alert" className="form-error">
-          <ul>
-            {errors.map((msg) => (
-              <li key={msg}>{msg}</li>
-            ))}
-          </ul>
-        </div>
+      {Object.keys(errors).length > 0 && (
+        <p role="alert" className="form-error">
+          Corrija {Object.keys(errors).length === 1 ? "o campo indicado" : "os campos indicados"} para salvar as regras.
+        </p>
       )}
       {error && (
         <p role="alert" className="form-error">
@@ -103,7 +113,7 @@ export function CrmSettings({ data, save, busy }: { data: Workspace; save: Save;
           disabled={busy}
           onClick={() => {
             setValues(toRaw(DEFAULT_CRM_SETTINGS));
-            setErrors([]);
+            setErrors({});
           }}
         >
           Restaurar padrão

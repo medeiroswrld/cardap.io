@@ -22,7 +22,6 @@ export const operations = [
   "supabase.catalog",
   "supabase.workspace",
   "supabase.orders",
-  "supabase.crm",
   "supabase.feedback",
   "supabase.onboarding",
   "supabase.media",

@@ -22,6 +22,11 @@ test("campaign link targets the Brazilian number with the encoded message", () =
   assert.equal(formatted.origin + formatted.pathname, "https://wa.me/5511988887777");
 });
 
+test("chat link opens the conversation without a prefilled message", () => {
+  assert.equal(crm.chatLink("(11) 98888-7777"), "https://wa.me/5511988887777");
+  assert.equal(crm.chatLink("11988887777"), "https://wa.me/5511988887777");
+});
+
 test("CSV has BOM, semicolons, Brazilian formats, escaping and formula protection", () => {
   const csv = crm.customersCsv([
     { id: "1", name: "Ana; \"Souza\"", phone: "11988887777", segment: "vip", last_order_at: "2026-11-03T15:00:00Z", spent_cents: 123456 },
@@ -82,6 +87,7 @@ test("parseCrmSettings validates ranges and converts reais to cents", () => {
   assert.equal(parsed.ok, true);
   assert.equal(parsed.values.vip_min_spent_cents, 50050);
   assert.equal(crm.parseCrmSettings({ ...ok, recurring_days: "" }).ok, false);
+  assert.deepEqual(Object.keys(crm.parseCrmSettings({ ...ok, recurring_days: "6", vip_min_spent: "-1" }).errors), ["recurring_days", "vip_min_spent"]);
   assert.equal(crm.parseCrmSettings({ ...ok, recurring_days: "6" }).ok, false);
   assert.equal(crm.parseCrmSettings({ ...ok, vip_min_orders: "1" }).ok, false);
   assert.equal(crm.parseCrmSettings({ ...ok, lapsed_days: "7.5" }).ok, false);
