@@ -100,10 +100,10 @@ const byName = (result) => Object.fromEntries(result.customers.map((c) => [c.nam
 await root();
 const ana = await contact(a, "Ana Souza", "11900000001", "authorized"); // VIP by orders
 const bia = await contact(a, "Bia Lima", "11900000002", "authorized"); // recorrente
-const caio = await contact(a, "Caio Reis", "11900000003"); // novo
-const davi = await contact(a, "Davi Melo", "11900000004", "authorized"); // sumido (was VIP)
-const eva = await contact(a, "Eva Rocha", "11900000005"); // sem pedidos
-const fabio = await contact(a, "Fábio Dias", "11900000006", "authorized"); // VIP by spend
+await contact(a, "Caio Reis", "11900000003"); // novo
+await contact(a, "Davi Melo", "11900000004", "authorized"); // sumido (was VIP)
+await contact(a, "Eva Rocha", "11900000005"); // sem pedidos
+await contact(a, "Fábio Dias", "11900000006", "authorized"); // VIP by spend
 await contact(b, "Ana Souza", "11900000001", "authorized"); // same phone, other tenant
 for (let i = 0; i < 5; i++) await order("11900000001", 3000, i + 1, { items: [[pa, "Burger", 2]] });
 await order("11900000001", 9999, 1, { status: "cancelado" });
@@ -163,7 +163,13 @@ await ok("adjusted rules change segments", async () => {
 await ok("search, tag, marketing filter, sorting and pagination", async () => {
   assert.deepEqual((await customers({ search: "bia" })).customers.map((c) => c.name), ["Bia Lima"]);
   assert.deepEqual((await customers({ search: "0003" })).customers.map((c) => c.name), ["Caio Reis"]);
-  assert.equal((await customers({ search: "100%" })).total, 0);
+  assert.deepEqual((await customers({ search: "(11) 90000-0003" })).customers.map((c) => c.name), ["Caio Reis"]);
+  // Mixed text never falls back to a phone search: "Ana 11" would otherwise match every phone with "11".
+  assert.equal((await customers({ search: "Ana 11" })).total, 0);
+  assert.equal((await customers({ search: "11" })).total, 0); // fewer than 3 digits: name only
+  // LIKE wildcards are matched literally (no name or phone contains them).
+  assert.equal((await customers({ search: "%" })).total, 0);
+  assert.equal((await customers({ search: "_" })).total, 0);
   assert.equal((await customers({ marketing: true })).total, 4);
   assert.deepEqual((await customers({ sort: "spent", limit: 2 })).customers.map((c) => c.name), ["Fábio Dias", "Davi Melo"]);
   const page2 = await customers({ sort: "name", limit: 2, offset: 2 });
@@ -220,12 +226,18 @@ await ok("only the owner of the same restaurant can use CRM functions", async ()
     await rejects(() => db.query("select crm_save_customer($1,$2,'{}','')", [a, ana]), "FORBIDDEN");
     await rejects(() => db.query("select crm_campaign($1,'vip',null)", [a]), "FORBIDDEN");
     await rejects(() => db.query("select crm_erase_customer($1,$2)", [a, ana]), "FORBIDDEN");
+    await rejects(
+      () => db.query("select crm_save_settings($1,$2)", [a, JSON.stringify({ recurring_min_orders: 2, recurring_days: 60, vip_min_orders: 5, vip_min_spent_cents: 0, vip_days: 90, lapsed_days: 30 })]),
+      "FORBIDDEN",
+    );
   }
   await login(ownerB);
   await rejects(() => db.query("select crm_customer($1,$2)", [b, ana]), "NOT_FOUND");
   await root();
   await db.exec("set role anon");
   await rejects(() => db.query("select crm_customers($1,null,null,null,false,'last_order',50,0)", [a]), "permission denied");
+  await rejects(() => db.query("select * from crm_rows($1)", [a]), "permission denied");
+  await login(ownerA);
   await rejects(() => db.query("select * from crm_rows($1)", [a]), "permission denied");
   await root();
 });
@@ -237,17 +249,32 @@ await ok("erasure is blocked by open orders, then anonymizes and logs without pe
   await rejects(() => db.query("select crm_erase_customer($1,$2)", [a, bia]), "CUSTOMER_HAS_OPEN_ORDERS");
   await root();
   await db.query("update orders set status='entregue' where id=$1", [open]);
+  // Free text tied to the customer's orders, plus the same kind of text on another customer's order.
+  const cancelled = await order("11900000002", 1500, 2, { status: "cancelado" });
+  await db.query("update orders set cancellation_reason='Bia mudou de endereço' where id=$1", [cancelled]);
+  await db.query("update order_items set note='Entregar para Bia no portão' where order_id=$1", [open]);
+  await db.query("insert into order_status_events(restaurant_id,order_id,status,reason) values($1,$2,'cancelado','Bia pediu para cancelar')", [a, cancelled]);
+  const anaCancelled = (await db.query("select id from orders where restaurant_id=$1 and customer_phone='11900000001' and status='cancelado'", [a])).rows[0].id;
+  await db.query("update orders set cancellation_reason='Ana desistiu' where id=$1", [anaCancelled]);
+  await db.query("update order_items set note='Ana: sem cebola' where order_id=$1", [anaCancelled]);
+  await db.query("insert into order_status_events(restaurant_id,order_id,status,reason) values($1,$2,'cancelado','Ana pediu para cancelar')", [a, anaCancelled]);
   await login(ownerA);
   const r = (await db.query("select crm_erase_customer($1,$2) as r", [a, bia])).rows[0].r;
-  assert.equal(r.orders_affected, 3);
+  assert.equal(r.orders_affected, 4);
   await root();
-  const left = await db.query("select customer_name,customer_phone,total_cents from orders where restaurant_id=$1 and customer_name='Cliente removido' order by total_cents", [a]);
-  assert.deepEqual(left.rows.map((o) => [o.customer_phone, o.total_cents]), [["", 1000], ["", 4000], ["", 4700]]);
+  const left = await db.query("select customer_name,customer_phone,total_cents,cancellation_reason from orders where restaurant_id=$1 and customer_name='Cliente removido' order by total_cents", [a]);
+  assert.deepEqual(left.rows.map((o) => [o.customer_phone, o.total_cents, o.cancellation_reason]), [["", 1000, null], ["", 1500, null], ["", 4000, null], ["", 4700, null]]);
+  const erasedIds = [open, cancelled];
+  assert.equal((await db.query("select 1 from order_items where order_id = any($1) and note <> ''", [erasedIds])).rows.length, 0);
+  assert.equal((await db.query("select 1 from order_status_events where order_id = any($1) and reason is not null", [erasedIds])).rows.length, 0);
+  assert.equal((await db.query("select cancellation_reason from orders where id=$1", [anaCancelled])).rows[0].cancellation_reason, "Ana desistiu");
+  assert.deepEqual((await db.query("select note from order_items where order_id=$1", [anaCancelled])).rows.map((i) => i.note), ["Ana: sem cebola"]);
+  assert.deepEqual((await db.query("select reason from order_status_events where order_id=$1 and reason is not null", [anaCancelled])).rows.map((e) => e.reason), ["Ana pediu para cancelar"]);
   assert.equal((await db.query("select 1 from contacts where id=$1", [bia])).rows.length, 0);
   assert.equal((await db.query("select 1 from order_addresses where street='Rua B'")).rows.length, 0);
   assert.equal((await db.query("select 1 from marketing_consent_events where contact_id=$1", [bia])).rows.length, 0);
   const ev = await db.query("select orders_affected,actor_id from data_erasure_events where restaurant_id=$1", [a]);
-  assert.deepEqual(ev.rows[0], { orders_affected: 3, actor_id: ownerA });
+  assert.deepEqual(ev.rows[0], { orders_affected: 4, actor_id: ownerA });
   const otherTenant = await db.query("select customer_phone from orders where restaurant_id=$1", [b]);
   assert.equal(otherTenant.rows[0].customer_phone, "11900000001");
   assert.equal((await customers()).total, 5);

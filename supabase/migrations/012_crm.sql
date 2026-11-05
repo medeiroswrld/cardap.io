@@ -21,7 +21,7 @@ alter table public.restaurants
 create table public.data_erasure_events (
   id uuid primary key default gen_random_uuid(),
   restaurant_id uuid not null references public.restaurants(id) on delete cascade,
-  actor_id uuid references auth.users(id),
+  actor_id uuid references auth.users(id) on delete set null,
   orders_affected integer not null check (orders_affected >= 0),
   created_at timestamptz not null default now()
 );
@@ -32,12 +32,13 @@ create policy owner_read on public.data_erasure_events for select to authenticat
 
 create index orders_restaurant_phone on public.orders(restaurant_id, customer_phone, created_at desc);
 
--- Single source of truth for totals and segments. Internal: callable only by the definer functions below.
+-- Single source of truth for totals and segments. Internal: not executable by API roles; runs with the
+-- privileges of the definer functions below that call it (security invoker, so it never elevates on its own).
 create function public.crm_rows(p_restaurant uuid)
 returns table(id uuid, name text, phone text, marketing_status text, tags text[], notes text,
   orders_count integer, spent_cents bigint, avg_ticket_cents integer,
   first_order_at timestamptz, last_order_at timestamptz, segment text)
-language sql stable security definer set search_path=public as $$
+language sql stable security invoker set search_path=public as $$
   with r as (select * from restaurants where id = p_restaurant),
   o as (
     select customer_phone as phone,
@@ -80,7 +81,11 @@ begin
   if sort not in ('last_order','spent','orders','name') or p_limit is null or p_limit not between 1 and 100
     or p_offset is null or p_offset < 0 or length(coalesce(p_search, '')) > 80 then raise exception 'INVALID_INPUT'; end if;
   pattern := '%' || replace(replace(replace(lower(coalesce(s, '')), '\', '\\'), '%', '\%'), '_', '\_') || '%';
-  digits := nullif(regexp_replace(coalesce(s, ''), '\D', '', 'g'), '');
+  -- Phone search only when the term is digits plus phone punctuation with at least 3 digits; otherwise name only.
+  if s ~ '^[0-9()+\s.-]+$' then
+    digits := regexp_replace(s, '\D', '', 'g');
+    if length(digits) < 3 then digits := null; end if;
+  end if;
   with base as (select * from crm_rows(p_restaurant)),
   filtered as (
     select * from base
@@ -208,7 +213,14 @@ begin
   end if;
   delete from order_addresses a using orders o
     where a.order_id = o.id and a.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant and o.customer_phone = c.phone;
-  update orders set customer_name = 'Cliente removido', customer_phone = ''
+  -- Free text written by the customer or about the cancellation can hold personal data: clear it too.
+  update order_items i set note = '' from orders o
+    where i.order_id = o.id and i.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant
+      and o.customer_phone = c.phone and i.note <> '';
+  update order_status_events e set reason = null from orders o
+    where e.order_id = o.id and e.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant
+      and o.customer_phone = c.phone and e.reason is not null;
+  update orders set customer_name = 'Cliente removido', customer_phone = '', cancellation_reason = null
     where restaurant_id = p_restaurant and customer_phone = c.phone;
   get diagnostics affected = row_count;
   delete from marketing_consent_events where restaurant_id = p_restaurant and contact_id = c.id;
