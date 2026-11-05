@@ -63,6 +63,7 @@ npm run test:media
 npm run test:foundation
 npm run test:online
 npm run test:photos
+npm run test:crm
 npm run lint
 npm run typecheck
 npm run build -- --webpack
@@ -73,3 +74,5 @@ O teste de mídia requer FFmpeg e Chrome local, gera um clipe temporário, confe
 Validação de 22/10/2026: 45 verificações de banco, 11 testes de observabilidade/limites e um teste de mídia passaram; TypeScript, ESLint e build de produção com webpack passaram. Dois testes integrados contra o Supabase também passaram: interações/moderação/isolamento e ingredientes/adicionais/pedido/métricas de fotos. Esses testes criaram e limparam dados isolados. Para executar o build local em outra porta, definir `NEXT_PUBLIC_APP_URL` tanto no build quanto no start, porque essa variável é incorporada na compilação. A primeira tentativa em 3102 usando o build de outra origem foi corretamente recusada com 403; a repetição com a origem alinhada passou.
 
 Antes de receber público: testar dois restaurantes e mesas diferentes, conferir destino do QR, abrir o cardápio em outro navegador, enviar um pedido com opcionais, acompanhar até entregue, testar curtidas/comentários e sua moderação, verificar fotos/vídeos e métricas. Um piloto assistido não equivale a prontidão para escala; SMTP/domínio, alertas, recuperação de backup e retenção de dados ainda precisam de decisão e validação operacional.
+
+Implantação do CRM (subprojeto H): aplicar `supabase/migrations/012_crm.sql` no Supabase hospedado antes de publicar o código da aba Clientes. O teste hospedado `tests/crm-live.spec.ts` só deve rodar com autorização e depois dessa migration.

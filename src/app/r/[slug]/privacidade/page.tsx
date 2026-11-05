@@ -26,6 +26,11 @@ export default async function Page({
         referência e bairro) é usado apenas para entregar o pedido e fica visível
         somente para a equipe do restaurante e para você, neste navegador.
       </p>
+      <p>
+        O restaurante pode manter o histórico dos seus pedidos e anotações de
+        atendimento (como preferências) para atender você melhor. Você pode pedir
+        ao restaurante a exclusão desses dados a qualquer momento.
+      </p>
       <h2>Ofertas são opcionais</h2>
       <p>
         A autorização de marketing é separada do pedido. A equipe registra a

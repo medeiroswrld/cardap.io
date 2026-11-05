@@ -387,3 +387,13 @@ Fora do MVP atual: integração com PDV, pagamentos online, agendamento, integra
 - O fundador prefere execução prática e pouca repetição de perguntas. Faça perguntas quando uma decisão realmente faltar, sem solicitar novamente informações já presentes no projeto.
 
 Ao receber este contexto, primeiro inspecione `AGENTS.md`, este documento, `git status`, os arquivos alterados e a solicitação atual do usuário. Apresente o entendimento e continue o trabalho solicitado, preservando alterações existentes. Este handoff, por si só, não solicita reescrever o sistema, publicar, contratar serviços ou executar testes destrutivos.
+
+## Complemento de 04/11/2026 (branch `melhorias/h-crm`)
+
+Subprojeto H, CRM de restaurante:
+
+- **Migration `supabase/migrations/012_crm.sql`: aplicar no Supabase hospedado ANTES do deploy deste código** (com a 012 aplicada e o código antigo no ar nada quebra). Etiquetas e anotações em `contacts`; seis regras `crm_*` de segmentos em `restaurants`; `data_erasure_events` sem dados pessoais. A função interna `crm_rows` é a única regra de totais e segmentos. Funções só do dono: `crm_customers`, `crm_customer`, `crm_save_customer`, `crm_campaign`, `crm_save_settings`, `crm_erase_customer`.
+- **API:** `src/app/api/restaurants/[id]/crm/**`. **Regras puras:** `src/lib/crm.ts`. **UI:** `src/components/crm/*`; a aba "Clientes" substitui "Contatos". Segmentos: Novos, Recorrentes, VIP, Sumidos e Sem pedidos (limiares configuráveis em Configurações).
+- **Campanhas:** o painel lista somente clientes que autorizaram marketing e abre conversas no WhatsApp com a mensagem pronta; nada é enviado automaticamente.
+- **LGPD:** "Excluir dados do cliente" (confirmação digitando EXCLUIR) apaga etiquetas, anotações, endereços e consentimento e troca nome/telefone dos pedidos por "Cliente removido". Os textos de privacidade foram atualizados.
+- **Testes:** `npm run test:crm`; `test:database` também executa `scripts/test-crm.mjs`; teste hospedado opt-in `tests/crm-live.spec.ts` (só com `RUN_CONNECTED_LIVE=1` e a 012 aplicada; ainda não executado no Supabase real).
