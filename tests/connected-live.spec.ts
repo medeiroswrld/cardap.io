@@ -357,7 +357,9 @@ test("Supabase real: login, catálogo, foto, sincronização de vídeo, pedido e
     await expect(
       page.getByRole("heading", { name: "Fotos", exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("Foto atual", { exact: true })).toBeVisible();
+    // The video saved above generates a cover that replaces the product photo,
+    // so the views recorded earlier now belong to the previous photo.
+    await expect(page.getByText("Foto anterior", { exact: true })).toBeVisible();
     await page.screenshot({
       path: ".impeccable/review/photo-metrics-mobile.png",
       fullPage: true,

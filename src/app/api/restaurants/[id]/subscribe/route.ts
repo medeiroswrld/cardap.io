@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { cookies } from "next/headers";
 import { z } from "zod";
+import { enforcePublicLimit } from "@/lib/rate-limit";
 import { serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 async function handlePOST(
@@ -19,6 +20,9 @@ async function handlePOST(
       .parse(await request.json());
     const token = (await cookies()).get(`guest_${id}`)?.value;
     if (!token) throw new Error("UNAUTHORIZED");
+    // Opt-ins are unverified phones: throttle them like other public writes.
+    await enforcePublicLimit(request, id, "feedback");
+    await enforcePublicLimit(request, id, "feedback_session", token);
     const { error } = await serviceClient().rpc("subscribe_guest", {
       p_restaurant: id,
       p_token_hash: hash(token),
