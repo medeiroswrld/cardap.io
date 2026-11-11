@@ -82,6 +82,7 @@ const schema = z.discriminatedUnion("action", [
     tables: z.number().int().min(1).max(100),
     pickup_enabled: z.boolean().optional(),
     delivery_enabled: z.boolean().optional(),
+    auto_accept_orders: z.boolean().optional(),
     delivery_min_order_cents: z
       .number()
       .int()

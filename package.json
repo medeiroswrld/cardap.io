@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "test:crm": "node --test scripts/test-crm-unit.mjs",
-    "test:online": "node --test scripts/test-online.mjs",
+    "test:online": "node --test scripts/test-online.mjs scripts/test-order-ticket.mjs",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs && node scripts/test-crm.mjs",

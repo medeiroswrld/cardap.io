@@ -18,6 +18,7 @@ export type RestaurantRow = {
   pickup_enabled: boolean;
   delivery_enabled: boolean;
   delivery_min_order_cents: number;
+  auto_accept_orders: boolean;
   crm_recurring_min_orders: number;
   crm_recurring_days: number;
   crm_vip_min_orders: number;

@@ -83,8 +83,12 @@ async function handleGET(
       ].some((r) => r.error)
     )
       throw new Error("DATABASE_ERROR");
+    // Auto-accepted orders skip "aguardando_aceite", so new online orders in
+    // "recebido" get the first-order badge too.
     const pendingOnline = (orders.data || []).filter(
-      (o) => o.status === "aguardando_aceite",
+      (o) =>
+        o.status === "aguardando_aceite" ||
+        (o.status === "recebido" && o.fulfillment !== "mesa"),
     );
     await Promise.all(
       pendingOnline.map(async (order) => {

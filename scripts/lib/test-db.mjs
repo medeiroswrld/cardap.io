@@ -14,6 +14,7 @@ export const MIGRATIONS = [
   "010_pilot_rate_limits.sql",
   "011_online_orders.sql",
   "012_crm.sql",
+  "013_auto_accept.sql",
 ];
 
 // Supabase-owned schemas/roles are represented locally; business SQL is unchanged.

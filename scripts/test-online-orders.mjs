@@ -19,8 +19,8 @@ const allDay = JSON.stringify(
 );
 await db.query("insert into auth.users values($1),($2),($3)", [ownerA, ownerB, staffA]);
 await db.query(
-  `insert into restaurants(id,name,slug,accepting_orders,opening_hours,pickup_enabled,delivery_enabled,delivery_min_order_cents)
-   values($1,'Casa A','casa-a',true,$3,true,true,3000),($2,'Casa B','casa-b',true,$3,false,false,0)`,
+  `insert into restaurants(id,name,slug,accepting_orders,opening_hours,pickup_enabled,delivery_enabled,delivery_min_order_cents,auto_accept_orders)
+   values($1,'Casa A','casa-a',true,$3,true,true,3000,false),($2,'Casa B','casa-b',true,$3,false,false,0,false)`,
   [a, b, allDay],
 );
 await db.query(
@@ -256,6 +256,46 @@ await ok("order_online is a valid rate-limit scope with 12 attempts per window",
   for (let i = 0; i < 13; i++)
     last = (await db.query("select consume_public_rate_limit($1,'order_online',$2) as r", [a, subject])).rows[0].r;
   assert.equal(last.allowed, false);
+});
+
+await ok("new restaurants accept online orders automatically by default", async () => {
+  await root();
+  const { rows } = await db.query("select column_default from information_schema.columns where table_name='restaurants' and column_name='auto_accept_orders'");
+  assert.equal(rows[0].column_default, "true");
+});
+
+await ok("settings keep auto-accept when omitted and change it when sent", async () => {
+  const settings = (over) =>
+    JSON.stringify({
+      name: "Casa A", subtitle: "", phone: "", address: "", privacy_email: "a@a.com",
+      retention_days: 90, accepting_orders: true, opening_hours: JSON.parse(allDay),
+      ...over,
+    });
+  await login(ownerA);
+  await db.query("select save_restaurant_settings($1,$2,$3)", [a, settings({ auto_accept_orders: true }), 1]);
+  await db.query("select save_restaurant_settings($1,$2,$3)", [a, settings({}), 1]);
+  await root();
+  const { rows } = await db.query("select auto_accept_orders from restaurants where id=$1", [a]);
+  assert.equal(rows[0].auto_accept_orders, true);
+});
+
+await ok("auto-accepted delivery starts as recebido with the zone estimate", async () => {
+  await db.query("update restaurants set pickup_enabled=true,delivery_min_order_cents=0 where id=$1", [a]);
+  const r = await place(await guest(), delivery());
+  assert.equal(r.status, "recebido");
+  const { rows } = await db.query("select estimate_minutes from orders where id=$1", [r.id]);
+  assert.equal(rows[0].estimate_minutes, 40);
+  const events = await db.query("select status from order_status_events where order_id=$1", [r.id]);
+  assert.deepEqual(events.rows.map((e) => e.status), ["recebido"]);
+  const next = await advance(staffA, r.id, "recebido", "em_preparo");
+  assert.equal(next.status, "em_preparo");
+});
+
+await ok("auto-accepted pickup starts as recebido without an estimate", async () => {
+  const r = await place(await guest(), { ...base, fulfillment: "retirada", payment_method: "cartao", items: items(1) });
+  assert.equal(r.status, "recebido");
+  const { rows } = await db.query("select estimate_minutes from orders where id=$1", [r.id]);
+  assert.equal(rows[0].estimate_minutes, null);
 });
 
 await db.close();

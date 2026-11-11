@@ -80,6 +80,8 @@ test("Supabase real: pedido de entrega do checkout ao aceite e entrega", async (
         pickup_enabled: true,
         delivery_enabled: true,
         delivery_min_order_cents: 3000,
+        // This test covers the manual acceptance flow.
+        auto_accept_orders: false,
       },
     });
     if (settings.error) throw settings.error;

@@ -30,11 +30,13 @@ export function OrderBoard({
   busy,
   change,
   restaurantName,
+  onPrint,
 }: {
   orders: RealOrder[];
   busy: boolean;
   change: Change;
   restaurantName: string;
+  onPrint?: (order: RealOrder) => void;
 }) {
   const [selected, setSelected] = useState<RealOrder | null>(null);
   const [status, setStatus] = useState<OrderStatus>("em_preparo");
@@ -159,14 +161,17 @@ export function OrderBoard({
                             </Button>
                           )}
                           {order.status === "aguardando_aceite" && (
-                            <>
-                              <Button
-                                variant="outline"
-                                disabled={busy}
-                                onClick={() => open(order, "recusado")}
-                              >
-                                Recusar
-                              </Button>
+                            <Button
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => open(order, "recusado")}
+                            >
+                              Recusar
+                            </Button>
+                          )}
+                          {online &&
+                            (order.status === "aguardando_aceite" ||
+                              order.status === "recebido") && (
                               <Button asChild variant="outline">
                                 <a
                                   target="_blank"
@@ -183,7 +188,15 @@ export function OrderBoard({
                                   Confirmar no WhatsApp
                                 </a>
                               </Button>
-                            </>
+                            )}
+                          {onPrint && (
+                            <Button
+                              variant="outline"
+                              onClick={() => onPrint(order)}
+                              aria-label={`Imprimir pedido #${order.number}`}
+                            >
+                              Imprimir
+                            </Button>
                           )}
                           {canCancel(order.status) && (
                             <Button

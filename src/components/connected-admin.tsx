@@ -43,6 +43,7 @@ import { CustomersPanel } from "./crm/customers-panel";
 import { CampaignPanel } from "./crm/campaign-panel";
 import { CrmSettings } from "./crm/crm-settings";
 import { useOrderAlerts } from "./use-order-alerts";
+import { useOrderPrinting } from "./use-order-printing";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
 type Save = (body: unknown) => Promise<void>;
@@ -150,6 +151,11 @@ export function ConnectedAdmin({ id }: { id: string }) {
     }
   }
   const alerts = useOrderAlerts(data?.orders);
+  const printing = useOrderPrinting(
+    data?.orders,
+    data?.restaurant.name ?? "",
+    data?.restaurant.timezone,
+  );
   const owner = data?.role === "owner";
   const allowed = pages.filter(
     (p) => owner || p[0] === "pedidos" || p[0] === "resumo",
@@ -322,12 +328,39 @@ export function ConnectedAdmin({ id }: { id: string }) {
                           : "Silenciar alertas"}
                       </Button>
                     )}
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={printing.auto}
+                        onChange={printing.toggleAuto}
+                      />{" "}
+                      Imprimir pedidos novos automaticamente
+                    </label>
+                    <label className="form-label inline-label">
+                      Papel
+                      <select
+                        value={printing.width}
+                        onChange={(e) =>
+                          printing.setWidth(e.target.value === "58" ? 58 : 80)
+                        }
+                      >
+                        <option value="80">80 mm</option>
+                        <option value="58">58 mm</option>
+                      </select>
+                    </label>
                   </div>
+                  {printing.auto && (
+                    <p className="field-help">
+                      Ligue só no computador da impressora. Cada pedido sai uma vez
+                      quando entra em &quot;Recebido&quot;. Deixe esta tela aberta.
+                    </p>
+                  )}
                   <OrderBoard
                     orders={data.orders}
                     busy={busy}
                     change={change}
                     restaurantName={data.restaurant.name}
+                    onPrint={(order) => void printing.print(order)}
                   />
                 </>
               )}
@@ -961,6 +994,7 @@ function SettingsForm({
             accepting_orders: form.has("accepting_orders"),
             pickup_enabled: form.has("pickup_enabled"),
             delivery_enabled: form.has("delivery_enabled"),
+            auto_accept_orders: form.has("auto_accept_orders"),
             delivery_min_order_cents: Math.round(
               Number(form.get("delivery_min") || 0) * 100,
             ),
@@ -1118,6 +1152,18 @@ function SettingsForm({
         />{" "}
         Aceitar pedidos para entrega
       </label>
+      <label className="checkbox-label">
+        <input
+          name="auto_accept_orders"
+          type="checkbox"
+          defaultChecked={r.auto_accept_orders ?? true}
+        />{" "}
+        Aceitar pedidos de retirada e entrega automaticamente
+      </label>
+      <p className="field-help">
+        Ligado: o pedido entra direto em &quot;Recebido&quot; e a equipe só avança
+        preparo, pronto e entrega. Desligado: cada pedido espera alguém aceitar.
+      </p>
       <label className="form-label">
         Pedido mínimo para entrega (R$)
         <input
