@@ -150,8 +150,28 @@ export function OrderBoard({
                       {order.cancellation_reason && (
                         <p className="notice">{order.cancellation_reason}</p>
                       )}
+                      {history && onPrint && (
+                        <div className="connected-order-actions">
+                          <Button
+                            variant="outline"
+                            onClick={() => onPrint(order)}
+                            aria-label={`Reimprimir pedido #${order.number}`}
+                          >
+                            Reimprimir
+                          </Button>
+                        </div>
+                      )}
                       {!history && (
                         <div className="connected-order-actions">
+                          {onPrint && (
+                            <Button
+                              variant="outline"
+                              onClick={() => onPrint(order)}
+                              aria-label={`Imprimir pedido #${order.number}`}
+                            >
+                              Imprimir
+                            </Button>
+                          )}
                           {next && (
                             <Button
                               disabled={busy}
@@ -189,15 +209,6 @@ export function OrderBoard({
                                 </a>
                               </Button>
                             )}
-                          {onPrint && (
-                            <Button
-                              variant="outline"
-                              onClick={() => onPrint(order)}
-                              aria-label={`Imprimir pedido #${order.number}`}
-                            >
-                              Imprimir
-                            </Button>
-                          )}
                           {canCancel(order.status) && (
                             <Button
                               variant="ghost"
