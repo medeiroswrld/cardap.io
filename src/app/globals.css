@@ -5121,3 +5121,62 @@ body:has(.immersive-shell) .toast {
   font-size: 12px;
   word-break: break-all;
 }
+
+.bag-offers {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+.bag-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface-2, #f6f1ea);
+}
+.bag-offer > div {
+  display: grid;
+  gap: 2px;
+}
+.bag-offer span {
+  font-size: 0.9rem;
+}
+.bag-suggestions {
+  display: grid;
+  gap: 8px;
+}
+.bag-suggestions h3 {
+  margin: 4px 0;
+  font-size: 1rem;
+}
+.bag-suggestion {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.bag-suggestion img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.bag-suggestion span {
+  display: grid;
+}
+.bag-suggestion-add {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+.bag-prompt {
+  display: grid;
+  gap: 12px;
+}

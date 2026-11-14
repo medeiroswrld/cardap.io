@@ -48,6 +48,7 @@ import {
   MinimumNotice,
 } from "./fulfillment-fields";
 import type { Product } from "@/lib/types";
+import { BagOffers, useBagOffers } from "./bag-offers";
 const categoryIcons: Record<string, typeof Hamburger> = {
   burger: Hamburger,
   fries: Soup,
@@ -660,6 +661,9 @@ export function MenuApp() {
     </div>
   );
 }
+// The "Antes de fechar…" step shows at most once per page load (visit).
+let upsellPromptShown = false;
+
 export function Bag({
   onCheckout,
   inModal = false,
@@ -686,6 +690,17 @@ export function Bag({
       notify("Não foi possível atualizar a sacola. Tente novamente.");
     }
   };
+  const offers = useBagOffers();
+  const [prompting, setPrompting] = useState(false);
+  const finish = () => {
+    if (!upsellPromptShown && offers.hasOffers) {
+      upsellPromptShown = true;
+      setPrompting(true);
+      return;
+    }
+    setPrompting(false);
+    onCheckout();
+  };
   return (
     <div className={`bag-panel ${inModal ? "bag-modal" : ""}`}>
       {!inModal && (
@@ -699,66 +714,82 @@ export function Bag({
           </span>
         </div>
       )}
-      {!count ? (
-        <div className="bag-empty">
-          <div className="empty-bag-icon">
-            <ShoppingBag size={35} strokeWidth={1.25} />
-            <span>+</span>
-          </div>
-          <h3>
-            Uma boa escolha
-            <br />
-            começa por aqui.
-          </h3>
-          <p>
-            Adicione seus favoritos e deixe
-            <br />o resto com a gente.
-          </p>
-          <span className="empty-bag-line" />
+      {prompting && count > 0 ? (
+        <div className="bag-prompt">
+          <h3>Antes de fechar…</h3>
+          <BagOffers offers={offers} />
+          <Button className="full-width" onClick={finish}>
+            {offers.hasOffers ? "Não, obrigado, finalizar" : "Finalizar pedido"}
+          </Button>
+          <button type="button" className="button button-ghost" onClick={() => setPrompting(false)}>
+            Voltar para a sacola
+          </button>
         </div>
       ) : (
-        <div className="bag-items">
-          {state.bag.map((item, i) => {
-            const p = state.products.find((p) => p.id === item.productId);
-            return (
-              <div key={`${item.productId}-${i}`} className="bag-item">
-                <img src={p?.image || "/images/burger.jpg"} alt="" />
-                <div>
-                  <strong>{p?.name || "Produto removido"}</strong>
-                  <span>{money(item.price)}</span>
-                  <OrderChoices
-                    removed={item.removedIngredients}
-                    additions={item.addOns}
-                  />
-                  {item.note && <small>{item.note}</small>}
-                  <div className="quantity-control">
-                    <button
-                      aria-label={`Diminuir ${p?.name}`}
-                      onClick={() => change(i, -1)}
-                    >
-                      <Minus size={13} />
-                    </button>
-                    <span>{item.quantity}</span>
-                    <button
-                      aria-label={`Aumentar ${p?.name}`}
-                      disabled={item.quantity >= 20}
-                      onClick={() => change(i, 1)}
-                    >
-                      <Plus size={13} />
-                    </button>
+        <>
+        {!count ? (
+          <div className="bag-empty">
+            <div className="empty-bag-icon">
+              <ShoppingBag size={35} strokeWidth={1.25} />
+              <span>+</span>
+            </div>
+            <h3>
+              Uma boa escolha
+              <br />
+              começa por aqui.
+            </h3>
+            <p>
+              Adicione seus favoritos e deixe
+              <br />o resto com a gente.
+            </p>
+            <span className="empty-bag-line" />
+          </div>
+        ) : (
+          <div className="bag-items">
+            {state.bag.map((item, i) => {
+              const p = state.products.find((p) => p.id === item.productId);
+              return (
+                <div key={`${item.productId}-${i}`} className="bag-item">
+                  <img src={p?.image || "/images/burger.jpg"} alt="" />
+                  <div>
+                    <strong>{p?.name || "Produto removido"}</strong>
+                    <span>{money(item.price)}</span>
+                    <OrderChoices
+                      removed={item.removedIngredients}
+                      additions={item.addOns}
+                    />
+                    {item.note && <small>{item.note}</small>}
+                    <div className="quantity-control">
+                      <button
+                        aria-label={`Diminuir ${p?.name}`}
+                        onClick={() => change(i, -1)}
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span>{item.quantity}</span>
+                      <button
+                        aria-label={`Aumentar ${p?.name}`}
+                        disabled={item.quantity >= 20}
+                        onClick={() => change(i, 1)}
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
                   </div>
+                  <button
+                    className="remove-item"
+                    aria-label={`Remover ${p?.name}`}
+                    onClick={() => change(i, -item.quantity)}
+                  >
+                    <X size={15} />
+                  </button>
                 </div>
-                <button
-                  className="remove-item"
-                  aria-label={`Remover ${p?.name}`}
-                  onClick={() => change(i, -item.quantity)}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
+          {count > 0 && <BagOffers offers={offers} />}
+        </>
       )}
       <div className="bag-summary">
         <div>
@@ -772,7 +803,7 @@ export function Bag({
         <Button
           className="full-width"
           disabled={!count || !ready || !state.settings.accepting}
-          onClick={onCheckout}
+          onClick={finish}
         >
           Revisar pedido <ArrowRight size={17} />
         </Button>
