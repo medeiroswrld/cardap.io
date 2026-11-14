@@ -10,7 +10,7 @@ import {
   statusLabel,
   type OrderStatus,
 } from "@/lib/order-flow";
-import { boardColumns, columnTitle, modalKind } from "@/lib/order-board";
+import { boardColumns, columnTitle, minutesWaiting, modalKind } from "@/lib/order-board";
 import { whatsappConfirmationLink } from "@/lib/online-order";
 import { money } from "@/lib/utils";
 import { ApiRequestError } from "@/lib/client-api";
@@ -112,6 +112,12 @@ export function OrderBoard({
                           { hour: "2-digit", minute: "2-digit" },
                         )}
                       </p>
+                      {order.status === "aguardando_pagamento" && (
+                        <p className="status-pill">
+                          Pix de {money(order.total_cents)} · esperando há{" "}
+                          {minutesWaiting(order.created_at, Date.now())} min
+                        </p>
+                      )}
                       {online && order.customer_phone && (
                         <p>Telefone: {order.customer_phone}</p>
                       )}

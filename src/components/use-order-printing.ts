@@ -77,7 +77,9 @@ export function useOrderPrinting(
     // Seed on first data (and whenever auto-print is turned on): what is
     // already on screen is never printed automatically.
     if (printed.current === null || !auto) {
-      printed.current = new Set(orders.filter((o) => o.status !== "aguardando_aceite").map((o) => o.id));
+      // Pending orders stay unprinted: they print when they reach "recebido".
+      const pending = ["aguardando_aceite", "aguardando_pagamento"];
+      printed.current = new Set(orders.filter((o) => !pending.includes(o.status)).map((o) => o.id));
       return;
     }
     for (const order of ordersToPrint(orders, printed.current)) {
