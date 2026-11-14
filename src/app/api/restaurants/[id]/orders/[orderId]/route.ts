@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 import { withOrderAddress } from "@/lib/embed";
+import { orderTxid, pixPayload, pixReceiptLink } from "@/lib/pix";
 type Context = { params: Promise<{ id: string; orderId: string }> };
 async function handleGET(_request: Request, { params }: Context) {
   try {
@@ -47,9 +48,36 @@ async function handleGET(_request: Request, { params }: Context) {
             .single()
         : { data: null, error: null };
     if (restaurantError) logFailure(restaurantError, "supabase.orders");
+    let payment: { pix_code: string | null; pix_whatsapp: string | null; restaurant_name: string } | null = null;
+    if (data.status === "aguardando_pagamento") {
+      const [pixRow, rest] = await Promise.all([
+        client.from("restaurant_pix").select("pix_key,merchant_name,merchant_city").eq("restaurant_id", id).maybeSingle(),
+        client.from("restaurants").select("name,phone").eq("id", id).single(),
+      ]);
+      if (pixRow.error) logFailure(pixRow.error, "supabase.orders");
+      if (rest.error) logFailure(rest.error, "supabase.orders");
+      const name = rest.data?.name ?? "";
+      payment = {
+        restaurant_name: name,
+        // Amount comes from the order saved by the server, never from the client.
+        pix_code: pixRow.data
+          ? pixPayload({
+              key: pixRow.data.pix_key,
+              name: pixRow.data.merchant_name,
+              city: pixRow.data.merchant_city,
+              amountCents: data.total_cents,
+              txid: orderTxid(data.number),
+            })
+          : null,
+        pix_whatsapp: rest.data?.phone
+          ? pixReceiptLink({ phone: rest.data.phone, number: data.number, totalCents: data.total_cents, restaurantName: name })
+          : null,
+      };
+    }
     return Response.json(
       {
         ...withOrderAddress(data),
+        ...(payment ?? {}),
         google_review_url: restaurant?.google_review_url || "",
         feedback_enabled: restaurant?.feedback_enabled ?? true,
       },

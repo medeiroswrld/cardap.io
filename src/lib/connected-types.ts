@@ -101,6 +101,9 @@ export type RealOrder = {
   cancellation_reason: string | null;
   google_review_url?: string;
   feedback_enabled?: boolean;
+  pix_code?: string | null;
+  pix_whatsapp?: string | null;
+  restaurant_name?: string;
   dining_tables: { number: number } | null;
   order_items: {
     id: string;

@@ -5106,3 +5106,18 @@ body:has(.immersive-shell) .toast {
   align-items: center;
   gap: 8px;
 }
+.pix-payment {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--surface-2, #f6f1ea);
+}
+.pix-payment textarea {
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}

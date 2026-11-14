@@ -7,12 +7,14 @@ import type { RealOrder } from "@/lib/connected-types";
 import {
   customerSteps,
   fulfillmentLabel,
-  paymentNames,
+  paymentLabel,
+  paysFirst,
   statusLabel,
 } from "@/lib/order-flow";
 import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
 import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
+import { PixPayment } from "./pix-payment";
 export function ConnectedTracking({
   restaurantId,
   slug,
@@ -120,7 +122,7 @@ export function ConnectedTracking({
             </div>
           ) : (
             <ol className="connected-steps">
-              {customerSteps(order.fulfillment).map((status, index, steps) => (
+              {customerSteps(order.fulfillment, paysFirst(order)).map((status, index, steps) => (
                 <li
                   key={status}
                   className={
@@ -133,6 +135,11 @@ export function ConnectedTracking({
               ))}
             </ol>
           )}
+          {order.status === "aguardando_pagamento" && <PixPayment order={order} />}
+          {order.status !== "aguardando_pagamento" && paysFirst(order) &&
+            !["cancelado", "recusado"].includes(order.status) && (
+              <p className="notice">Pagamento confirmado pelo restaurante.</p>
+            )}
           {order.order_addresses && (
             <p>
               Entregar em {order.order_addresses.street},{" "}
@@ -145,7 +152,7 @@ export function ConnectedTracking({
           )}
           {order.payment_method && (
             <p>
-              Pagamento: {paymentNames[order.payment_method]}
+              Pagamento: {paymentLabel(order.payment_method, paysFirst(order))}
               {order.change_for_cents
                 ? ` · troco para ${money(order.change_for_cents)}`
                 : ""}
