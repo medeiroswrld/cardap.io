@@ -280,5 +280,18 @@ await ok("erasure is blocked by open orders, then anonymizes and logs without pe
   assert.equal((await customers()).total, 5);
 });
 
+await ok("an unpaid Pix order blocks erasure until it is cancelled", async () => {
+  await root();
+  const caio = await contact(a, "Caio Pix", "11900000009");
+  const unpaid = await order("11900000009", 1000, 0, { status: "aguardando_pagamento", delivery: "Rua C" });
+  await login(ownerA);
+  await rejects(() => db.query("select crm_erase_customer($1,$2)", [a, caio]), "CUSTOMER_HAS_OPEN_ORDERS");
+  await root();
+  await db.query("update orders set status='cancelado', cancellation_reason='Cliente não pagou' where id=$1", [unpaid]);
+  await login(ownerA);
+  const r = (await db.query("select crm_erase_customer($1,$2) as r", [a, caio])).rows[0].r;
+  assert.equal(r.orders_affected, 1);
+});
+
 await db.close();
 console.log(`${count} CRM database checks passed.`);

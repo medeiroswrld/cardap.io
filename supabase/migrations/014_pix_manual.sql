@@ -172,3 +172,33 @@ begin
 end $$;
 revoke all on function public.advance_order(uuid,uuid,text,text,text,integer) from public,anon;
 grant execute on function public.advance_order(uuid,uuid,text,text,text,integer) to authenticated;
+
+-- Unpaid Pix orders are open too: erasing the customer would drop their address and notes.
+create or replace function public.crm_erase_customer(p_restaurant uuid, p_contact uuid) returns jsonb
+language plpgsql security definer set search_path=public as $$
+declare c contacts; affected integer;
+begin
+  if not is_member(p_restaurant, true) then raise exception 'FORBIDDEN'; end if;
+  select * into c from contacts where id = p_contact and restaurant_id = p_restaurant for update;
+  if not found then raise exception 'NOT_FOUND'; end if;
+  if exists(select 1 from orders where restaurant_id = p_restaurant and customer_phone = c.phone
+      and status in ('aguardando_pagamento','aguardando_aceite','recebido','em_preparo','pronto','saiu_para_entrega')) then
+    raise exception 'CUSTOMER_HAS_OPEN_ORDERS';
+  end if;
+  delete from order_addresses a using orders o
+    where a.order_id = o.id and a.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant and o.customer_phone = c.phone;
+  -- Free text written by the customer or about the cancellation can hold personal data: clear it too.
+  update order_items i set note = '' from orders o
+    where i.order_id = o.id and i.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant
+      and o.customer_phone = c.phone and i.note <> '';
+  update order_status_events e set reason = null from orders o
+    where e.order_id = o.id and e.restaurant_id = o.restaurant_id and o.restaurant_id = p_restaurant
+      and o.customer_phone = c.phone and e.reason is not null;
+  update orders set customer_name = 'Cliente removido', customer_phone = '', cancellation_reason = null
+    where restaurant_id = p_restaurant and customer_phone = c.phone;
+  get diagnostics affected = row_count;
+  delete from marketing_consent_events where restaurant_id = p_restaurant and contact_id = c.id;
+  delete from contacts where id = c.id and restaurant_id = p_restaurant;
+  insert into data_erasure_events(restaurant_id, actor_id, orders_affected) values (p_restaurant, auth.uid(), affected);
+  return jsonb_build_object('orders_affected', affected);
+end $$;
