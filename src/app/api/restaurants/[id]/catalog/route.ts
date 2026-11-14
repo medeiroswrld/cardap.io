@@ -100,6 +100,12 @@ const schema = z.discriminatedUnion("action", [
     position: z.number().int().min(0).max(10000),
   }),
   z.object({ action: z.literal("revoke_marketing"), id: z.uuid() }),
+  z.object({
+    action: z.literal("save_pix"),
+    pix_key: z.string().trim().max(77),
+    merchant_name: z.string().trim().max(25),
+    merchant_city: z.string().trim().max(15),
+  }),
   crmSettingsBody,
 ]);
 async function handlePOST(
@@ -209,6 +215,14 @@ async function handlePOST(
           { status: 409, headers: noStore },
         );
       }
+      if (error) throw error;
+    } else if (body.action === "save_pix") {
+      const { error } = await supabase.rpc("save_restaurant_pix", {
+        p_restaurant: id,
+        p_key: body.pix_key,
+        p_name: body.merchant_name,
+        p_city: body.merchant_city,
+      });
       if (error) throw error;
     } else if (body.action === "crm_settings") {
       const { action: _, ...settings } = body;

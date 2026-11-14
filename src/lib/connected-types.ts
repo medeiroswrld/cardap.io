@@ -117,6 +117,7 @@ export type RealOrder = {
 export type Workspace = {
   restaurant: RestaurantRow;
   role: "owner" | "operations";
+  pix: { pix_key: string; merchant_name: string; merchant_city: string } | null;
   feedback: {
     id: string;
     product_id: string;

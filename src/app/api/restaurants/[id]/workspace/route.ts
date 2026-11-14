@@ -87,6 +87,7 @@ async function handleGET(
     // "recebido" get the first-order badge too.
     const pendingOnline = (orders.data || []).filter(
       (o) =>
+        o.status === "aguardando_pagamento" ||
         o.status === "aguardando_aceite" ||
         (o.status === "recebido" && o.fulfillment !== "mesa"),
     );
@@ -132,8 +133,9 @@ async function handleGET(
     let metrics: unknown[] = [];
     let photoMetrics: unknown[] = [];
     let feedback: unknown[] = [];
+    let pix: unknown = null;
     if (role === "owner") {
-      const [m, photos, reviews] = await Promise.all([
+      const [m, photos, reviews, pixRow] = await Promise.all([
         supabase
           .from("video_view_sessions")
           .select(
@@ -158,12 +160,18 @@ async function handleGET(
           .or("liked.eq.true,comment.neq.")
           .order("updated_at", { ascending: false })
           .limit(200),
+        supabase
+          .from("restaurant_pix")
+          .select("pix_key,merchant_name,merchant_city")
+          .eq("restaurant_id", id)
+          .maybeSingle(),
       ]);
-      if (m.error || photos.error || reviews.error)
+      if (m.error || photos.error || reviews.error || pixRow.error)
         throw new Error("DATABASE_ERROR");
       metrics = m.data;
       photoMetrics = photos.data;
       feedback = reviews.data;
+      pix = pixRow.data;
     }
     return Response.json(
       {
@@ -180,6 +188,7 @@ async function handleGET(
         metrics,
         photoMetrics,
         feedback,
+        pix,
       },
       { headers: noStore },
     );
