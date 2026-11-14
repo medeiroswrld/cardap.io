@@ -1,6 +1,6 @@
 import type { BagItem, Product } from "./types";
 
-export type AddOn = { id: string; name: string; price_cents: number };
+export type AddOn = { id: string; name: string; price_cents: number; offer_in_bag?: boolean };
 
 export function sameBagChoice(a: BagItem, b: BagItem) {
   return (
