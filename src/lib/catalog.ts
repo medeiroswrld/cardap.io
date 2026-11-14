@@ -72,7 +72,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
       client.rpc("restaurant_pix_enabled", { p_restaurant: restaurant.id }),
     ]);
   if (
-    [categories, products, media, tables, options, optionLinks, zones, pixEnabled].some(
+    [categories, products, media, tables, options, optionLinks, zones].some(
       (r) => r.error,
     )
   ) {
@@ -81,6 +81,13 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
       errorCode: "DATABASE_ERROR",
     });
     throw new Error("DATABASE_ERROR");
+  }
+  // Pix is optional: a failed check falls back to pay-on-delivery instead of breaking the menu.
+  if (pixEnabled.error) {
+    logger.warn("dependency.failed", {
+      operation: "supabase.catalog",
+      errorCode: "DATABASE_ERROR",
+    });
   }
   return {
     restaurant,
