@@ -298,5 +298,65 @@ await ok("auto-accepted pickup starts as recebido without an estimate", async ()
   assert.equal(rows[0].estimate_minutes, null);
 });
 
+await ok("only the owner saves the Pix key and only members read it", async () => {
+  await login(ownerB);
+  await rejects(() => db.query("select save_restaurant_pix($1,'chave@casa.com','Casa A','Curitiba')", [a]), "FORBIDDEN");
+  await login(staffA);
+  await rejects(() => db.query("select save_restaurant_pix($1,'chave@casa.com','Casa A','Curitiba')", [a]), "FORBIDDEN");
+  await login(ownerA);
+  await rejects(() => db.query("select save_restaurant_pix($1,'chave@casa.com','','Curitiba')", [a]), "INVALID_INPUT");
+  await db.query("select save_restaurant_pix($1,'  chave@casa.com ','Casa A','Curitiba')", [a]);
+  await login(staffA);
+  const own = await db.query("select pix_key,merchant_name,merchant_city from restaurant_pix where restaurant_id=$1", [a]);
+  assert.deepEqual(own.rows[0], { pix_key: "chave@casa.com", merchant_name: "Casa A", merchant_city: "Curitiba" });
+  await login(ownerB);
+  assert.equal((await db.query("select * from restaurant_pix")).rows.length, 0);
+  await anon();
+  await rejects(() => db.query("select * from restaurant_pix"), "permission denied");
+  const enabled = await db.query("select restaurant_pix_enabled($1) as on", [a]);
+  assert.equal(enabled.rows[0].on, true);
+});
+
+let pixDeliveryId;
+await ok("Pix online order waits for payment even with auto-accept", async () => {
+  await root();
+  await db.query("update restaurants set auto_accept_orders=true where id=$1", [a]);
+  const r = await place(await guest(), delivery({ payment_method: "pix", change_for_cents: null }));
+  pixDeliveryId = r.id;
+  assert.equal(r.status, "aguardando_pagamento");
+  const { rows } = await db.query("select estimate_minutes from orders where id=$1", [r.id]);
+  assert.equal(rows[0].estimate_minutes, null);
+  const events = await db.query("select status from order_status_events where order_id=$1", [r.id]);
+  assert.deepEqual(events.rows.map((e) => e.status), ["aguardando_pagamento"]);
+  const cash = await place(await guest(), { ...base, fulfillment: "retirada", payment_method: "dinheiro", items: items(1) });
+  assert.equal(cash.status, "recebido");
+});
+
+await ok("Pix recebido moves to recebido with the zone estimate; other jumps are refused", async () => {
+  await rejects(() => advance(staffA, pixDeliveryId, "aguardando_pagamento", "em_preparo"), "INVALID_TRANSITION");
+  const r = await advance(staffA, pixDeliveryId, "aguardando_pagamento", "recebido");
+  assert.equal(r.status, "recebido");
+  await root();
+  const { rows } = await db.query("select estimate_minutes from orders where id=$1", [pixDeliveryId]);
+  assert.equal(rows[0].estimate_minutes, 40);
+});
+
+await ok("unpaid Pix order is cancelled only with a reason", async () => {
+  const r = await place(await guest(), { ...base, fulfillment: "retirada", payment_method: "pix", items: items(1) });
+  assert.equal(r.status, "aguardando_pagamento");
+  await rejects(() => advance(staffA, r.id, "aguardando_pagamento", "cancelado", "x"), "INVALID_TRANSITION");
+  const done = await advance(staffA, r.id, "aguardando_pagamento", "cancelado", "Cliente não pagou");
+  assert.equal(done.status, "cancelado");
+});
+
+await ok("removing the Pix key turns Pix back into pay-on-delivery", async () => {
+  await login(ownerA);
+  await db.query("select save_restaurant_pix($1,'','','')", [a]);
+  await anon();
+  assert.equal((await db.query("select restaurant_pix_enabled($1) as on", [a])).rows[0].on, false);
+  const r = await place(await guest(), { ...base, fulfillment: "retirada", payment_method: "pix", items: items(1) });
+  assert.equal(r.status, "recebido");
+});
+
 await db.close();
 console.log(`${count} online-order database checks passed.`);
