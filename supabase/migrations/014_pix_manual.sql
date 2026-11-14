@@ -15,6 +15,7 @@ create table public.restaurant_pix (
 alter table public.restaurant_pix enable row level security;
 revoke all on public.restaurant_pix from anon, authenticated;
 grant select on public.restaurant_pix to authenticated;
+grant select on public.restaurant_pix to service_role;
 create policy member_read on public.restaurant_pix for select to authenticated using (is_member(restaurant_id));
 
 create function public.save_restaurant_pix(p_restaurant uuid,p_key text,p_name text,p_city text) returns void

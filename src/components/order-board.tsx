@@ -7,6 +7,7 @@ import {
   fulfillmentLabel,
   nextAction,
   paymentNames,
+  paysFirst,
   statusLabel,
   type OrderStatus,
 } from "@/lib/order-flow";
@@ -131,7 +132,10 @@ export function OrderBoard({
                       )}
                       {online && order.payment_method && (
                         <p>
-                          Pagamento: {paymentNames[order.payment_method]}
+                          Pagamento:{" "}
+                          {order.payment_method === "pix" && paysFirst(order)
+                            ? "Pix (pago pelo cardápio)"
+                            : paymentNames[order.payment_method]}
                           {order.change_for_cents
                             ? ` · troco para ${money(order.change_for_cents)}`
                             : ""}

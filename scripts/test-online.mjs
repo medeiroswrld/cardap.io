@@ -75,6 +75,17 @@ test("WhatsApp link targets the customer's Brazilian number with a readable summ
   assert.match(text, /R\$\s?57,00/);
 });
 
+test("WhatsApp text says Pix was paid through the menu for prepaid orders", () => {
+  const base = {
+    number: 7, customer_name: "Ana", customer_phone: "11988887777", fulfillment: "retirada",
+    total_cents: 3000, payment_method: "pix", change_for_cents: null,
+    items: [{ quantity: 1, product_name: "Burger" }], restaurantName: "Casa X",
+  };
+  const text = (o) => new URL(online.whatsappConfirmationLink(o)).searchParams.get("text");
+  assert.match(text(base), /Pix na hora/);
+  assert.match(text({ ...base, order_status_events: [{ status: "aguardando_pagamento" }] }), /Pix \(pago pelo cardápio\)/);
+});
+
 test("alert repeats while there are pending orders, unless muted", () => {
   assert.equal(alerts.pendingCount([{ status: "aguardando_aceite" }, { status: "recebido" }]), 1);
   const base = { pending: 1, newOrderIds: [], lastPlayedAt: 0, now: 25000, muted: false };

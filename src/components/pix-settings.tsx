@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import type { Workspace } from "@/lib/connected-types";
+import { guessPixKeyType, type PixKeyType } from "@/lib/pix";
 
 type Save = (body: unknown) => Promise<void>;
 
 export function PixSettings({ data, save, busy }: { data: Workspace; save: Save; busy: boolean }) {
   const [error, setError] = useState("");
   const pix = data.pix;
-  async function submit(values: { pix_key: string; merchant_name: string; merchant_city: string }) {
+  async function submit(values: { pix_key: string; key_type?: PixKeyType; merchant_name: string; merchant_city: string }) {
     try {
       setError("");
       await save({ action: "save_pix", ...values });
@@ -23,8 +24,14 @@ export function PixSettings({ data, save, busy }: { data: Workspace; save: Save;
       onSubmit={(e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);
+        const pixKey = String(form.get("pix_key")).trim();
+        if (!pixKey) {
+          setError("Informe a chave Pix.");
+          return;
+        }
         void submit({
-          pix_key: String(form.get("pix_key")).trim(),
+          pix_key: pixKey,
+          key_type: String(form.get("key_type")) as PixKeyType,
           merchant_name: String(form.get("merchant_name")).trim(),
           merchant_city: String(form.get("merchant_city")).trim(),
         });
@@ -37,9 +44,22 @@ export function PixSettings({ data, save, busy }: { data: Workspace; save: Save;
         O cliente envia o comprovante para o telefone do restaurante no WhatsApp.
       </p>
       <label className="form-label">
+        Tipo da chave
+        <select name="key_type" required defaultValue={pix ? guessPixKeyType(pix.pix_key) : "cpf"}>
+          <option value="cpf">CPF</option>
+          <option value="cnpj">CNPJ</option>
+          <option value="telefone">Telefone</option>
+          <option value="email">E-mail</option>
+          <option value="aleatoria">Chave aleatória</option>
+        </select>
+      </label>
+      <label className="form-label">
         Chave Pix
         <input name="pix_key" required maxLength={77} defaultValue={pix?.pix_key ?? ""} />
       </label>
+      <p className="field-help">
+        Depois de salvar, faça um pedido de teste e pague pelo app do seu banco para conferir o QR Code.
+      </p>
       <div className="form-columns">
         <label className="form-label">
           Nome do recebedor

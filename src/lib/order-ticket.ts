@@ -1,6 +1,6 @@
 // Kitchen/counter ticket for thermal printers (58 mm or 80 mm), printed from
 // the browser. Pure functions: the component only opens the print dialog.
-import { fulfillmentLabel, paymentNames, type Fulfillment, type PaymentMethod } from "./order-flow";
+import { fulfillmentLabel, paymentNames, paysFirst, type Fulfillment, type PaymentMethod } from "./order-flow";
 import type { AddOn } from "./product-options";
 
 export type PaperWidth = 58 | 80;
@@ -18,6 +18,7 @@ export type TicketOrder = {
   payment_method: PaymentMethod | null;
   change_for_cents: number | null;
   estimate_minutes: number | null;
+  order_status_events?: { status: string }[];
   dining_tables: { number: number } | null;
   order_addresses: {
     zone_name: string;
@@ -117,8 +118,11 @@ export function ticketHtml(
       `<div class="row"><span>Taxa de entrega</span><span>${brl(order.delivery_fee_cents)}</span></div>`,
     );
   parts.push(`<div class="row big"><span>TOTAL</span><span>${brl(order.total_cents)}</span></div>`);
+  const prepaidPix =
+    order.payment_method === "pix" &&
+    paysFirst({ order_status_events: order.order_status_events ?? [] });
   if (order.payment_method) {
-    parts.push(`<div>Pagamento: ${e(paymentNames[order.payment_method])}</div>`);
+    parts.push(`<div>Pagamento: ${e(prepaidPix ? "Pix (pago pelo cardápio)" : paymentNames[order.payment_method])}</div>`);
     if (order.change_for_cents)
       parts.push(
         `<div class="strong">Troco para ${brl(order.change_for_cents)} (levar ${brl(order.change_for_cents - order.total_cents)})</div>`,

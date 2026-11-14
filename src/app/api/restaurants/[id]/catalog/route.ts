@@ -2,6 +2,7 @@ import { logFailure, withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { invalidateCatalog } from "@/lib/catalog-cache";
+import { normalizePixKey, pixText } from "@/lib/pix";
 import { crmSettingsBody } from "@/lib/crm-query";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
@@ -103,6 +104,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("save_pix"),
     pix_key: z.string().trim().max(77),
+    key_type: z.enum(["cpf", "cnpj", "telefone", "email", "aleatoria"]).optional(),
     merchant_name: z.string().trim().max(25),
     merchant_city: z.string().trim().max(15),
   }),
@@ -217,9 +219,20 @@ async function handlePOST(
       }
       if (error) throw error;
     } else if (body.action === "save_pix") {
+      let key = "";
+      if (body.pix_key) {
+        const normalized = body.key_type ? normalizePixKey(body.key_type, body.pix_key) : null;
+        if (
+          !normalized ||
+          !pixText(body.merchant_name, 25) ||
+          !pixText(body.merchant_city, 15)
+        )
+          throw new Error("INVALID_INPUT");
+        key = normalized;
+      }
       const { error } = await supabase.rpc("save_restaurant_pix", {
         p_restaurant: id,
-        p_key: body.pix_key,
+        p_key: key,
         p_name: body.merchant_name,
         p_city: body.merchant_city,
       });

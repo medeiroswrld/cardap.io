@@ -34,3 +34,26 @@ test("receipt link opens WhatsApp with the order and amount", () => {
   assert.equal(pix.pixReceiptLink({ phone: "5541991314989", number: 1, totalCents: 1, restaurantName: "x" }).startsWith("https://wa.me/5541991314989"), true);
   assert.equal(pix.pixReceiptLink({ phone: "123", number: 1, totalCents: 1, restaurantName: "x" }), null);
 });
+
+test("normalizePixKey cleans each key type or returns null", () => {
+  const n = pix.normalizePixKey;
+  assert.equal(n("telefone", "(41) 99131-4989"), "+5541991314989");
+  assert.equal(n("telefone", "+55 41 99131-4989"), "+5541991314989");
+  assert.equal(n("telefone", "123"), null);
+  assert.equal(n("cnpj", "12.345.678/0001-95"), "12345678000195");
+  assert.equal(n("cnpj", "1234"), null);
+  assert.equal(n("cpf", "123.456.789-09"), "12345678909");
+  assert.equal(n("cpf", "123.456.789-0"), null);
+  assert.equal(n("email", " Loja@Casa.com "), "loja@casa.com");
+  assert.equal(n("email", "sem-arroba"), null);
+  assert.equal(n("aleatoria", " 123E4567-E12B-12D1-A456-426655440000 "), "123e4567-e12b-12d1-a456-426655440000");
+  assert.equal(n("aleatoria", "abc"), null);
+});
+
+test("guessPixKeyType guesses from the stored value", () => {
+  assert.equal(pix.guessPixKeyType("+5541991314989"), "telefone");
+  assert.equal(pix.guessPixKeyType("loja@casa.com"), "email");
+  assert.equal(pix.guessPixKeyType("12345678909"), "cpf");
+  assert.equal(pix.guessPixKeyType("12345678000195"), "cnpj");
+  assert.equal(pix.guessPixKeyType("123e4567-e12b-12d1-a456-426655440000"), "aleatoria");
+});

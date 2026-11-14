@@ -19,7 +19,7 @@ export function crc16(payload: string) {
 export function pixText(text: string, max: number) {
   return text
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^A-Za-z0-9 .-]/g, "")
     .trim()
     .slice(0, max)
@@ -66,4 +66,36 @@ export function pixReceiptLink(input: {
     return null;
   const text = `Olá! Pedido #${input.number} no ${input.restaurantName}. Segue o comprovante do Pix de ${brl(input.totalCents)}.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+export type PixKeyType = "cpf" | "cnpj" | "telefone" | "email" | "aleatoria";
+
+// Bank apps only accept the raw key: digits for CPF/CNPJ, +55 phone, lowercase e-mail/UUID.
+export function normalizePixKey(type: PixKeyType, raw: string): string | null {
+  const text = raw.trim();
+  if (type === "cpf" || type === "cnpj") {
+    const digits = text.replace(/\D/g, "");
+    return digits.length === (type === "cpf" ? 11 : 14) ? digits : null;
+  }
+  if (type === "telefone") {
+    let digits = text.replace(/\D/g, "");
+    if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55"))
+      digits = digits.slice(2);
+    return digits.length === 10 || digits.length === 11 ? "+55" + digits : null;
+  }
+  const key = text.toLowerCase();
+  if (type === "email")
+    return key.length <= 77 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key) ? key : null;
+  if (type === "aleatoria")
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(key) ? key : null;
+  return null;
+}
+
+// Only the key is stored, not its type: guess it to preselect the form.
+export function guessPixKeyType(key: string): PixKeyType {
+  if (key.startsWith("+55")) return "telefone";
+  if (key.includes("@")) return "email";
+  if (/^\d{11}$/.test(key)) return "cpf";
+  if (/^\d{14}$/.test(key)) return "cnpj";
+  return "aleatoria";
 }

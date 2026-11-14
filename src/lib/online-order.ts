@@ -1,4 +1,4 @@
-import { paymentNames, type Fulfillment, type PaymentMethod } from "./order-flow";
+import { paymentNames, paysFirst, type Fulfillment, type PaymentMethod } from "./order-flow";
 
 export function orderTotals(
   subtotal: number,
@@ -38,6 +38,7 @@ export type WhatsAppOrder = {
     complement: string;
     reference: string;
   } | null;
+  order_status_events?: { status: string }[];
   restaurantName: string;
 };
 
@@ -61,7 +62,12 @@ export function whatsappConfirmationLink(order: WhatsAppOrder) {
   } else if (order.fulfillment === "retirada") lines.push("Retirada no balcão.");
   if (order.payment_method)
     lines.push(
-      `Pagamento: ${paymentNames[order.payment_method]}` +
+      `Pagamento: ${
+        order.payment_method === "pix" &&
+        paysFirst({ order_status_events: order.order_status_events ?? [] })
+          ? "Pix (pago pelo cardápio)"
+          : paymentNames[order.payment_method]
+      }` +
         (order.change_for_cents
           ? ` (troco para ${brl(order.change_for_cents)})`
           : ""),

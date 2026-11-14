@@ -62,3 +62,15 @@ test("auto-print takes each received order once", () => {
   ];
   assert.deepEqual(ticket.ordersToPrint(list, printed).map((o) => o.id), ["b"]);
 });
+
+test("prepaid Pix orders do not say Pix na hora", () => {
+  const pixOrder = { ...order, payment_method: "pix", change_for_cents: null };
+  assert.ok(ticket.ticketHtml(pixOrder, "Casa", 80).includes("Pix na hora"));
+  const prepaid = ticket.ticketHtml(
+    { ...pixOrder, order_status_events: [{ status: "aguardando_pagamento" }, { status: "recebido" }] },
+    "Casa",
+    80,
+  );
+  assert.ok(prepaid.includes("Pix (pago pelo cardápio)"));
+  assert.ok(!prepaid.includes("Pix na hora"));
+});

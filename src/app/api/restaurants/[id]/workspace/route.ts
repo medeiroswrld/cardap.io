@@ -166,12 +166,18 @@ async function handleGET(
           .eq("restaurant_id", id)
           .maybeSingle(),
       ]);
-      if (m.error || photos.error || reviews.error || pixRow.error)
+      if (m.error || photos.error || reviews.error)
         throw new Error("DATABASE_ERROR");
+      // Pix is optional: a failed read must not break the owner's admin.
+      if (pixRow.error)
+        logger.warn("dependency.failed", {
+          operation: "supabase.workspace",
+          errorCode: "DATABASE_ERROR",
+        });
       metrics = m.data;
       photoMetrics = photos.data;
       feedback = reviews.data;
-      pix = pixRow.data;
+      pix = pixRow.error ? null : pixRow.data;
     }
     return Response.json(
       {
