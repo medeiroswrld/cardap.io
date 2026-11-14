@@ -292,7 +292,7 @@ export function ConnectedMenuProvider({
         ready,
         session: "",
         error,
-        online: onlineOptions(catalog.restaurant, catalog.zones),
+        online: onlineOptions(catalog.restaurant, catalog.zones, catalog.pixOnline),
         update,
         add,
         checkout,

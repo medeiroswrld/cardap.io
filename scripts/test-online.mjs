@@ -203,3 +203,10 @@ test("board shows the payment column first and only when it has orders", () => {
   assert.equal(board.minutesWaiting("2026-11-14T20:00:00.000Z", Date.parse("2026-11-14T20:07:40.000Z")), 7);
   assert.equal(board.minutesWaiting("2026-11-14T20:00:00.000Z", Date.parse("2026-11-14T19:59:00.000Z")), 0);
 });
+
+test("online options carry the advance Pix flag", () => {
+  const draft = load("src/lib/fulfillment-draft.ts");
+  const r = { pickup_enabled: true, delivery_enabled: false, delivery_min_order_cents: 0 };
+  assert.equal(draft.onlineOptions(r, []).pixOnline, false);
+  assert.equal(draft.onlineOptions(r, [], true).pixOnline, true);
+});

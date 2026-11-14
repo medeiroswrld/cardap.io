@@ -7,6 +7,7 @@ export type OnlineOptions = {
   delivery: boolean;
   minimum: number;
   zones: DeliveryZone[];
+  pixOnline?: boolean;
 };
 export type FulfillmentDraft = {
   fulfillment: "retirada" | "entrega";
@@ -27,6 +28,7 @@ export function onlineOptions(
     delivery_min_order_cents: number;
   },
   zones: DeliveryZone[],
+  pixOnline = false,
 ): OnlineOptions | undefined {
   const delivery = restaurant.delivery_enabled && zones.length > 0;
   if (!restaurant.pickup_enabled && !delivery) return undefined;
@@ -35,6 +37,7 @@ export function onlineOptions(
     delivery,
     minimum: restaurant.delivery_min_order_cents,
     zones,
+    pixOnline,
   };
 }
 

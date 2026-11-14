@@ -161,6 +161,7 @@ export type Catalog = {
   media: MediaRow[];
   tables: TableRow[];
   zones: DeliveryZone[];
+  pixOnline: boolean;
 };
 export function catalogState(catalog: Catalog): {
   products: Product[];

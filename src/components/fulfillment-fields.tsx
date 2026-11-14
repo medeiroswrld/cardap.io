@@ -1,7 +1,7 @@
 "use client";
 import { money } from "@/lib/utils";
 import { missingForMinimum, orderTotals } from "@/lib/online-order";
-import { paymentNames, type PaymentMethod } from "@/lib/order-flow";
+import { paymentLabel, paymentNames, type PaymentMethod } from "@/lib/order-flow";
 import {
   unavailableModeMessage,
   type FulfillmentDraft,
@@ -122,10 +122,15 @@ export function FulfillmentFields({
               checked={draft.payment === method}
               onChange={() => set({ payment: method, changeFor: "" })}
             />
-            <span>{paymentNames[method]}</span>
+            <span>{paymentLabel(method, !!options.pixOnline)}</span>
           </label>
         ))}
       </fieldset>
+      {draft.payment === "pix" && options.pixOnline && (
+        <p className="field-help">
+          Você paga pelo Pix na próxima tela. O pedido vai para a cozinha assim que o restaurante confirmar o pagamento.
+        </p>
+      )}
       {draft.payment === "dinheiro" && (
         <label className="form-label">
           Troco para quanto? (opcional)

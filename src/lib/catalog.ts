@@ -24,7 +24,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     throw new Error("DATABASE_ERROR");
   }
   if (!restaurant) return null;
-  const [categories, products, media, tables, options, optionLinks, zones] =
+  const [categories, products, media, tables, options, optionLinks, zones, pixEnabled] =
     await Promise.all([
       client
         .from("categories")
@@ -69,9 +69,10 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
         .eq("restaurant_id", restaurant.id)
         .eq("active", true)
         .order("position"),
+      client.rpc("restaurant_pix_enabled", { p_restaurant: restaurant.id }),
     ]);
   if (
-    [categories, products, media, tables, options, optionLinks, zones].some(
+    [categories, products, media, tables, options, optionLinks, zones, pixEnabled].some(
       (r) => r.error,
     )
   ) {
@@ -90,14 +91,15 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     media: media.data,
     tables: tables.data,
     zones: zones.data,
+    pixOnline: pixEnabled.data === true,
   } as Catalog;
 }
 
 // Short shared cache for the public menu; invalidated by owner mutations.
 export function readCatalog(slug: string): Promise<Catalog | null> {
   if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
-  // Bump "v2" whenever the Catalog shape changes so old cached entries are ignored.
-  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v2", slug], {
+  // Bump "v3" whenever the Catalog shape changes so old cached entries are ignored.
+  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v3", slug], {
     revalidate: 60,
     tags: [catalogTag(slug)],
   })();
