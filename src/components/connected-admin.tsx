@@ -40,6 +40,7 @@ import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderBoard } from "./order-board";
 import { DeliverySettings } from "./delivery-settings";
 import { PixSettings } from "./pix-settings";
+import { BagSuggestionsSettings } from "./bag-suggestions-settings";
 import { CustomersPanel } from "./crm/customers-panel";
 import { CampaignPanel } from "./crm/campaign-panel";
 import { CrmSettings } from "./crm/crm-settings";
@@ -379,6 +380,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   <SettingsForm data={data} save={save} busy={busy} />
                   <DeliverySettings data={data} save={save} busy={busy} />
                   <PixSettings data={data} save={save} busy={busy} />
+                  <BagSuggestionsSettings data={data} save={save} busy={busy} />
                   <CrmSettings data={data} save={save} busy={busy} />
                 </>
               )}

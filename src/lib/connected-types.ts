@@ -25,6 +25,7 @@ export type RestaurantRow = {
   crm_vip_min_spent_cents: number;
   crm_vip_days: number;
   crm_lapsed_days: number;
+  bag_suggestions: string[];
 };
 export type DeliveryZone = {
   id: string;
@@ -54,6 +55,7 @@ export type OptionRow = {
   name: string;
   price_cents: number;
   active: boolean;
+  offer_in_bag: boolean;
 };
 export type OptionLink = { product_id: string; option_id: string };
 export type ProductRow = {
@@ -236,6 +238,7 @@ export function catalogState(catalog: Catalog): {
         )
         .join(" • "),
       privacyEmail: catalog.restaurant.privacy_email,
+      bagSuggestions: catalog.restaurant.bag_suggestions ?? [],
     },
   };
 }

@@ -78,6 +78,7 @@ export type Settings = {
   address: string;
   hours: string;
   privacyEmail: string;
+  bagSuggestions?: string[];
 };
 export type DemoState = {
   version: 1;

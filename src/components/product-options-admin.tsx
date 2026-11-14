@@ -41,6 +41,7 @@ export function ProductOptionsAdmin({
             restaurant_id: data.restaurant.id,
             price_cents: 0,
             active: true,
+            offer_in_bag: false,
             product_ids: [],
           },
     );
@@ -82,6 +83,7 @@ export function ProductOptionsAdmin({
                   {option.active ? "Ativo" : "Pausado"} ·{" "}
                   {option.price_cents ? money(option.price_cents) : "Grátis"}{" "}
                   por unidade
+                  {option.offer_in_bag ? " · oferecido na sacola" : ""}
                 </p>
                 <p className="field-help">
                   {names.length
@@ -126,6 +128,7 @@ export function ProductOptionsAdmin({
                   name: edit.name,
                   price_cents: edit.price_cents,
                   active: edit.active,
+                  offer_in_bag: edit.offer_in_bag,
                   product_ids: edit.product_ids,
                 });
                 setEdit(null);
@@ -174,6 +177,18 @@ export function ProductOptionsAdmin({
               />
               Ativo no cardápio
             </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={edit.offer_in_bag}
+                onChange={(e) => setEdit({ ...edit, offer_in_bag: e.target.checked })}
+              />
+              Oferecer na sacola
+            </label>
+            <p className="field-help">
+              Na sacola, quem pediu um desses produtos sem este opcional vê
+              &quot;Transformar em combo por +{money(edit.price_cents)}?&quot;. Ideal para combos.
+            </p>
             <fieldset className="choice-group">
               <legend>Em quais produtos?</legend>
               <p className="field-help">

@@ -41,6 +41,14 @@ const schema = z.discriminatedUnion("action", [
       .array(z.uuid())
       .max(500)
       .refine((v) => new Set(v).size === v.length),
+    offer_in_bag: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("bag_suggestions"),
+    product_ids: z
+      .array(z.uuid())
+      .max(3)
+      .refine((v) => new Set(v).size === v.length),
   }),
   z.object({ action: z.literal("save_product"), product }),
   z.object({ action: z.literal("archive_product"), id: z.uuid() }),
@@ -142,6 +150,14 @@ async function handlePOST(
         p_products: body.product_ids,
       });
       if (error) throw error;
+      if (body.offer_in_bag !== undefined) {
+        const flag = await supabase.rpc("set_option_offer_in_bag", {
+          p_restaurant: id,
+          p_option: body.id,
+          p_offer: body.offer_in_bag,
+        });
+        if (flag.error) throw flag.error;
+      }
     } else if (body.action === "save_product") {
       const { data: existing } = await supabase
         .from("products")
@@ -235,6 +251,12 @@ async function handlePOST(
         p_key: key,
         p_name: body.merchant_name,
         p_city: body.merchant_city,
+      });
+      if (error) throw error;
+    } else if (body.action === "bag_suggestions") {
+      const { error } = await supabase.rpc("save_bag_suggestions", {
+        p_restaurant: id,
+        p_products: body.product_ids,
       });
       if (error) throw error;
     } else if (body.action === "crm_settings") {
