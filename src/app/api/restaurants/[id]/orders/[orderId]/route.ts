@@ -78,6 +78,7 @@ async function handlePATCH(request: Request, { params }: Context) {
           "cancelado",
         ]),
         expected_status: z.enum([
+          "aguardando_pagamento",
           "aguardando_aceite",
           "recebido",
           "em_preparo",

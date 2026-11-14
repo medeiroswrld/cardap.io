@@ -181,3 +181,25 @@ test("modal kind follows the action", () => {
   assert.equal(board.modalKind("recebido", "em_preparo"), "preparing");
   assert.equal(board.modalKind("pronto", "saiu_para_entrega"), "confirm");
 });
+
+test("Pix paid in advance has its own first step and action", () => {
+  assert.deepEqual(flow.customerSteps("entrega", true), ["aguardando_pagamento", "recebido", "em_preparo", "pronto", "saiu_para_entrega", "entregue"]);
+  assert.deepEqual(flow.customerSteps("retirada", true), ["aguardando_pagamento", "recebido", "em_preparo", "pronto", "entregue"]);
+  assert.deepEqual(flow.customerSteps("mesa", true), ["recebido", "em_preparo", "pronto", "entregue"]);
+  assert.deepEqual(flow.nextAction("aguardando_pagamento", "entrega"), { status: "recebido", label: "Pix recebido" });
+  assert.equal(flow.canCancel("aguardando_pagamento"), true);
+  assert.equal(flow.statusLabel("aguardando_pagamento", "retirada"), "Aguardando pagamento");
+  assert.equal(flow.paymentLabel("pix", true), "Pix agora, pelo cardápio");
+  assert.equal(flow.paymentLabel("pix", false), "Pix na hora");
+  assert.equal(flow.paysFirst({ order_status_events: [{ status: "aguardando_pagamento" }, { status: "recebido" }] }), true);
+  assert.equal(flow.paysFirst({ order_status_events: [{ status: "recebido" }] }), false);
+});
+
+test("board shows the payment column first and only when it has orders", () => {
+  assert.deepEqual(board.boardColumns([], false), ["recebido", "em_preparo", "pronto"]);
+  assert.deepEqual(board.boardColumns([{ status: "aguardando_pagamento" }], false), ["aguardando_pagamento", "recebido", "em_preparo", "pronto"]);
+  assert.equal(board.columnTitle("aguardando_pagamento"), "Aguardando pagamento");
+  assert.equal(board.modalKind("aguardando_pagamento", "recebido"), "confirm");
+  assert.equal(board.minutesWaiting("2026-11-14T20:00:00.000Z", Date.parse("2026-11-14T20:07:40.000Z")), 7);
+  assert.equal(board.minutesWaiting("2026-11-14T20:00:00.000Z", Date.parse("2026-11-14T19:59:00.000Z")), 0);
+});

@@ -1,6 +1,7 @@
 import { statusLabel, type OrderStatus } from "./order-flow";
 
 const OPEN: OrderStatus[] = [
+  "aguardando_pagamento",
   "aguardando_aceite",
   "recebido",
   "em_preparo",
@@ -10,12 +11,11 @@ const OPEN: OrderStatus[] = [
 const HISTORY: OrderStatus[] = ["entregue", "recusado", "cancelado"];
 
 // Columns that only exist for online orders are hidden while empty.
+const ONLINE_ONLY: OrderStatus[] = ["aguardando_pagamento", "aguardando_aceite", "saiu_para_entrega"];
 export function boardColumns(orders: { status: string }[], history: boolean) {
   if (history) return HISTORY;
   return OPEN.filter(
-    (column) =>
-      (column !== "aguardando_aceite" && column !== "saiu_para_entrega") ||
-      orders.some((o) => o.status === column),
+    (column) => !ONLINE_ONLY.includes(column) || orders.some((o) => o.status === column),
   );
 }
 
@@ -33,4 +33,8 @@ export function modalKind(from: OrderStatus, to: OrderStatus): ModalKind {
   if (from === "aguardando_aceite" && to === "recebido") return "accept";
   if (to === "em_preparo") return "preparing";
   return "confirm";
+}
+
+export function minutesWaiting(createdAt: string, now: number) {
+  return Math.max(0, Math.floor((now - Date.parse(createdAt)) / 60000));
 }

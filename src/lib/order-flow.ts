@@ -1,6 +1,7 @@
-// Order lifecycle per fulfillment. Mirrors advance_order in migration 011.
+// Order lifecycle per fulfillment. Mirrors advance_order in migration 014.
 export type Fulfillment = "mesa" | "retirada" | "entrega";
 export type OrderStatus =
+  | "aguardando_pagamento"
   | "aguardando_aceite"
   | "recebido"
   | "em_preparo"
@@ -18,6 +19,7 @@ export const paymentNames: Record<PaymentMethod, string> = {
 };
 
 const names: Record<OrderStatus, string> = {
+  aguardando_pagamento: "Aguardando pagamento",
   aguardando_aceite: "Aguardando o restaurante aceitar",
   recebido: "Recebido",
   em_preparo: "Em preparo",
@@ -35,13 +37,15 @@ export function statusLabel(status: OrderStatus, fulfillment: Fulfillment) {
   return names[status];
 }
 
-export function customerSteps(fulfillment: Fulfillment): OrderStatus[] {
+// paysFirst: the order was created waiting for an advance Pix payment.
+export function customerSteps(fulfillment: Fulfillment, paysFirst = false): OrderStatus[] {
   if (fulfillment === "mesa")
     return ["recebido", "em_preparo", "pronto", "entregue"];
+  const first: OrderStatus = paysFirst ? "aguardando_pagamento" : "aguardando_aceite";
   if (fulfillment === "retirada")
-    return ["aguardando_aceite", "recebido", "em_preparo", "pronto", "entregue"];
+    return [first, "recebido", "em_preparo", "pronto", "entregue"];
   return [
-    "aguardando_aceite",
+    first,
     "recebido",
     "em_preparo",
     "pronto",
@@ -50,10 +54,20 @@ export function customerSteps(fulfillment: Fulfillment): OrderStatus[] {
   ];
 }
 
+export function paysFirst(order: { order_status_events: { status: string }[] }) {
+  return order.order_status_events.some((e) => e.status === "aguardando_pagamento");
+}
+
+export function paymentLabel(method: PaymentMethod, pixOnline: boolean) {
+  return method === "pix" && pixOnline ? "Pix agora, pelo cardápio" : paymentNames[method];
+}
+
 export function nextAction(
   status: OrderStatus,
   fulfillment: Fulfillment,
 ): { status: OrderStatus; label: string } | null {
+  if (status === "aguardando_pagamento")
+    return { status: "recebido", label: "Pix recebido" };
   if (status === "aguardando_aceite")
     return { status: "recebido", label: "Aceitar pedido" };
   if (status === "recebido")
@@ -72,7 +86,7 @@ export function nextAction(
 }
 
 export function canCancel(status: OrderStatus) {
-  return ["recebido", "em_preparo", "saiu_para_entrega"].includes(status);
+  return ["aguardando_pagamento", "recebido", "em_preparo", "saiu_para_entrega"].includes(status);
 }
 
 export function fulfillmentLabel(order: {
