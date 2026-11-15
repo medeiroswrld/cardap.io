@@ -45,7 +45,11 @@ export function BagOffers({ offers }: { offers: ReturnType<typeof useBagOffers> 
               Transformar {offer.productName} em combo por +{money(offer.option.price_cents)}?
             </span>
           </div>
-          <Button variant="outline" onClick={() => offers.acceptCombo(offer.index, offer.option.id)}>
+          <Button
+            variant="outline"
+            aria-label={`Adicionar ${offer.option.name} ao ${offer.productName}`}
+            onClick={() => offers.acceptCombo(offer.index, offer.option.id)}
+          >
             Adicionar
           </Button>
         </div>

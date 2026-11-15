@@ -9,7 +9,7 @@ export function comboOffers(bag: BagItem[], products: Product[]): ComboOffer[] {
   const offers: ComboOffer[] = [];
   bag.forEach((item, index) => {
     const product = products.find((p) => p.id === item.productId);
-    if (!product) return;
+    if (!product || !product.available || !product.published) return;
     const chosen = new Set((item.addOns || []).map((o) => o.id));
     const option = (product.addOns || [])
       .filter((o) => o.offer_in_bag && !chosen.has(o.id))

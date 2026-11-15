@@ -7,9 +7,11 @@ import type { Workspace } from "@/lib/connected-types";
 type Save = (body: unknown) => Promise<void>;
 
 export function BagSuggestionsSettings({ data, save, busy }: { data: Workspace; save: Save; busy: boolean }) {
-  const [selected, setSelected] = useState<string[]>(data.restaurant.bag_suggestions ?? []);
-  const [error, setError] = useState("");
   const products = data.products.filter((p) => p.published);
+  const [selected, setSelected] = useState<string[]>(() =>
+    (data.restaurant.bag_suggestions ?? []).filter((id) => products.some((p) => p.id === id)),
+  );
+  const [error, setError] = useState("");
   const toggle = (id: string) =>
     setSelected((current) =>
       current.includes(id) ? current.filter((v) => v !== id) : current.length < 3 ? [...current, id] : current,

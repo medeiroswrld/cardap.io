@@ -20,6 +20,11 @@ test("offers the combo once per item that does not have it", () => {
   assert.deepEqual(up.comboOffers([item({ productId: "gone" })], [burger]), []);
 });
 
+test("no combo offer for an unavailable or unpublished item", () => {
+  assert.deepEqual(up.comboOffers([item()], [{ ...burger, available: false }]), []);
+  assert.deepEqual(up.comboOffers([item()], [{ ...burger, published: false }]), []);
+});
+
 test("picks the first offered option by name", () => {
   const early = { id: "a", name: "Batata grande", price_cents: 500, offer_in_bag: true };
   const offers = up.comboOffers([item()], [{ ...burger, addOns: [combo, early] }]);

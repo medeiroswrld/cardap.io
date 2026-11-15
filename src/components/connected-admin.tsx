@@ -380,7 +380,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   <SettingsForm data={data} save={save} busy={busy} />
                   <DeliverySettings data={data} save={save} busy={busy} />
                   <PixSettings data={data} save={save} busy={busy} />
-                  <BagSuggestionsSettings data={data} save={save} busy={busy} />
+                  <BagSuggestionsSettings key={(data.restaurant.bag_suggestions ?? []).join(",")} data={data} save={save} busy={busy} />
                   <CrmSettings data={data} save={save} busy={busy} />
                 </>
               )}
