@@ -40,6 +40,7 @@ import { VideoMetrics } from "./video-metrics";
 import { ProductOptionsAdmin } from "./product-options-admin";
 import { OrderBoard } from "./order-board";
 import { DeliverySettings } from "./delivery-settings";
+import { MenuThemeSettings } from "./menu-theme-settings";
 import { PixSettings } from "./pix-settings";
 import { BagSuggestionsSettings } from "./bag-suggestions-settings";
 import { CustomersPanel } from "./crm/customers-panel";
@@ -381,6 +382,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
               {owner && page === "configuracoes" && (
                 <>
                   <SettingsForm data={data} save={save} busy={busy} />
+                  <MenuThemeSettings data={data} save={save} busy={busy} />
                   <DeliverySettings data={data} save={save} busy={busy} />
                   <PixSettings data={data} save={save} busy={busy} />
                   <BagSuggestionsSettings key={(data.restaurant.bag_suggestions ?? []).join(",")} data={data} save={save} busy={busy} />
@@ -399,6 +401,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   restaurantId={id}
                   restaurantName={data.restaurant.name}
                   timezone={data.restaurant.timezone}
+                  logoUrl={data.restaurant.menu_theme?.logo_url}
                 />
               )}
               {owner && page === "avaliacoes" && (

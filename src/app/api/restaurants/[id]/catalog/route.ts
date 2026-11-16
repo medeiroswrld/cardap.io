@@ -1,4 +1,5 @@
 import { logFailure, withRequestLogging } from "@/lib/observability/logger";
+import { errorCode, errorStatus } from "@/lib/observability/core";
 import { z } from "zod";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { invalidateCatalog } from "@/lib/catalog-cache";
@@ -117,6 +118,10 @@ const schema = z.discriminatedUnion("action", [
     key_type: z.enum(["cpf", "cnpj", "telefone", "email", "aleatoria"]).optional(),
     merchant_name: z.string().trim().max(25),
     merchant_city: z.string().trim().max(15),
+  }),
+  z.object({
+    action: z.literal("menu_theme"),
+    theme: z.record(z.string(), z.string().max(400)).refine((t) => Object.keys(t).length <= 12),
   }),
   crmSettingsBody,
 ]);
@@ -275,6 +280,20 @@ async function handlePOST(
         p_products: body.product_ids,
       });
       if (error) throw error;
+    } else if (body.action === "menu_theme") {
+      const { error } = await supabase.rpc("save_menu_theme", {
+        p_restaurant: id,
+        p_theme: body.theme,
+      });
+      if (error) {
+        const code = errorCode(error);
+        if (errorStatus(code) >= 500) throw error;
+        logFailure(error, "supabase.catalog");
+        return Response.json(
+          { error: code },
+          { status: errorStatus(code), headers: noStore },
+        );
+      }
     } else if (body.action === "crm_settings") {
       const { action: _, ...settings } = body;
       void _;

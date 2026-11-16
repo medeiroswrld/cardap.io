@@ -10,10 +10,12 @@ export function ResultsReportPanel({
   restaurantId,
   restaurantName,
   timezone,
+  logoUrl,
 }: {
   restaurantId: string;
   restaurantName: string;
   timezone: string;
+  logoUrl?: string;
 }) {
   const [options] = useState(() => monthOptions(new Date(), timezone));
   const [month, setMonth] = useState(options[0].value);
@@ -68,6 +70,7 @@ export function ResultsReportPanel({
       {report && !loading && (
         <div className="results-print">
           <header className="results-header">
+            {logoUrl && <img className="brand-logo" src={logoUrl} alt="" />}
             <strong>{restaurantName}</strong>
             <span>Relatório de resultados · {label}</span>
             <small>Fome Play · Amply</small>
