@@ -1208,7 +1208,7 @@ function SettingsForm({
           type="number"
           min="0"
           max="60"
-          step="0.5"
+          step="0.01"
           defaultValue={Number(r.ifood_fee_percent ?? 27)}
         />
       </label>

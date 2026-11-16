@@ -34,7 +34,7 @@ begin
    select customer_phone as phone,min(created_at) as first_in_month from cur where customer_phone<>'' group by customer_phone
  ), history as (
    select p.phone,p.first_in_month,
-     (select max(d.created_at) from delivered d where d.customer_phone=p.phone and d.created_at<m_start) as last_before
+     (select max(o.created_at) from orders o where o.restaurant_id=p_restaurant and o.customer_phone=p.phone and o.status='entregue' and o.created_at<m_start) as last_before
    from phones p
  ), items as (
    select i.product_id,i.product_name,i.quantity,i.unit_price_cents,o.created_at
@@ -73,12 +73,12 @@ begin
      'returning',count(*) filter (where last_before is not null),
      'reactivated',count(*) filter (where last_before is not null and first_in_month-last_before>=interval '30 days')) from history),
   'top_quantity',coalesce((select jsonb_agg(jsonb_build_object('product_id',product_id,'name',name,'quantity',quantity,'revenue_cents',revenue_cents)
-     order by quantity desc,revenue_cents desc,name) from (select * from dishes order by quantity desc,revenue_cents desc,name limit 5) t),'[]'::jsonb),
+     order by quantity desc,revenue_cents desc,name,product_id) from (select * from dishes order by quantity desc,revenue_cents desc,name,product_id limit 5) t),'[]'::jsonb),
   'top_revenue',coalesce((select jsonb_agg(jsonb_build_object('product_id',product_id,'name',name,'quantity',quantity,'revenue_cents',revenue_cents)
-     order by revenue_cents desc,quantity desc,name) from (select * from dishes order by revenue_cents desc,quantity desc,name limit 5) t),'[]'::jsonb),
+     order by revenue_cents desc,quantity desc,name,product_id) from (select * from dishes order by revenue_cents desc,quantity desc,name,product_id limit 5) t),'[]'::jsonb),
   'top_videos',coalesce((select jsonb_agg(jsonb_build_object('product_id',t.product_id,'name',coalesce(p.name,'Produto removido'),
-     'adds',t.adds,'qualified_views',t.qualified_views) order by t.adds desc,t.qualified_views desc,p.name)
-     from (select * from videos order by adds desc,qualified_views desc limit 5) t
+     'adds',t.adds,'qualified_views',t.qualified_views) order by t.adds desc,t.qualified_views desc,p.name,t.product_id)
+     from (select * from videos order by adds desc,qualified_views desc,product_id limit 5) t
      left join products p on p.id=t.product_id and p.restaurant_id=p_restaurant),'[]'::jsonb)
  ) into result;
  return result;

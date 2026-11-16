@@ -172,5 +172,10 @@ await ok("an empty month returns zeros and empty lists", async () => {
   assert.deepEqual(r.top_videos, []);
 });
 
+await ok("owner of another restaurant cannot change the iFood fee", async () => {
+  await login(ownerB);
+  await rejects(() => db.query("select set_ifood_fee($1,5)", [a]), "FORBIDDEN");
+});
+
 await db.close();
 console.log(`${count} results report database checks passed.`);

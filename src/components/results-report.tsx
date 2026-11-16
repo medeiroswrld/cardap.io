@@ -84,7 +84,9 @@ export function ResultsReportPanel({
                 Entrega {report.orders.by_fulfillment.entrega.count}
               </p>
               <p className="field-help">
-                Faturamento vs. mês anterior: {variation(report.orders.revenue_cents, report.previous.revenue_cents)}
+                {month === options[0].value
+                  ? "Mês em andamento: a comparação com o mês anterior aparece quando o mês fechar."
+                  : `Faturamento vs. mês anterior: ${variation(report.orders.revenue_cents, report.previous.revenue_cents)}`}
               </p>
             </article>
             <article className="admin-panel results-card results-highlight">
