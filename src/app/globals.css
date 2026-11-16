@@ -1736,7 +1736,7 @@ button:hover:not(:disabled) {
   margin-left: auto;
   font-size: 9px;
   background: var(--brand);
-  color: white;
+  color: var(--brand-contrast);
   min-width: 21px;
   height: 20px;
   border-radius: 5px;
@@ -2960,7 +2960,7 @@ tr:last-child > td {
     border-radius: 11px;
     box-shadow: 0 5px 22px #54191923;
     background: var(--brand);
-    color: white;
+    color: var(--brand-contrast);
     padding: 15px 20px;
     font-size: 12px;
   }
@@ -2971,7 +2971,7 @@ tr:last-child > td {
     gap: 10px;
   }
   .bag-count {
-    background: #ffffff25;
+    background: color-mix(in srgb, var(--brand-contrast) 15%, transparent);
     width: 23px;
     height: 23px;
     border-radius: 5px;
@@ -2986,7 +2986,7 @@ tr:last-child > td {
     border: 3px solid var(--background);
     border-radius: 50%;
     background: var(--brand);
-    color: white;
+    color: var(--brand-contrast);
     font-size: 9px;
     width: 22px;
     height: 22px;
@@ -4753,6 +4753,7 @@ tr:last-child > td {
   display: grid;
   place-items: center;
   background: var(--brand);
+  color: var(--brand-contrast);
   border: 1px solid #fff8;
   min-width: 19px;
   height: 19px;
@@ -5327,6 +5328,7 @@ h2,
 h3,
 .brand-name {
   font-family: var(--font-heading);
+  font-synthesis: none;
 }
 .brand-logo {
   width: 40px;

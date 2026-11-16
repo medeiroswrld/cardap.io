@@ -54,3 +54,21 @@ test("theme variables cover colors, contrast, fonts and corners", () => {
   assert.equal(t.themeVariables({ radius: "reto" })["--radius"], "4px");
   assert.equal(t.themeVariables({ radius: "redondo" })["--radius"], "24px");
 });
+
+test("unknown or malformed values fall back to the brasa defaults", () => {
+  let v;
+  assert.doesNotThrow(() => {
+    v = t.themeVariables({ heading_font: "comic", brand: "red", radius: "x", body_font: "zzz", mode: "neon" });
+  });
+  const d = t.themeVariables(t.PRESETS.brasa);
+  assert.equal(v["--brand"], d["--brand"]);
+  assert.equal(v["--font-heading"], d["--font-heading"]);
+  assert.equal(v["--font-sans"], d["--font-sans"]);
+  assert.equal(v["--radius"], d["--radius"]);
+  assert.equal(t.resolveTheme({ mode: "neon", background: "#FFF" }).mode, "light");
+});
+
+test("modeFor derives light or dark from the background", () => {
+  assert.equal(t.modeFor("#14110f"), "dark");
+  assert.equal(t.modeFor("#fff8f2"), "light");
+});

@@ -44,13 +44,25 @@ export const BODY_FONTS: Record<BodyFont, { label: string; family: string }> = {
 };
 const RADIUS: Record<Radius, string> = { reto: "4px", suave: "14px", redondo: "24px" };
 
+const HEX = /^#[0-9a-f]{6}$/;
+const COLOR_KEYS = ["brand", "background", "surface", "text"] as const;
+
 export function resolveTheme(theme?: MenuTheme | null): ResolvedTheme {
   const { label: _label, ...base } = PRESETS.brasa;
   void _label;
-  const clean = Object.fromEntries(
-    Object.entries(theme ?? {}).filter(([key, value]) => key !== "preset" && value !== undefined && value !== ""),
-  );
-  return { ...base, ...clean } as ResolvedTheme;
+  const raw = (theme ?? {}) as Record<string, unknown>;
+  const out: ResolvedTheme = { ...base };
+  for (const key of COLOR_KEYS) {
+    const value = raw[key];
+    if (typeof value === "string" && HEX.test(value)) out[key] = value;
+  }
+  if (raw.mode === "light" || raw.mode === "dark") out.mode = raw.mode;
+  if (typeof raw.heading_font === "string" && Object.hasOwn(HEADING_FONTS, raw.heading_font)) out.heading_font = raw.heading_font as HeadingFont;
+  if (typeof raw.body_font === "string" && Object.hasOwn(BODY_FONTS, raw.body_font)) out.body_font = raw.body_font as BodyFont;
+  if (typeof raw.radius === "string" && Object.hasOwn(RADIUS, raw.radius)) out.radius = raw.radius as Radius;
+  if (typeof raw.logo_url === "string" && raw.logo_url) out.logo_url = raw.logo_url;
+  if (typeof raw.cover_url === "string" && raw.cover_url) out.cover_url = raw.cover_url;
+  return out;
 }
 
 function channels(hex: string) {
@@ -66,6 +78,9 @@ function luminance(hex: string) {
 export function contrastRatio(a: string, b: string) {
   const [x, y] = [luminance(a), luminance(b)];
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+export function modeFor(background: string): "light" | "dark" {
+  return HEX.test(background) && luminance(background) < 0.5 ? "dark" : "light";
 }
 export function isReadable(theme?: MenuTheme | null) {
   const r = resolveTheme(theme);

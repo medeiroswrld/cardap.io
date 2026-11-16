@@ -60,6 +60,8 @@ const categoryIcons: Record<string, typeof Hamburger> = {
 export function MenuApp() {
   const { state, ready, add, notify, mode, slug, online } = useDemo();
   useMenuTheme(state.settings.theme);
+  const rawCover = state.settings.theme?.cover_url;
+  const safeCover = rawCover && /^https:\/\/[^"'()\\\s]+$/.test(rawCover) ? rawCover : undefined;
   const [category, setCategory] = useState("todos");
   const [query, setQuery] = useState("");
   // Each restaurant picks how its menu opens; the demo keeps the reels.
@@ -217,12 +219,8 @@ export function MenuApp() {
         )}
         {view === "list" && (
           <div
-            className={`menu-intro${state.settings.theme?.cover_url ? " has-cover" : ""}`}
-            style={
-              state.settings.theme?.cover_url
-                ? { backgroundImage: `url("${state.settings.theme.cover_url}")` }
-                : undefined
-            }
+            className={`menu-intro${safeCover ? " has-cover" : ""}`}
+            style={safeCover ? { backgroundImage: `url("${safeCover}")` } : undefined}
           >
             <div>
               <div className="open-label">

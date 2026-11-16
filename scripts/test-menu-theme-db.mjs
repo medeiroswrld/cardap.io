@@ -48,6 +48,16 @@ await ok("contrast ratio follows WCAG", async () => {
   const { rows } = await db.query("select round(contrast_ratio('#000000','#ffffff'),2) as bw, round(contrast_ratio('#ffffff','#ffffff'),2) as ww");
   assert.equal(Number(rows[0].bw), 21);
   assert.equal(Number(rows[0].ww), 1);
+  const ch = await db.query("select round(contrast_ratio('#ff0000','#ffffff'),2) as r, round(contrast_ratio('#0000ff','#ffffff'),2) as b");
+  assert.equal(Number(ch.rows[0].r), 4);
+  assert.equal(Number(ch.rows[0].b), 8.59);
+});
+
+await ok("helper functions are not callable by anon", async () => {
+  await anon();
+  await rejects(() => db.query("select hex_luminance('#ffffff')"), "permission denied");
+  await rejects(() => db.query("select contrast_ratio('#ffffff','#000000')"), "permission denied");
+  await rejects(() => db.query("select valid_menu_theme($1,'{}'::jsonb)", [a]), "permission denied");
 });
 
 await ok("menus start with an empty theme readable by anyone", async () => {
@@ -98,6 +108,14 @@ await ok("unreadable combinations are refused", async () => {
   await login(ownerA);
   await rejects(() => save({ text: "#eeeeee" }), "LOW_CONTRAST");
   await rejects(() => save({ mode: "dark", background: "#111111", surface: "#1c1c1c", text: "#333333" }), "LOW_CONTRAST");
+});
+
+await ok("direct table updates cannot bypass theme validation", async () => {
+  await login(ownerA);
+  await rejects(() => db.query("update restaurants set menu_theme='{\"heading_font\":\"comic\"}' where id=$1", [a]), "restaurants_menu_theme_check");
+  await rejects(() => db.query("update restaurants set menu_theme=$2 where id=$1", [a, JSON.stringify({ logo_url: "https://evil.example.com/x.webp" })]), "restaurants_menu_theme_check");
+  await rejects(() => db.query("update restaurants set menu_theme=$2 where id=$1", [a, JSON.stringify({ text: "#eeeeee" })]), "restaurants_menu_theme_check");
+  await db.query("update restaurants set menu_theme=$2 where id=$1", [a, JSON.stringify({ brand: "#123456" })]);
 });
 
 await ok("an empty object resets to the default look", async () => {

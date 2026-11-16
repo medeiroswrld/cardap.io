@@ -9,6 +9,7 @@ import {
   HEADING_FONTS,
   PRESETS,
   isReadable,
+  modeFor,
   resolveTheme,
   themeVariables,
   type MenuTheme,
@@ -30,7 +31,11 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
   const resolved = resolveTheme(theme);
   const readable = isReadable(theme);
   const set = (patch: MenuTheme) => setTheme((t) => ({ ...t, ...patch }));
-  const setColor = (patch: MenuTheme) => setTheme((t) => ({ ...t, ...patch, preset: "personalizado" }));
+  const setCustom = (patch: MenuTheme) =>
+    setTheme((t) => {
+      const next = { ...t, ...patch, preset: "personalizado" as const };
+      return { ...next, mode: modeFor(resolveTheme(next).background) };
+    });
 
   async function upload(field: "logo_url" | "cover_url", file: File | undefined) {
     if (!file) return;
@@ -52,13 +57,16 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
     }
   }
 
-  async function submit(next: MenuTheme) {
+  async function submit(next: MenuTheme): Promise<boolean> {
     try {
       setError("");
-      const clean = Object.fromEntries(Object.entries(next).filter(([, v]) => typeof v === "string" && v !== ""));
+      const withMode = Object.keys(next).length ? { ...next, mode: modeFor(resolveTheme(next).background) } : next;
+      const clean = Object.fromEntries(Object.entries(withMode).filter(([, v]) => typeof v === "string" && v !== ""));
       await save({ action: "menu_theme", theme: clean });
+      return true;
     } catch (err) {
       setError((err as Error).message);
+      return false;
     }
   }
 
@@ -113,21 +121,11 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
         {theme.cover_url && <Button type="button" variant="ghost" onClick={() => without(["cover_url"])}>Remover capa</Button>}
       </div>
 
-      <fieldset className="choice-group">
-        <legend>Tema</legend>
-        <label className="checkbox-label">
-          <input type="radio" name="mode" checked={resolved.mode === "light"} onChange={() => setColor({ mode: "light" })} /> Claro
-        </label>
-        <label className="checkbox-label">
-          <input type="radio" name="mode" checked={resolved.mode === "dark"} onChange={() => setColor({ mode: "dark" })} /> Escuro
-        </label>
-      </fieldset>
-
       <div className="form-columns">
         {COLOR_FIELDS.map(([field, label]) => (
           <label key={field} className="form-label">
             {label}
-            <input type="color" value={resolved[field]} onChange={(e) => setColor({ [field]: e.target.value.toLowerCase() })} />
+            <input type="color" value={resolved[field]} onChange={(e) => setCustom({ [field]: e.target.value.toLowerCase() })} />
           </label>
         ))}
       </div>
@@ -135,7 +133,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
       <div className="form-columns">
         <label className="form-label">
           Fonte dos títulos
-          <select value={resolved.heading_font} onChange={(e) => set({ heading_font: e.target.value as MenuTheme["heading_font"] })}>
+          <select value={resolved.heading_font} onChange={(e) => setCustom({ heading_font: e.target.value as MenuTheme["heading_font"] })}>
             {Object.entries(HEADING_FONTS).map(([id, f]) => (
               <option key={id} value={id} style={{ fontFamily: f.family }}>
                 {f.label}
@@ -145,7 +143,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
         </label>
         <label className="form-label">
           Fonte do texto
-          <select value={resolved.body_font} onChange={(e) => set({ body_font: e.target.value as MenuTheme["body_font"] })}>
+          <select value={resolved.body_font} onChange={(e) => setCustom({ body_font: e.target.value as MenuTheme["body_font"] })}>
             {Object.entries(BODY_FONTS).map(([id, f]) => (
               <option key={id} value={id} style={{ fontFamily: f.family }}>
                 {f.label}
@@ -155,7 +153,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
         </label>
         <label className="form-label">
           Cantos
-          <select value={resolved.radius} onChange={(e) => set({ radius: e.target.value as MenuTheme["radius"] })}>
+          <select value={resolved.radius} onChange={(e) => setCustom({ radius: e.target.value as MenuTheme["radius"] })}>
             <option value="reto">Retos</option>
             <option value="suave">Suaves</option>
             <option value="redondo">Bem arredondados</option>
@@ -191,9 +189,9 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
           type="button"
           variant="outline"
           disabled={busy || !!uploading}
-          onClick={() => {
-            setTheme({});
-            void submit({});
+          onClick={async () => {
+            if (!window.confirm("Voltar ao visual padrão? Logo, capa, cores e fontes personalizadas serão removidos.")) return;
+            if (await submit({})) setTheme({});
           }}
         >
           Voltar ao padrão
