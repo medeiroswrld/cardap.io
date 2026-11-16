@@ -39,6 +39,7 @@ export const errorCodes = [
   "STATE_CONFLICT",
   "UNEXPECTED_ERROR",
   "INVALID_INPUT",
+  "LOW_CONTRAST",
   "UNAUTHORIZED",
   "GUEST_SESSION_EXPIRED",
   "FORBIDDEN",
@@ -211,6 +212,7 @@ export function errorStatus(code: ErrorCode) {
   if (
     [
       "INVALID_INPUT",
+      "LOW_CONTRAST",
       "INVALID_ASSET",
       "EMAIL_REQUIRED",
       "PASSWORD_REQUIRED",

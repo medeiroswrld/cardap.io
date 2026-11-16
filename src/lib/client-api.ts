@@ -9,6 +9,7 @@ export class ApiRequestError extends Error {
   }
 }
 export const apiErrorMessages: Record<string, string> = {
+  LOW_CONTRAST: "Essas cores deixam o texto difícil de ler. Escolha cores com mais contraste.",
   PRICE_CHANGED:
     "Um preço mudou. Remova o item da sacola e adicione novamente para conferir o valor atual.",
   OPTIONS_CHANGED:
