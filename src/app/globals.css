@@ -222,11 +222,11 @@ svg {
   flex-shrink: 0;
 }
 ::selection {
-  background: #f1d3cc;
+  background: color-mix(in srgb, var(--brand) 24%, transparent);
   color: var(--text);
 }
 :focus-visible {
-  outline: 3px solid #a6323280;
+  outline: 3px solid color-mix(in srgb, var(--brand) 50%, transparent);
   outline-offset: 3px;
 }
 input,
@@ -239,7 +239,7 @@ textarea::placeholder {
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d6c6bb transparent;
+  scrollbar-color: var(--border) transparent;
 }
 button {
   transition:
@@ -262,7 +262,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 9px;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   width: 100%;
   outline: none;
 }
@@ -270,7 +270,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px #a6323212;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 7%, transparent);
 }
 input[type="checkbox"] {
   width: 17px;
@@ -315,14 +315,14 @@ button:hover:not(:disabled) {
 }
 .button-primary {
   background: var(--brand);
-  color: white;
+  color: var(--brand-contrast);
 }
 .button-primary:hover {
   background: var(--brand-dark);
 }
 .button-outline {
   border-color: var(--border);
-  background: white;
+  background: var(--surface);
 }
 .button-outline:hover {
   background: var(--soft);
@@ -396,7 +396,7 @@ button:hover:not(:disabled) {
   height: 46px;
   border-radius: 13px;
   background: var(--brand);
-  color: #fff;
+  color: var(--brand-contrast);
   display: grid;
   place-items: center;
 }
@@ -503,7 +503,7 @@ button:hover:not(:disabled) {
 }
 .intro-dot {
   margin: 0 4px;
-  color: #bcafa6;
+  color: var(--muted);
 }
 .menu-intro h1 {
   font-size: 30px;
@@ -556,7 +556,7 @@ button:hover:not(:disabled) {
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: #77665c;
+  color: var(--muted);
   width: 100%;
 }
 .category-button > svg:last-child {
@@ -565,7 +565,7 @@ button:hover:not(:disabled) {
   opacity: 0;
 }
 .category-button.active {
-  color: white;
+  color: var(--brand-contrast);
   background: var(--brand);
 }
 .category-button.active > svg:last-child {
@@ -579,7 +579,7 @@ button:hover:not(:disabled) {
   padding: 23px 18px 22px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #fbf0e5;
+  background: var(--soft);
 }
 .house-note > svg {
   color: var(--brand);
@@ -634,7 +634,7 @@ button:hover:not(:disabled) {
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   padding: 0 13px;
   flex: 1;
   min-width: 0;
@@ -652,7 +652,7 @@ button:hover:not(:disabled) {
 }
 .search-field:focus-within {
   border-color: var(--brand);
-  outline: 2px solid #a6323212;
+  outline: 2px solid color-mix(in srgb, var(--brand) 7%, transparent);
 }
 .search-field button {
   display: grid;
@@ -667,7 +667,7 @@ button:hover:not(:disabled) {
   gap: 3px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: white;
+  background: var(--surface);
 }
 .view-switch button {
   display: grid;
@@ -679,7 +679,7 @@ button:hover:not(:disabled) {
   color: var(--muted);
 }
 .view-switch button.active {
-  background: #f4e4dd;
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
   color: var(--brand);
 }
 .feed-meta {
@@ -692,7 +692,7 @@ button:hover:not(:disabled) {
 }
 .feed-meta > span:first-child {
   font-weight: 650;
-  color: #605149;
+  color: var(--muted);
 }
 .feed-meta > span:last-child {
   white-space: nowrap;
@@ -829,7 +829,7 @@ button:hover:not(:disabled) {
   z-index: 1;
 }
 .food-bottom {
-  background: #fff;
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -885,7 +885,7 @@ button:hover:not(:disabled) {
 }
 .bag-panel {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -894,7 +894,7 @@ button:hover:not(:disabled) {
   align-items: center;
   justify-content: space-between;
   padding: 21px 20px;
-  border-bottom: 1px solid #f0e8e0;
+  border-bottom: 1px solid var(--border);
 }
 .bag-heading h2 {
   font-size: 14px;
@@ -920,21 +920,21 @@ button:hover:not(:disabled) {
   width: 78px;
   height: 78px;
   border-radius: 50%;
-  background: #faf3ec;
+  background: var(--soft);
   position: relative;
   margin: 0 auto 18px;
-  color: #b69881;
+  color: var(--muted);
 }
 .empty-bag-icon > span {
   position: absolute;
   bottom: 12px;
   right: 11px;
-  border: 3px solid white;
+  border: 3px solid var(--surface);
   border-radius: 50%;
   height: 23px;
   width: 23px;
   background: var(--brand);
-  color: white;
+  color: var(--brand-contrast);
   display: grid;
   place-items: center;
   font-size: 14px;
@@ -960,7 +960,7 @@ button:hover:not(:disabled) {
 }
 .bag-summary {
   padding: 17px 20px 18px;
-  border-top: 1px solid #f0e8e0;
+  border-top: 1px solid var(--border);
 }
 .bag-summary > div {
   display: flex;
@@ -999,8 +999,8 @@ button:hover:not(:disabled) {
   margin-top: 11px;
 }
 .bag-summary .button:disabled {
-  background: #eaded4;
-  color: #866e5e;
+  background: var(--soft);
+  color: var(--muted);
   opacity: 1;
   border: 0;
 }
@@ -1028,7 +1028,7 @@ button:hover:not(:disabled) {
 .table-service strong {
   display: block;
   font-size: 10px;
-  color: #65574c;
+  color: var(--muted);
 }
 .table-service p {
   font-size: 9px;
@@ -1124,7 +1124,7 @@ button:hover:not(:disabled) {
   align-items: stretch;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
 }
 .product-list .food-visual {
   width: 130px;
@@ -1180,8 +1180,8 @@ button:hover:not(:disabled) {
   align-items: center;
   gap: 10px;
   padding: 14px 18px;
-  background: #f7eee3;
-  color: #725b42;
+  background: var(--soft);
+  color: var(--muted);
   font-size: 11px;
   line-height: 1.65;
   border-radius: 9px;
@@ -1203,7 +1203,7 @@ button:hover:not(:disabled) {
   gap: 14px;
 }
 .empty-state > svg {
-  color: #ae9180;
+  color: var(--muted);
 }
 .empty-state h1 {
   font-size: 28px;
@@ -1372,7 +1372,7 @@ button:hover:not(:disabled) {
   margin: 10px 0 18px;
 }
 .checkout-summary {
-  background: #fff;
+  background: var(--surface);
   border-radius: 9px;
   padding: 18px;
   border: 1px solid var(--border);
@@ -1402,7 +1402,7 @@ button:hover:not(:disabled) {
   bottom: 28px;
   transform: translateX(-50%);
   background: var(--text);
-  color: #fff;
+  color: var(--background);
   max-width: calc(100vw - 32px);
   padding: 14px 23px;
   border-radius: 10px;
@@ -1459,7 +1459,7 @@ button:hover:not(:disabled) {
   position: absolute;
   top: 14px;
   left: 14px;
-  background: white;
+  background: var(--surface);
   color: var(--brand);
   font-size: 10px;
   padding: 6px 9px;
@@ -1515,11 +1515,11 @@ button:hover:not(:disabled) {
 }
 .tracking-subtitle span {
   margin: 0 10px;
-  color: #baa799;
+  color: var(--muted);
 }
 .tracking-card {
   border: 1px solid var(--border);
-  background: white;
+  background: var(--surface);
   border-radius: 14px;
   padding: 27px;
   margin-top: 22px;
@@ -1618,7 +1618,7 @@ button:hover:not(:disabled) {
   text-align: left;
   align-items: center;
   justify-content: space-between;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--border);
   padding: 20px;
   border-radius: 12px;
@@ -4376,7 +4376,7 @@ tr:last-child > td {
   padding: 26px;
   border: 1px solid var(--border);
   border-radius: 18px;
-  background: white;
+  background: var(--surface);
   margin-top: 26px;
 }
 .connected-order h2 {
@@ -4398,7 +4398,7 @@ tr:last-child > td {
   font-size: 12px;
   color: var(--muted);
   padding: 9px;
-  background: #f5f1ed;
+  background: var(--soft);
   border-radius: 8px;
 }
 .connected-steps li.complete {
@@ -5115,7 +5115,7 @@ body:has(.immersive-shell) .toast {
   text-align: center;
   padding: 16px;
   border-radius: 16px;
-  background: var(--surface-2, #f6f1ea);
+  background: var(--soft);
 }
 .pix-payment textarea {
   width: 100%;
@@ -5136,7 +5136,7 @@ body:has(.immersive-shell) .toast {
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
-  background: var(--surface-2, #f6f1ea);
+  background: var(--soft);
 }
 .bag-offer > div {
   display: grid;
