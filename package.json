@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "test:crm": "node --test scripts/test-crm-unit.mjs",
-    "test:online": "node --test scripts/test-online.mjs scripts/test-order-ticket.mjs scripts/test-pix.mjs scripts/test-bag-upsell.mjs scripts/test-opening-hours.mjs scripts/test-results-report.mjs",
+    "test:online": "node --test scripts/test-online.mjs scripts/test-order-ticket.mjs scripts/test-pix.mjs scripts/test-bag-upsell.mjs scripts/test-opening-hours.mjs scripts/test-results-report.mjs scripts/test-menu-theme.mjs",
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs && node scripts/test-crm.mjs && node scripts/test-upsell-db.mjs && node scripts/test-menu-view-db.mjs && node scripts/test-results-db.mjs && node scripts/test-menu-theme-db.mjs",
