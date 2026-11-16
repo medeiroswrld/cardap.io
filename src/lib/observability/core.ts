@@ -117,6 +117,7 @@ const routes = new Set([
     "crm",
     "crm/[contactId]",
     "crm/campaign",
+    "results",
   ].map((part) => `/api/restaurants/[id]/${part}`),
 ]);
 export function safeAction(method: string, route: string) {
