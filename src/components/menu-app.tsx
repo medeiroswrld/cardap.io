@@ -18,6 +18,7 @@ import {
   List,
   MapPin,
   Minus,
+  Play,
   Plus,
   Search,
   ShoppingBag,
@@ -59,7 +60,11 @@ export function MenuApp() {
   const { state, ready, add, notify, mode, slug, online } = useDemo();
   const [category, setCategory] = useState("todos");
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"feed" | "list">("feed");
+  // Each restaurant picks how its menu opens; the demo keeps the reels.
+  const [view, setView] = useState<"feed" | "list">(() =>
+    state.settings.startView === "lista" ? "list" : "feed",
+  );
+  const [reelsStart, setReelsStart] = useState<string | undefined>();
   const [selected, setSelected] = useState<Product | null>(null);
   const [feedbackProduct, setFeedbackProduct] = useState<Product | null>(null);
   const [bagOpen, setBagOpen] = useState(false);
@@ -111,6 +116,17 @@ export function MenuApp() {
   );
   const count = state.bag.reduce((sum, i) => sum + i.quantity, 0);
   const total = state.bag.reduce((sum, i) => sum + i.quantity * i.price, 0);
+  const closedMessage =
+    state.settings.closedMessage ?? "Estamos com os pedidos pausados.";
+  const videoItems = state.products.filter(
+    (p) => p.published && p.video && categories.some((c) => c.id === p.categoryId),
+  );
+  const openReels = (productId: string) => {
+    setCategory("todos");
+    setQuery("");
+    setReelsStart(productId);
+    setView("feed");
+  };
   const choose = (id: string) => {
     setCategory(id);
     requestAnimationFrame(() =>
@@ -231,11 +247,38 @@ export function MenuApp() {
           </div>
         )}
         {!state.settings.accepting && (
-          <div className="notice">
+          <div className="notice closed-notice" role="status">
             <Clock3 size={18} />
-            Estamos com os pedidos pausados. Você pode continuar explorando o
-            cardápio.
+            <div>
+              <strong>{closedMessage}</strong>
+              {state.settings.weeklyHours && (
+                <span>Horário: {state.settings.weeklyHours}</span>
+              )}
+              <span>Você pode continuar explorando o cardápio.</span>
+            </div>
           </div>
+        )}
+        {view === "list" && videoItems.length > 0 && (
+          <section className="video-strip" aria-label="Pratos em vídeo">
+            <h2>Veja em vídeo</h2>
+            <div className="video-strip-row">
+              {videoItems.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="video-strip-card"
+                  onClick={() => openReels(p.id)}
+                  aria-label={`Ver vídeo de ${p.name}`}
+                >
+                  <img src={p.image} alt="" />
+                  <span className="video-strip-play">
+                    <Play size={18} fill="currentColor" />
+                  </span>
+                  <span className="video-strip-name">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
         <div className="menu-workspace">
           <aside className="menu-left">
@@ -440,7 +483,11 @@ export function MenuApp() {
                       >
                         <Plus size={18} />
                         <span>
-                          {p.available ? "Adicionar" : "Indisponível"}
+                          {!p.available
+                            ? "Indisponível"
+                            : !state.settings.accepting
+                              ? "Fechado"
+                              : "Adicionar"}
                         </span>
                       </Button>
                     </div>
@@ -524,6 +571,8 @@ export function MenuApp() {
           count={count}
           table={table}
           accepting={state.settings.accepting}
+          closedMessage={closedMessage}
+          startId={reelsStart}
           blocked={
             !!selected ||
             !!feedbackProduct ||
@@ -927,6 +976,11 @@ function ProductDetail({
             <Plus size={16} />
           </button>
         </div>
+        {!state.settings.accepting && (
+          <p className="detail-closed" role="status">
+            {state.settings.closedMessage ?? "Estamos com os pedidos pausados."}
+          </p>
+        )}
         <Button
           disabled={!product.available || !state.settings.accepting}
           onClick={() => {

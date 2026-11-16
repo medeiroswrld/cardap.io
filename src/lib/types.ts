@@ -79,6 +79,10 @@ export type Settings = {
   hours: string;
   privacyEmail: string;
   bagSuggestions?: string[];
+  // Why ordering is unavailable ("Fechado agora · abre hoje às 18:00"), null when open.
+  closedMessage?: string | null;
+  weeklyHours?: string;
+  startView?: "lista" | "reels";
 };
 export type DemoState = {
   version: 1;

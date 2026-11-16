@@ -29,6 +29,8 @@ export function ImmersiveMenu({
   count,
   table,
   accepting,
+  closedMessage,
+  startId,
   blocked,
   ready,
   onProduct,
@@ -48,6 +50,8 @@ export function ImmersiveMenu({
   count: number;
   table: number;
   accepting: boolean;
+  closedMessage: string;
+  startId?: string;
   blocked: boolean;
   ready: boolean;
   onProduct: (product: Product) => void;
@@ -64,6 +68,16 @@ export function ImmersiveMenu({
   useEffect(() => {
     feed.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [category, query]);
+  // Opened from the list's "Veja em vídeo" strip: start on that dish.
+  useEffect(() => {
+    const element = feed.current;
+    const index = startId ? items.findIndex((p) => p.id === startId) : -1;
+    if (!element || index < 1) return;
+    element.scrollTo({ top: index * element.clientHeight, behavior: "instant" });
+    setActive(index);
+    // Only on arrival: later item changes follow the normal category reset.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startId]);
   function selectCategory(id: string) {
     setActive(0);
     choose(id);
@@ -195,7 +209,7 @@ export function ImmersiveMenu({
                     </span>
                   </button>
                   {!accepting && (
-                    <span className="immersive-paused">Pedidos pausados</span>
+                    <span className="immersive-paused">{closedMessage}</span>
                   )}
                 </div>
                 <div className="immersive-actions">

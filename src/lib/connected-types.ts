@@ -1,5 +1,5 @@
 import type { Category, Product, Settings } from "./types";
-import { isRestaurantOpen } from "./opening-hours";
+import { isRestaurantOpen, openingMessage, weeklyHours } from "./opening-hours";
 import type { Fulfillment, OrderStatus, PaymentMethod } from "./order-flow";
 export type RestaurantRow = {
   id: string;
@@ -26,6 +26,7 @@ export type RestaurantRow = {
   crm_vip_days: number;
   crm_lapsed_days: number;
   bag_suggestions: string[];
+  menu_start_view?: "lista" | "reels";
 };
 export type DeliveryZone = {
   id: string;
@@ -239,6 +240,9 @@ export function catalogState(catalog: Catalog): {
         .join(" • "),
       privacyEmail: catalog.restaurant.privacy_email,
       bagSuggestions: catalog.restaurant.bag_suggestions ?? [],
+      closedMessage: openingMessage(catalog.restaurant),
+      weeklyHours: weeklyHours(catalog.restaurant.opening_hours),
+      startView: catalog.restaurant.menu_start_view ?? "lista",
     },
   };
 }

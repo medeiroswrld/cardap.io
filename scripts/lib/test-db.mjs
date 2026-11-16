@@ -17,6 +17,7 @@ export const MIGRATIONS = [
   "013_auto_accept.sql",
   "014_pix_manual.sql",
   "015_bag_upsell.sql",
+  "016_menu_start_view.sql",
 ];
 
 // Supabase-owned schemas/roles are represented locally; business SQL is unchanged.

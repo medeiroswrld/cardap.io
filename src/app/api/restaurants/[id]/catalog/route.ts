@@ -66,6 +66,7 @@ const schema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("settings"),
+    menu_start_view: z.enum(["lista", "reels"]).optional(),
     name: z.string().trim().min(2).max(80),
     subtitle: z.string().max(100),
     phone: z.string().max(20),
@@ -208,7 +209,7 @@ async function handlePOST(
       });
       if (error) throw error;
     } else if (body.action === "settings") {
-      const { action: _, tables, ...values } = body;
+      const { action: _, tables, menu_start_view, ...values } = body;
       void _;
       const { error } = await supabase.rpc("save_restaurant_settings", {
         p_restaurant: id,
@@ -216,6 +217,13 @@ async function handlePOST(
         p_tables: tables,
       });
       if (error) throw error;
+      if (menu_start_view) {
+        const view = await supabase.rpc("set_menu_start_view", {
+          p_restaurant: id,
+          p_view: menu_start_view,
+        });
+        if (view.error) throw view.error;
+      }
     } else if (body.action === "save_delivery_zone") {
       const { error } = await supabase.rpc("save_delivery_zone", {
         p_restaurant: id,

@@ -996,6 +996,7 @@ function SettingsForm({
             retention_days: Number(form.get("retention_days")),
             tables: Number(form.get("tables")),
             accepting_orders: form.has("accepting_orders"),
+            menu_start_view: form.get("menu_start_view") === "lista" ? "lista" : "reels",
             pickup_enabled: form.has("pickup_enabled"),
             delivery_enabled: form.has("delivery_enabled"),
             auto_accept_orders: form.has("auto_accept_orders"),
@@ -1132,6 +1133,17 @@ function SettingsForm({
           </div>
         );
       })}
+      <label className="form-label">
+        Como o cardápio abre para o cliente
+        <select name="menu_start_view" defaultValue={r.menu_start_view ?? "reels"}>
+          <option value="reels">Vídeos (reels): o cliente rola os pratos em vídeo</option>
+          <option value="lista">Lista tradicional: mais fácil para quem não usa reels</option>
+        </select>
+      </label>
+      <p className="field-help">
+        O cliente sempre pode trocar entre vídeos e lista. Na lista, os pratos com
+        vídeo aparecem numa faixa &quot;Veja em vídeo&quot; no topo.
+      </p>
       <label className="checkbox-label">
         <input
           name="accepting_orders"
