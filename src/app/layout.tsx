@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   ),
-  title: "Cardap.io",
-  description: "Cardápio digital com pedidos feitos direto da mesa.",
+  title: "Fome Play",
+  description: "Cardápio em vídeo com pedidos diretos, sem comissão.",
   robots: { index: false, follow: false },
 };
 export default function RootLayout({

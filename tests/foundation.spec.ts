@@ -29,8 +29,8 @@ test("demo funciona sem violações de CSP", async ({ page }) => {
 
 test("login mostra a marca da plataforma e metadados neutros", async ({ page }) => {
   await page.goto("/login");
-  await expect(page).toHaveTitle("Cardap.io");
-  await expect(page.getByRole("link", { name: "Cardap.io — início" })).toBeVisible();
+  await expect(page).toHaveTitle("Fome Play");
+  await expect(page.getByRole("link", { name: "Fome Play — início" })).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });
 
@@ -45,6 +45,6 @@ test("demo continua com dados e banner próprios", async ({ page }) => {
 
 test("demo não é indexada e tem título próprio", async ({ page }) => {
   await page.goto("/r/demo");
-  await expect(page).toHaveTitle("Demonstração · Cardap.io");
+  await expect(page).toHaveTitle("Demonstração · Fome Play");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });

@@ -6,7 +6,7 @@ import { DemoContext } from "./demo-provider";
 export function Brand({ compact = false }: { compact?: boolean }) {
   // Outside a menu (e.g. login) there is no restaurant: show the platform.
   const context = useContext(DemoContext);
-  const name = context?.state.settings.name ?? "Cardap.io";
+  const name = context?.state.settings.name ?? "Fome Play";
   return (
     <Link
       href={context ? `/r/${context.slug}` : "/"}
@@ -24,7 +24,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
         {!compact && (
           <small>
             {context?.state.settings.subtitle ??
-              "Cardápio digital com pedidos na mesa"}
+              "Cardápio em vídeo com pedidos diretos"}
           </small>
         )}
       </span>

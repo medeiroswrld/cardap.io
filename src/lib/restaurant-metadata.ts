@@ -27,6 +27,6 @@ export function restaurantMetadata(
 }
 
 export const DEMO_METADATA: Metadata = {
-  title: "Demonstração · Cardap.io",
+  title: "Demonstração · Fome Play",
   robots: { index: false, follow: false },
 };

@@ -70,7 +70,7 @@ export function ResultsReportPanel({
           <header className="results-header">
             <strong>{restaurantName}</strong>
             <span>Relatório de resultados · {label}</span>
-            <small>Cardap.io · Amply</small>
+            <small>Fome Play · Amply</small>
           </header>
           <div className="results-grid">
             <article className="admin-panel results-card">
