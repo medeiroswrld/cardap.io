@@ -17,6 +17,7 @@ import {
   LogOut,
   LayoutDashboard,
   MessageCircle,
+  Trophy,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { browserClient } from "@/lib/supabase/browser";
@@ -48,6 +49,7 @@ import { useOrderAlerts } from "./use-order-alerts";
 import { useOrderPrinting } from "./use-order-printing";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
+import { ResultsReportPanel } from "./results-report";
 type Save = (body: unknown) => Promise<void>;
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
@@ -56,6 +58,7 @@ const pages = [
   ["opcionais", "Opcionais", Plus],
   ["categorias", "Categorias", FolderOpen],
   ["metricas", "Métricas", BarChart3],
+  ["resultados", "Resultados", Trophy],
   ["avaliacoes", "Avaliações", MessageCircle],
   ["contatos", "Clientes", Users],
   ["configuracoes", "Configurações", Settings],
@@ -391,6 +394,13 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 </>
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
+              {owner && page === "resultados" && (
+                <ResultsReportPanel
+                  restaurantId={id}
+                  restaurantName={data.restaurant.name}
+                  timezone={data.restaurant.timezone}
+                />
+              )}
               {owner && page === "avaliacoes" && (
                 <FeedbackAdmin
                   feedback={data.feedback || []}

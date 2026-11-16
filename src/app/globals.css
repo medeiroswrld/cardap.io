@@ -5247,3 +5247,73 @@ body:has(.immersive-shell) .toast {
   text-align: left;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
 }
+
+.results-report {
+  display: grid;
+  gap: 16px;
+}
+.results-header {
+  display: none;
+}
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.results-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.results-card ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.results-big {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--brand);
+}
+.results-highlight {
+  border: 2px solid var(--brand);
+}
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .results-print,
+  .results-print * {
+    visibility: visible;
+  }
+  .results-print {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+  .results-header {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #000;
+  }
+  .results-header strong {
+    font-size: 20px;
+  }
+  .results-grid {
+    grid-template-columns: repeat(3, 1fr);
+    break-inside: avoid;
+  }
+  .results-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
