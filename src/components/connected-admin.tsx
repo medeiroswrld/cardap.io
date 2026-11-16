@@ -997,6 +997,7 @@ function SettingsForm({
             tables: Number(form.get("tables")),
             accepting_orders: form.has("accepting_orders"),
             menu_start_view: form.get("menu_start_view") === "lista" ? "lista" : "reels",
+            ifood_fee_percent: Number(String(form.get("ifood_fee_percent") || "27").replace(",", ".")),
             pickup_enabled: form.has("pickup_enabled"),
             delivery_enabled: form.has("delivery_enabled"),
             auto_accept_orders: form.has("auto_accept_orders"),
@@ -1190,6 +1191,21 @@ function SettingsForm({
           defaultValue={r.delivery_min_order_cents / 100}
         />
       </label>
+      <label className="form-label">
+        Taxa que você paga no iFood (%)
+        <input
+          name="ifood_fee_percent"
+          type="number"
+          min="0"
+          max="60"
+          step="0.5"
+          defaultValue={Number(r.ifood_fee_percent ?? 27)}
+        />
+      </label>
+      <p className="field-help">
+        Usada no relatório de resultados para calcular quanto você deixou de pagar ao iFood
+        nos pedidos de retirada e entrega feitos pelo cardápio.
+      </p>
       {error && (
         <p role="alert" className="form-error">
           {error}

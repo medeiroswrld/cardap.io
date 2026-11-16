@@ -27,6 +27,7 @@ export type RestaurantRow = {
   crm_lapsed_days: number;
   bag_suggestions: string[];
   menu_start_view?: "lista" | "reels";
+  ifood_fee_percent?: number | string;
 };
 export type DeliveryZone = {
   id: string;

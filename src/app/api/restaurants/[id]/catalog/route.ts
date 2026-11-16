@@ -67,6 +67,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("settings"),
     menu_start_view: z.enum(["lista", "reels"]).optional(),
+    ifood_fee_percent: z.number().min(0).max(60).optional(),
     name: z.string().trim().min(2).max(80),
     subtitle: z.string().max(100),
     phone: z.string().max(20),
@@ -209,7 +210,7 @@ async function handlePOST(
       });
       if (error) throw error;
     } else if (body.action === "settings") {
-      const { action: _, tables, menu_start_view, ...values } = body;
+      const { action: _, tables, menu_start_view, ifood_fee_percent, ...values } = body;
       void _;
       const { error } = await supabase.rpc("save_restaurant_settings", {
         p_restaurant: id,
@@ -223,6 +224,13 @@ async function handlePOST(
           p_view: menu_start_view,
         });
         if (view.error) throw view.error;
+      }
+      if (ifood_fee_percent !== undefined) {
+        const fee = await supabase.rpc("set_ifood_fee", {
+          p_restaurant: id,
+          p_percent: ifood_fee_percent,
+        });
+        if (fee.error) throw fee.error;
       }
     } else if (body.action === "save_delivery_zone") {
       const { error } = await supabase.rpc("save_delivery_zone", {
