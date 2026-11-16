@@ -1,0 +1,25 @@
+"use client";
+import { useEffect } from "react";
+import { resolveTheme, themeVariables, type MenuTheme } from "@/lib/menu-theme";
+
+// Writes the restaurant's variables on <html> while a customer screen is open,
+// so modals rendered in portals inherit them. Removed on unmount.
+export function useMenuTheme(theme?: MenuTheme | null) {
+  const key = JSON.stringify(theme ?? {});
+  useEffect(() => {
+    const parsed = JSON.parse(key) as MenuTheme;
+    const variables = themeVariables(parsed);
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
+    if (Object.keys(variables).length) {
+      const mode = resolveTheme(parsed).mode;
+      root.dataset.menuMode = mode;
+      root.style.colorScheme = mode;
+    }
+    return () => {
+      for (const name of Object.keys(variables)) root.style.removeProperty(name);
+      root.style.removeProperty("color-scheme");
+      delete root.dataset.menuMode;
+    };
+  }, [key]);
+}

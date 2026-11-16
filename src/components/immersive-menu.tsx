@@ -36,6 +36,7 @@ export function ImmersiveMenu({
   onProduct,
   onBag,
   onInfo,
+  logoUrl,
   onList,
   onFeedback,
 }: {
@@ -57,6 +58,7 @@ export function ImmersiveMenu({
   onProduct: (product: Product) => void;
   onBag: () => void;
   onInfo: () => void;
+  logoUrl?: string;
   onList: () => void;
   onFeedback: (product: Product) => void;
 }) {
@@ -252,6 +254,7 @@ export function ImmersiveMenu({
           )}
         </div>
         <header className="immersive-header">
+          {logoUrl && <img className="immersive-logo" src={logoUrl} alt="" />}
           <div>
             <strong>Cardápio</strong>
             {demo && <span className="immersive-demo">Demonstração</span>}

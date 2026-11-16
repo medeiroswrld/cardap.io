@@ -1,4 +1,5 @@
 import type { AddOn } from "./product-options";
+import type { MenuTheme } from "./menu-theme";
 export type Category = {
   id: string;
   name: string;
@@ -83,6 +84,7 @@ export type Settings = {
   closedMessage?: string | null;
   weeklyHours?: string;
   startView?: "lista" | "reels";
+  theme?: MenuTheme;
 };
 export type DemoState = {
   version: 1;

@@ -82,7 +82,10 @@ export function mix(a: string, b: string, weight: number) {
 }
 
 export function themeVariables(theme?: MenuTheme | null): Record<string, string> {
-  if (!theme || Object.keys(theme).length === 0) return {};
+  // Only style keys restyle the page; a logo/cover-only theme looks like today.
+  const values = (theme ?? {}) as Record<string, unknown>;
+  const STYLE_KEYS = ["mode", "brand", "background", "surface", "text", "heading_font", "body_font", "radius"];
+  if (!STYLE_KEYS.some((key) => values[key] !== undefined && values[key] !== "")) return {};
   const r = resolveTheme(theme);
   return {
     "--brand": r.brand,

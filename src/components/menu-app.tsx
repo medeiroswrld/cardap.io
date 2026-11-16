@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { useDemo, type OnlineChoice } from "./demo-provider";
+import { useMenuTheme } from "./use-menu-theme";
 import { Brand, DemoBanner } from "./brand";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
@@ -58,6 +59,7 @@ const categoryIcons: Record<string, typeof Hamburger> = {
 };
 export function MenuApp() {
   const { state, ready, add, notify, mode, slug, online } = useDemo();
+  useMenuTheme(state.settings.theme);
   const [category, setCategory] = useState("todos");
   const [query, setQuery] = useState("");
   // Each restaurant picks how its menu opens; the demo keeps the reels.
@@ -214,7 +216,14 @@ export function MenuApp() {
           <h1 className="reels-heading">Cardápio de {state.settings.name}</h1>
         )}
         {view === "list" && (
-          <div className="menu-intro">
+          <div
+            className={`menu-intro${state.settings.theme?.cover_url ? " has-cover" : ""}`}
+            style={
+              state.settings.theme?.cover_url
+                ? { backgroundImage: `url("${state.settings.theme.cover_url}")` }
+                : undefined
+            }
+          >
             <div>
               <div className="open-label">
                 <span
@@ -559,6 +568,7 @@ export function MenuApp() {
     >
       {view === "feed" ? (
         <ImmersiveMenu
+          logoUrl={state.settings.theme?.logo_url}
           ready={ready}
           items={items}
           categories={categories}

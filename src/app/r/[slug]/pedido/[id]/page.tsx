@@ -25,6 +25,7 @@ export default async function Page({
       restaurantId={catalog.restaurant.id}
       slug={slug}
       id={id}
+      theme={catalog.restaurant.menu_theme}
     />
   );
 }

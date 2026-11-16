@@ -15,15 +15,20 @@ import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
 import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
 import { PixPayment } from "./pix-payment";
+import { useMenuTheme } from "./use-menu-theme";
+import type { MenuTheme } from "@/lib/menu-theme";
 export function ConnectedTracking({
   restaurantId,
   slug,
   id,
+  theme,
 }: {
   restaurantId: string;
   slug: string;
   id?: string;
+  theme?: MenuTheme;
 }) {
+  useMenuTheme(theme);
   const [orders, setOrders] = useState<RealOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

@@ -12,5 +12,11 @@ export default async function Page({
   if (!isCatalogSlug(slug)) notFound();
   const catalog = await readCatalog(slug);
   if (!catalog) notFound();
-  return <ConnectedTracking restaurantId={catalog.restaurant.id} slug={slug} />;
+  return (
+    <ConnectedTracking
+      restaurantId={catalog.restaurant.id}
+      slug={slug}
+      theme={catalog.restaurant.menu_theme}
+    />
+  );
 }

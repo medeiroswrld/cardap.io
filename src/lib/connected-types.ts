@@ -1,4 +1,5 @@
 import type { Category, Product, Settings } from "./types";
+import type { MenuTheme } from "./menu-theme";
 import { isRestaurantOpen, openingMessage, weeklyHours } from "./opening-hours";
 import type { Fulfillment, OrderStatus, PaymentMethod } from "./order-flow";
 export type RestaurantRow = {
@@ -9,6 +10,7 @@ export type RestaurantRow = {
   timezone: string;
   opening_hours: { day: number; open: string; close: string }[];
   subtitle: string;
+  menu_theme?: MenuTheme;
   phone: string;
   address: string;
   privacy_email: string;
@@ -225,6 +227,7 @@ export function catalogState(catalog: Catalog): {
     })),
     settings: {
       name: catalog.restaurant.name,
+      theme: catalog.restaurant.menu_theme ?? {},
       subtitle: catalog.restaurant.subtitle,
       accepting: isRestaurantOpen(catalog.restaurant),
       tables: Math.max(

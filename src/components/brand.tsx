@@ -7,15 +7,20 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   // Outside a menu (e.g. login) there is no restaurant: show the platform.
   const context = useContext(DemoContext);
   const name = context?.state.settings.name ?? "Fome Play";
+  const logo = context?.state.settings.theme?.logo_url;
   return (
     <Link
       href={context ? `/r/${context.slug}` : "/"}
       className="brand"
       aria-label={`${name} — início`}
     >
-      <span className="brand-icon">
-        <Flame size={27} strokeWidth={1.8} />
-      </span>
+      {logo ? (
+        <img className="brand-logo" src={logo} alt="" />
+      ) : (
+        <span className="brand-icon">
+          <Flame size={27} strokeWidth={1.8} />
+        </span>
+      )}
       <span>
         <span className="brand-name">
           {name.toLocaleLowerCase("pt-BR")}

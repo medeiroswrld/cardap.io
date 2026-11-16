@@ -32,6 +32,10 @@ test("an empty theme changes nothing", () => {
   assert.deepEqual(t.themeVariables(undefined), {});
 });
 
+test("a logo-only theme changes nothing", () => {
+  assert.deepEqual(t.themeVariables({ logo_url: "https://x.supabase.co/a.webp", preset: "brasa" }), {});
+});
+
 test("theme variables cover colors, contrast, fonts and corners", () => {
   const v = t.themeVariables(t.PRESETS.noite);
   assert.equal(v["--brand"], "#e0a43a");
