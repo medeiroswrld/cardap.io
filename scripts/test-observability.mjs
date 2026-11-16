@@ -351,7 +351,7 @@ test("every exported API method uses the wrapper with an allowlisted static rout
       }
     }
   }
-  assert.equal(count, 25);
+  assert.equal(count, 26);
 });
 
 test("rate-limit identity ignores untrusted forwarding and never stores raw identifiers", () => {
