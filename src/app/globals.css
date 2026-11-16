@@ -5365,3 +5365,12 @@ h3,
   object-fit: contain;
   background: rgba(255, 255, 255, 0.9);
 }
+.menu-intro.has-cover .restaurant-info,
+.menu-intro.has-cover .open-label > span,
+.menu-intro.has-cover .intro-dot {
+  color: rgba(255, 255, 255, 0.86);
+}
+.menu-intro.has-cover .restaurant-info {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.25);
+}

@@ -11,15 +11,10 @@ export function useMenuTheme(theme?: MenuTheme | null) {
     const variables = themeVariables(parsed);
     const root = document.documentElement;
     for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
-    if (Object.keys(variables).length) {
-      const mode = resolveTheme(parsed).mode;
-      root.dataset.menuMode = mode;
-      root.style.colorScheme = mode;
-    }
+    if (Object.keys(variables).length) root.style.colorScheme = resolveTheme(parsed).mode;
     return () => {
       for (const name of Object.keys(variables)) root.style.removeProperty(name);
       root.style.removeProperty("color-scheme");
-      delete root.dataset.menuMode;
     };
   }, [key]);
 }
