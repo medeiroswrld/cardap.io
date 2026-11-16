@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
@@ -20,15 +20,19 @@ export function ResultsReportPanel({
   const [report, setReport] = useState<ResultsReport | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const id = ++latest.current;
     setLoading(true);
     setError("");
+    setReport(null);
     try {
-      setReport(await requestJson<ResultsReport>(`/api/restaurants/${restaurantId}/results?month=${month}`));
+      const data = await requestJson<ResultsReport>(`/api/restaurants/${restaurantId}/results?month=${month}`);
+      if (id === latest.current) setReport(data);
     } catch {
-      setError("Não foi possível carregar o relatório. Tente novamente.");
+      if (id === latest.current) setError("Não foi possível carregar o relatório. Tente novamente.");
     } finally {
-      setLoading(false);
+      if (id === latest.current) setLoading(false);
     }
   }, [restaurantId, month]);
   useEffect(() => {
@@ -56,9 +60,9 @@ export function ResultsReportPanel({
       {error && (
         <p role="alert" className="form-error">
           {error}{" "}
-          <button type="button" className="button button-ghost" onClick={() => void load()}>
+          <Button type="button" variant="ghost" onClick={() => void load()}>
             Tentar novamente
-          </button>
+          </Button>
         </p>
       )}
       {report && !loading && (

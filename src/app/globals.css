@@ -5285,14 +5285,16 @@ body:has(.immersive-shell) .toast {
     size: A4 portrait;
     margin: 14mm;
   }
-  body * {
+  body:has(.results-print) * {
     visibility: hidden;
   }
-  .results-print,
-  .results-print * {
+  body:has(.results-print) .results-print,
+  body:has(.results-print) .results-print * {
     visibility: visible;
   }
-  .results-print {
+  body:has(.results-print) .results-print {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
     position: absolute;
     inset: 0 auto auto 0;
     width: 100%;
