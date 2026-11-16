@@ -57,6 +57,33 @@ export function ProductOptionsAdmin({
           <Plus size={17} /> Novo opcional
         </Button>
       </div>
+      {data.options.length > 0 && (
+        <div className="connected-toolbar">
+          <p className="field-help">
+            Na sacola, o cliente vê uma sugestão para adicionar um opcional ao lanche
+            (um por item). Ligue para todos de uma vez ou escolha um por um em cada opcional.
+          </p>
+          <Button
+            variant="outline"
+            disabled={busy || data.options.every((o) => o.offer_in_bag)}
+            onClick={() => void save({ action: "options_in_bag_all", offer: true }).catch((err) => setError((err as Error).message))}
+          >
+            Oferecer todos na sacola
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy || !data.options.some((o) => o.offer_in_bag)}
+            onClick={() => void save({ action: "options_in_bag_all", offer: false }).catch((err) => setError((err as Error).message))}
+          >
+            Tirar todos da sacola
+          </Button>
+          {!edit && error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+        </div>
+      )}
       {!data.options.length && (
         <section className="admin-panel connected-panel">
           <h2>Um toque a mais no pedido.</h2>

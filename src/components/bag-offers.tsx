@@ -42,7 +42,9 @@ export function BagOffers({ offers }: { offers: ReturnType<typeof useBagOffers> 
           <div>
             <strong>{offer.option.name}</strong>
             <span>
-              Transformar {offer.productName} em combo por +{money(offer.option.price_cents)}?
+              {/combo/i.test(offer.option.name)
+                ? `Transformar ${offer.productName} em combo por +${money(offer.option.price_cents)}?`
+                : `Adicionar ao ${offer.productName} por +${money(offer.option.price_cents)}?`}
             </span>
           </div>
           <Button

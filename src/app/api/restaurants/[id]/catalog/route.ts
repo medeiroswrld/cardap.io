@@ -44,6 +44,7 @@ const schema = z.discriminatedUnion("action", [
       .refine((v) => new Set(v).size === v.length),
     offer_in_bag: z.boolean().optional(),
   }),
+  z.object({ action: z.literal("options_in_bag_all"), offer: z.boolean() }),
   z.object({
     action: z.literal("bag_suggestions"),
     product_ids: z
@@ -274,6 +275,21 @@ async function handlePOST(
         p_city: body.merchant_city,
       });
       if (error) throw error;
+    } else if (body.action === "options_in_bag_all") {
+      // Bulk switch for every option already registered (owner-only RPC per option).
+      const { data: options, error: listError } = await supabase
+        .from("product_options")
+        .select("id")
+        .eq("restaurant_id", id);
+      if (listError) throw listError;
+      for (const option of options ?? []) {
+        const { error } = await supabase.rpc("set_option_offer_in_bag", {
+          p_restaurant: id,
+          p_option: option.id,
+          p_offer: body.offer,
+        });
+        if (error) throw error;
+      }
     } else if (body.action === "bag_suggestions") {
       const { error } = await supabase.rpc("save_bag_suggestions", {
         p_restaurant: id,
