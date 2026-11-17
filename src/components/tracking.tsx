@@ -32,7 +32,7 @@ export function TrackingPage({ id }: { id?: string }) {
           <ModeToggle compact className="tracking-mode-toggle" />
           <Link href="/r/demo" className="button button-outline">
             <ArrowLeft size={16} />
-            Voltar<span className="tracking-back-extra">&nbsp;ao cardápio</span>
+            Voltar ao cardápio
           </Link>
         </div>
       </header>

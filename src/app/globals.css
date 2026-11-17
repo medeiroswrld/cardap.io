@@ -4469,10 +4469,12 @@ tr:last-child > td {
   align-items: center;
   gap: 10px;
 }
+.tracking-header-actions .mode-toggle { flex: none; }
+.tracking-header-actions .button { min-width: 0; }
 @media (max-width: 520px) {
-  .tracking-back-extra {
-    display: none;
-  }
+  .customer-header:has(.tracking-header-actions) { gap: 10px; }
+  .tracking-header-actions { flex: 1; min-width: 0; justify-content: flex-end; gap: 8px; }
+  .tracking-header-actions .button { padding-inline: 12px; gap: 6px; text-align: center; line-height: 1.15; }
 }
 /* Menu on the Fome Play look: the demo ribbon follows the tokens. */
 html[data-app="menu"]:not([data-own-theme]) .demo-banner {
@@ -4710,6 +4712,10 @@ html[data-app="menu"]:not([data-own-theme]) .demo-banner {
 .immersive-header .mode-toggle-compact {
   border: 0;
   background: transparent;
+  color: #fff;
+}
+.immersive-header .mode-toggle-compact:hover {
+  background: rgb(255 255 255 / 0.14);
   color: #fff;
 }
 .immersive-header button {
@@ -5178,6 +5184,7 @@ body:has(.immersive-shell) .toast {
 .crm-table th, .crm-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
 .crm-table small { display: block; color: var(--muted); }
 .crm-link { min-height: 44px; min-width: 44px; padding: 0; background: none; border: 0; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; text-align: left; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .crm-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .crm-pages { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .crm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }

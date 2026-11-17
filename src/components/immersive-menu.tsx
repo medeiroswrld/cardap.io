@@ -278,7 +278,7 @@ export function ImmersiveMenu({
             {demo && <span className="immersive-demo">Demonstração</span>}
           </div>
           <div className="immersive-header-actions">
-            {showModeToggle && <ModeToggle compact />}
+            {showModeToggle && <ModeToggle compact iconSize={24} />}
             <button
               aria-label="Buscar no cardápio"
               onClick={() => setSearchOpen(true)}
