@@ -38,7 +38,7 @@ test("the head script agrees with resolveMode and isGestaoPath", () => {
       for (const path of ["/gestao/1", "/r/capiburguer", "/login"]) {
         const r = runScript({ stored, prefersDark, path });
         assert.equal(r.mode, m.resolveMode(stored, prefersDark));
-        assert.equal(r.scheme, r.mode);
+        assert.equal(r.scheme, m.isGestaoPath(path) ? r.mode : undefined);
         assert.equal(r.app, m.isGestaoPath(path) ? "gestao" : undefined);
       }
 });

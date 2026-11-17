@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/manrope";
 import "./globals.css";
 import { MODE_SCRIPT } from "@/lib/color-mode";
+import { AppScope } from "@/components/app-scope";
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
@@ -18,7 +19,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: MODE_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <AppScope />
+        {children}
+      </body>
     </html>
   );
 }

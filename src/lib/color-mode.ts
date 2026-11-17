@@ -16,4 +16,4 @@ export function isGestaoPath(pathname: string) {
 // functions above; scripts/test-color-mode.mjs checks that they agree.
 export const MODE_SCRIPT = `(function(){try{var d=document.documentElement,s=null;try{s=localStorage.getItem(${JSON.stringify(
   MODE_STORAGE_KEY,
-)})}catch(e){}var m=s==="dark"||s==="light"?s:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";d.dataset.mode=m;d.style.colorScheme=m;if(${GESTAO_PATH.toString()}.test(location.pathname))d.dataset.app="gestao"}catch(e){}})();`;
+)})}catch(e){}var m=s==="dark"||s==="light"?s:matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";d.dataset.mode=m;if(${GESTAO_PATH.toString()}.test(location.pathname)){d.dataset.app="gestao";d.style.colorScheme=m}}catch(e){}})();`;
