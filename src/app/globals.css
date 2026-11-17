@@ -4095,11 +4095,12 @@ tr:last-child > td {
   height: 100dvh;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
-  padding: 28px 20px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 22px;
   min-width: 0;
+  overflow-y: auto;
 }
 .connected-sidebar .brand-name {
   max-width: 160px;
@@ -4139,6 +4140,24 @@ tr:last-child > td {
   margin-top: auto;
   display: grid;
   gap: 4px;
+}
+@media (min-width: 701px) {
+  .connected-sidebar {
+    padding: 20px 20px 16px;
+    gap: 16px;
+  }
+  .connected-sidebar nav {
+    gap: 2px;
+  }
+  .connected-sidebar nav button,
+  .connected-sidebar-foot > a,
+  .connected-sidebar-foot > button {
+    min-height: 38px;
+    padding: 9px 14px;
+  }
+  .connected-sidebar-foot {
+    gap: 2px;
+  }
 }
 .connected-main {
   min-width: 0;
@@ -4480,6 +4499,7 @@ tr:last-child > td {
   }
   .connected-sidebar-foot {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
   }
   .connected-sidebar .brand-name {

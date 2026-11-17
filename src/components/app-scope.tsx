@@ -12,7 +12,9 @@ export function AppScope() {
     if (isGestaoPath(pathname)) {
       root.dataset.app = "gestao";
       root.style.colorScheme = root.dataset.mode ?? "";
-    } else {
+    } else if (root.dataset.app === "gestao") {
+      // Leaving gestão: clear only what gestão set. On /r pages the menu
+      // theme hook owns colorScheme, so never touch it otherwise.
       delete root.dataset.app;
       root.style.colorScheme = "";
     }
