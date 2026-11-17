@@ -75,7 +75,10 @@ export function ImmersiveMenu({
     const element = feed.current;
     const index = startId ? items.findIndex((p) => p.id === startId) : -1;
     if (!element || index < 1) return;
-    element.scrollTo({ top: index * element.clientHeight, behavior: "instant" });
+    element.scrollTo({
+      top: index * element.clientHeight,
+      behavior: "instant",
+    });
     setActive(index);
     // Only on arrival: later item changes follow the normal category reset.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -173,84 +176,96 @@ export function ImmersiveMenu({
               </button>
             </div>
           ) : (
-            items.map((product, index) => (
-              <article
-                className="immersive-reel"
-                key={product.id}
-                inert={index !== active}
-                aria-hidden={index !== active}
-                aria-label={`${product.name}, ${index + 1} de ${items.length}`}
-              >
-                <ProductMedia
-                  key={product.video || product.image}
-                  product={product}
-                  autoPlay={index === active}
-                  suspended={blocked || searchOpen}
+            items.map((product, index) =>
+              // Only the slide on screen and its neighbours carry content; the rest
+              // stay as empty snap points so a long menu does not render dozens of
+              // videos, captions and buttons at once.
+              Math.abs(index - active) > 1 ? (
+                <article
+                  className="immersive-reel"
+                  key={product.id}
+                  inert
+                  aria-hidden
                 />
-                <div className="immersive-shade" />
-                <div className="immersive-caption">
-                  <button className="immersive-restaurant" onClick={onInfo}>
-                    <span>
-                      <Flame size={16} />
-                    </span>
-                    {name}
-                    <span className="immersive-dot">·</span>Mesa {table}
-                  </button>
-                  <button
-                    className="immersive-product"
-                    onClick={() => onProduct(product)}
-                    aria-label={`Ver detalhes de ${product.name}`}
-                  >
-                    <h2>{product.name}</h2>
-                    <p>{product.description}</p>
-                    <span className="immersive-price">
-                      {money(product.price)}{" "}
+              ) : (
+                <article
+                  className="immersive-reel"
+                  key={product.id}
+                  inert={index !== active}
+                  aria-hidden={index !== active}
+                  aria-label={`${product.name}, ${index + 1} de ${items.length}`}
+                >
+                  <ProductMedia
+                    key={product.video || product.image}
+                    product={product}
+                    autoPlay={index === active}
+                    suspended={blocked || searchOpen}
+                  />
+                  <div className="immersive-shade" />
+                  <div className="immersive-caption">
+                    <button className="immersive-restaurant" onClick={onInfo}>
                       <span>
-                        · {product.available ? "Ver prato" : "Indisponível"}
+                        <Flame size={16} />
                       </span>
-                    </span>
-                  </button>
-                  {!accepting && (
-                    <span className="immersive-paused">{closedMessage}</span>
-                  )}
-                </div>
-                <div className="immersive-actions">
-                  {product.restaurantId &&
-                    product.feedbackEnabled !== false && (
-                      <SocialActions
-                        restaurantId={product.restaurantId}
-                        productId={product.id}
-                        name={product.name}
-                        active={index === active && !blocked}
-                        onComments={() => onFeedback(product)}
-                      />
-                    )}
-                  <button
-                    onClick={() => onProduct(product)}
-                    aria-label={`Ingredientes de ${product.name}`}
-                  >
-                    <Utensils size={25} />
-                    <span>Prato</span>
-                  </button>
-                  <button
-                    onClick={onBag}
-                    aria-label={`Abrir sacola com ${count} itens`}
-                  >
-                    <span className="immersive-bag-icon">
-                      <ShoppingBag size={27} />
-                      {count > 0 && <b>{count}</b>}
-                    </span>
-                    <span>Sacola</span>
-                  </button>
-                  {!product.restaurantId && (
-                    <button onClick={onInfo} aria-label="Sobre a casa">
-                      <Info size={26} />
-                      <span>A casa</span>
+                      {name}
+                      <span className="immersive-dot">·</span>Mesa {table}
                     </button>
-                  )}
-                </div>
-              </article>
-            ))
+                    <button
+                      className="immersive-product"
+                      onClick={() => onProduct(product)}
+                      aria-label={`Ver detalhes de ${product.name}`}
+                    >
+                      <h2>{product.name}</h2>
+                      <p>{product.description}</p>
+                      <span className="immersive-price">
+                        {money(product.price)}{" "}
+                        <span>
+                          · {product.available ? "Ver prato" : "Indisponível"}
+                        </span>
+                      </span>
+                    </button>
+                    {!accepting && (
+                      <span className="immersive-paused">{closedMessage}</span>
+                    )}
+                  </div>
+                  <div className="immersive-actions">
+                    {product.restaurantId &&
+                      product.feedbackEnabled !== false && (
+                        <SocialActions
+                          restaurantId={product.restaurantId}
+                          productId={product.id}
+                          name={product.name}
+                          active={index === active && !blocked}
+                          onComments={() => onFeedback(product)}
+                        />
+                      )}
+                    <button
+                      onClick={() => onProduct(product)}
+                      aria-label={`Ingredientes de ${product.name}`}
+                    >
+                      <Utensils size={25} />
+                      <span>Prato</span>
+                    </button>
+                    <button
+                      onClick={onBag}
+                      aria-label={`Abrir sacola com ${count} itens`}
+                    >
+                      <span className="immersive-bag-icon">
+                        <ShoppingBag size={27} />
+                        {count > 0 && <b>{count}</b>}
+                      </span>
+                      <span>Sacola</span>
+                    </button>
+                    {!product.restaurantId && (
+                      <button onClick={onInfo} aria-label="Sobre a casa">
+                        <Info size={26} />
+                        <span>A casa</span>
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ),
+            )
           )}
         </div>
         <header className="immersive-header">
