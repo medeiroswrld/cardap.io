@@ -52,6 +52,7 @@ import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
 import { ResultsReportPanel } from "./results-report";
 import { ModeToggle } from "./mode-toggle";
+import { AdminOverview } from "./admin-overview";
 type Save = (body: unknown) => Promise<void>;
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
@@ -266,57 +267,20 @@ export function ConnectedAdmin({ id }: { id: string }) {
             <>
               {page === "resumo" && (
                 <>
-                  <div className="connected-stats">
-                    <Stat
-                      label="Pedidos em aberto"
-                      value={String(
-                        data.orders.filter((o) =>
-                          ["recebido", "em_preparo", "pronto"].includes(
-                            o.status,
-                          ),
-                        ).length,
-                      )}
-                    />
-                    <Stat
-                      label="Pedidos entregues"
-                      value={String(
-                        data.orders.filter((o) => o.status === "entregue")
-                          .length,
-                      )}
-                    />
-                    <Stat
-                      label="Total entregue"
-                      value={money(
-                        data.orders
-                          .filter((o) => o.status === "entregue")
-                          .reduce((s, o) => s + o.total_cents, 0),
-                      )}
-                    />
-                  </div>
-                  <p className="field-help">
-                    Resumo dos últimos {data.orders.length} pedidos (limite:
-                    200). Valores de pedidos; pagamento conferido no
-                    estabelecimento.
-                  </p>
-                  <section className="admin-panel connected-panel">
-                    <h2>Seu restaurante, no ar.</h2>
-                    <p>
-                      {data.products.length} produtos cadastrados ·{" "}
-                      {data.tables.filter((t) => t.active).length} mesas ativas
-                    </p>
-                    {owner &&
-                      (!data.products.length ||
-                        !data.tables.length ||
-                        !data.restaurant.opening_hours.length) && (
-                        <div className="notice">
-                          Para começar, cadastre produtos e configure as mesas e
-                          os horários de atendimento.
-                        </div>
-                      )}
-                    <Button onClick={() => setPage("pedidos")}>
-                      Acompanhar pedidos
-                    </Button>
-                  </section>
+                  <AdminOverview
+                    data={data}
+                    owner={owner}
+                    onOpenOrders={() => setPage("pedidos")}
+                  />
+                  {owner &&
+                    (!data.products.length ||
+                      !data.tables.length ||
+                      !data.restaurant.opening_hours.length) && (
+                      <div className="notice">
+                        Para começar, cadastre produtos e configure as mesas e
+                        os horários de atendimento.
+                      </div>
+                    )}
                 </>
               )}
               {page === "pedidos" && (
@@ -424,14 +388,6 @@ export function ConnectedAdmin({ id }: { id: string }) {
           {toast}
         </div>
       )}
-    </div>
-  );
-}
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="admin-panel connected-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

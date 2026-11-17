@@ -2341,7 +2341,6 @@ tr:last-child > td {
   border-radius: var(--radius);
   background: var(--surface);
   padding: 14px 12px;
-  box-shadow: 0 2px 3px #251c1a04;
 }
 .order-card-title {
   display: flex;
@@ -5644,6 +5643,10 @@ html[data-app="gestao"] .switch.checked {
 html[data-app="gestao"] .status-pill {
   background: var(--surface-2);
   color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 html[data-app="gestao"] .status-pill.recebido,
 html[data-app="gestao"] .status-pill.em_preparo,
@@ -5693,4 +5696,150 @@ html[data-app="gestao"] .admin-app .search-field input,
 html[data-app="gestao"] .connected-content .search-field input {
   background: transparent;
   border: 0;
+}
+
+/* Visão geral (dashboard) */
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 22px;
+  align-items: start;
+}
+.overview-main {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.overview-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--card-shadow);
+}
+.overview-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+.overview-title {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+.overview-dishes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+.overview-dish {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+.overview-dish img,
+.overview-dish-placeholder {
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.overview-dish span,
+.overview-dish small {
+  color: var(--muted);
+}
+.overview-table-panel {
+  padding: 22px;
+  overflow-x: auto;
+}
+.overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.overview-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 10px;
+}
+.overview-table td {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+.overview-latest {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  position: sticky;
+  top: 20px;
+}
+.overview-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.overview-items li,
+.overview-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.overview-total {
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  font-size: 16px;
+}
+@media (max-width: 980px) {
+  .overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .overview-latest {
+    position: static;
+  }
+}
+html[data-app="gestao"] .connected-content .overview-search input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+  appearance: none;
+}
+.overview-latest .status-pill {
+  justify-self: start;
+}
+.overview-table td {
+  font-size: 14px;
+}
+@media (max-width: 640px) {
+  .overview-table th:nth-child(3),
+  .overview-table td:nth-child(3) {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .overview-table-panel {
+    padding: 16px 12px;
+  }
+  .overview-table th,
+  .overview-table td {
+    padding: 10px 6px;
+  }
+  .overview-table .status-pill {
+    white-space: normal;
+  }
 }
