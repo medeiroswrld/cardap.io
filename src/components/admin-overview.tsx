@@ -19,17 +19,34 @@ export function AdminOverview({
   onOpenOrders: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [top, setTop] = useState<ResultsReport["top_quantity"]>([]);
+  const restaurantId = data.restaurant.id;
+  const [results, setResults] = useState<{
+    key: string;
+    status: "error" | "ready";
+    dishes: ResultsReport["top_quantity"];
+  } | null>(null);
   useEffect(() => {
     if (!owner) return;
+    let cancelled = false;
     const month = monthOptions(new Date(), data.restaurant.timezone)[0].value;
-    requestJson<ResultsReport>(`/api/restaurants/${data.restaurant.id}/results?month=${month}`)
-      .then((r) => setTop(r.top_quantity))
-      .catch(() => setTop([]));
-  }, [owner, data.restaurant.id, data.restaurant.timezone]);
+    requestJson<ResultsReport>(`/api/restaurants/${restaurantId}/results?month=${month}`)
+      .then((r) => {
+        if (!cancelled) setResults({ key: restaurantId, status: "ready", dishes: r.top_quantity });
+      })
+      .catch(() => {
+        if (!cancelled) setResults({ key: restaurantId, status: "error", dishes: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, restaurantId, data.restaurant.timezone]);
+  const status = results && results.key === restaurantId ? results.status : "loading";
 
-  const open = data.orders.filter((o) => ["recebido", "em_preparo", "pronto", "saiu_para_entrega"].includes(o.status)).length;
-  const delivered = data.orders.filter((o) => o.status === "entregue");
+  const open = useMemo(
+    () => data.orders.filter((o) => ["recebido", "em_preparo", "pronto", "saiu_para_entrega"].includes(o.status)).length,
+    [data.orders],
+  );
+  const delivered = useMemo(() => data.orders.filter((o) => o.status === "entregue"), [data.orders]);
   const recent = useMemo(
     () =>
       recentOrders(data.orders, 8).filter((o) =>
@@ -40,11 +57,15 @@ export function AdminOverview({
       ),
     [data.orders, query],
   );
-  const latest = recentOrders(data.orders, 1)[0];
-  const dishes = top
-    .map((d) => ({ ...d, product: data.products.find((p) => p.id === d.product_id) }))
-    .filter((d) => matchesQuery(d.name, query))
-    .slice(0, 6);
+  const latest = useMemo(() => recentOrders(data.orders, 1)[0], [data.orders]);
+  const dishes = useMemo(
+    () =>
+      (results && results.key === restaurantId ? results.dishes : [])
+        .map((d) => ({ ...d, product: data.products.find((p) => p.id === d.product_id) }))
+        .filter((d) => matchesQuery(d.name, query))
+        .slice(0, 5),
+    [results, restaurantId, data.products, query],
+  );
 
   return (
     <div className="overview">
@@ -68,7 +89,9 @@ export function AdminOverview({
           <section>
             <h2 className="overview-title">Pratos mais pedidos</h2>
             <p className="field-help">Neste mês, só pedidos entregues.</p>
-            {dishes.length ? (
+            {status === "error" ? (
+              <p className="field-help">Não foi possível carregar os pratos agora.</p>
+            ) : status === "loading" ? null : dishes.length ? (
               <div className="overview-dishes">
                 {dishes.map((d) => (
                   <article key={d.product_id} className="admin-panel overview-dish">

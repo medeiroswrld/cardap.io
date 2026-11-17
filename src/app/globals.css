@@ -5720,6 +5720,10 @@ html[data-app="gestao"] .connected-content .search-field input {
   color: var(--muted);
   box-shadow: var(--card-shadow);
 }
+.overview-search:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--brand) 50%, transparent);
+  outline-offset: 3px;
+}
 .overview-search input {
   flex: 1;
   border: 0;
@@ -5822,16 +5826,11 @@ html[data-app="gestao"] .connected-content .overview-search input:not([type="che
 .overview-latest .status-pill {
   justify-self: start;
 }
-.overview-table td {
-  font-size: 14px;
-}
 @media (max-width: 640px) {
   .overview-table th:nth-child(3),
   .overview-table td:nth-child(3) {
     display: none;
   }
-}
-@media (max-width: 640px) {
   .overview-table-panel {
     padding: 16px 12px;
   }
