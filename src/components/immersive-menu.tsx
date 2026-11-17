@@ -14,6 +14,7 @@ import {
 import { ProductMedia } from "./product-media";
 import { SocialActions } from "./product-feedback";
 import { Modal } from "./ui/dialog";
+import { ModeToggle } from "./mode-toggle";
 import { money } from "@/lib/utils";
 import type { Category, Product } from "@/lib/types";
 
@@ -37,6 +38,7 @@ export function ImmersiveMenu({
   onBag,
   onInfo,
   logoUrl,
+  showModeToggle = false,
   onList,
   onFeedback,
 }: {
@@ -59,6 +61,7 @@ export function ImmersiveMenu({
   onBag: () => void;
   onInfo: () => void;
   logoUrl?: string;
+  showModeToggle?: boolean;
   onList: () => void;
   onFeedback: (product: Product) => void;
 }) {
@@ -275,6 +278,7 @@ export function ImmersiveMenu({
             {demo && <span className="immersive-demo">Demonstração</span>}
           </div>
           <div className="immersive-header-actions">
+            {showModeToggle && <ModeToggle compact />}
             <button
               aria-label="Buscar no cardápio"
               onClick={() => setSearchOpen(true)}

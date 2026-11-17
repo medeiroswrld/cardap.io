@@ -113,6 +113,14 @@
   --font-sans: "Manrope Variable", sans-serif;
   --brand-contrast: #fff;
   --font-heading: var(--font-sans);
+  --radius-card: calc(var(--radius) + 6px);
+  --surface-2: var(--soft);
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --danger-bg: #fee2e2;
+  --danger-text: #991b1b;
 }
 .restaurant-quick-links {
   display: flex;
@@ -4450,6 +4458,27 @@ tr:last-child > td {
   align-items: center;
   gap: 8px;
 }
+.tracking-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tracking-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .tracking-back-extra {
+    display: none;
+  }
+}
+/* Menu on the Fome Play look: the demo ribbon follows the tokens. */
+html[data-app="menu"]:not([data-own-theme]) .demo-banner {
+  background: var(--surface-2);
+  color: var(--muted);
+}
 @media (max-width: 1100px) {
   .connected-admin {
     grid-template-columns: 200px minmax(0, 1fr);
@@ -4677,6 +4706,11 @@ tr:last-child > td {
   display: flex;
   gap: 4px;
   pointer-events: auto;
+}
+.immersive-header .mode-toggle-compact {
+  border: 0;
+  background: transparent;
+  color: #fff;
 }
 .immersive-header button {
   width: 44px;
@@ -5484,8 +5518,9 @@ h3,
   font-weight: 700;
 }
 
-/* Spec K — Fome Play design system (management area only in phase 1). */
-html[data-app="gestao"] {
+/* Spec K — Fome Play design system (management area + customer menu without its own theme). */
+html[data-app="gestao"],
+html[data-app="menu"]:not([data-own-theme]) {
   --background: #f6f5f3;
   --sidebar: #ffffff;
   --surface: #ffffff;
@@ -5510,7 +5545,8 @@ html[data-app="gestao"] {
   --font-sans: "Poppins", sans-serif;
   --font-heading: "Poppins", sans-serif;
 }
-html[data-app="gestao"][data-mode="dark"] {
+html[data-app="gestao"][data-mode="dark"],
+html[data-app="menu"][data-mode="dark"]:not([data-own-theme]) {
   --background: #161618;
   --sidebar: #1f1f22;
   --surface: #242427;
@@ -5546,6 +5582,16 @@ html[data-app="gestao"] body {
 }
 .mode-toggle:hover {
   background: var(--surface-2);
+  color: var(--text);
+}
+.mode-toggle-compact {
+  width: 42px;
+  height: 42px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   color: var(--text);
 }
 .status-pill.tone-success { background: var(--success-bg); color: var(--success-text); }

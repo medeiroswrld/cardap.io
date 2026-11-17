@@ -72,3 +72,11 @@ test("modeFor derives light or dark from the background", () => {
   assert.equal(t.modeFor("#14110f"), "dark");
   assert.equal(t.modeFor("#fff8f2"), "light");
 });
+
+test("hasOwnStyle is true only when a style key is set", () => {
+  assert.equal(t.hasOwnStyle({}), false);
+  assert.equal(t.hasOwnStyle(null), false);
+  assert.equal(t.hasOwnStyle({ logo_url: "https://x" }), false);
+  assert.equal(t.hasOwnStyle({ preset: "japones", mode: "dark", brand: "#d7263d" }), true);
+  assert.equal(t.hasOwnStyle({ radius: "reto" }), true);
+});

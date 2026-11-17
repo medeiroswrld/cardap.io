@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { MenuApp } from "@/components/menu-app";
 import { readCatalog } from "@/lib/catalog";
 import { isCatalogSlug } from "@/lib/catalog-cache";
+import { OwnThemeFlag } from "@/components/own-theme-flag";
 import { DemoProvider } from "@/components/demo-provider";
 import { ConnectedMenuProvider } from "@/components/connected-menu-provider";
 import { DEMO_METADATA, restaurantMetadata } from "@/lib/restaurant-metadata";
@@ -39,8 +40,11 @@ export default async function Page({
   const catalog = await readCatalog(slug);
   if (!catalog) notFound();
   return (
-    <ConnectedMenuProvider catalog={catalog}>
-      <MenuApp />
-    </ConnectedMenuProvider>
+    <>
+      <OwnThemeFlag theme={catalog.restaurant.menu_theme} />
+      <ConnectedMenuProvider catalog={catalog}>
+        <MenuApp />
+      </ConnectedMenuProvider>
+    </>
   );
 }

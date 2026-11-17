@@ -17,13 +17,13 @@ function subscribe(onChange: () => void) {
 // Server render and hydration both use "light"; the real mode is read after hydration.
 const serverMode = (): ColorMode => "light";
 
-export function ModeToggle({ className = "" }: { className?: string }) {
+export function ModeToggle({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const mode = useSyncExternalStore(subscribe, currentMode, serverMode);
   const next: ColorMode = mode === "dark" ? "light" : "dark";
   return (
     <button
       type="button"
-      className={`mode-toggle ${className}`.trim()}
+      className={`mode-toggle ${compact ? "mode-toggle-compact" : ""} ${className}`.replace(/\s+/g, " ").trim()}
       aria-label={next === "dark" ? "Ativar modo noturno" : "Ativar modo claro"}
       onClick={() => {
         const root = document.documentElement;
@@ -36,7 +36,7 @@ export function ModeToggle({ className = "" }: { className?: string }) {
       }}
     >
       {next === "dark" ? <Moon size={17} /> : <Sun size={17} />}
-      <span>{next === "dark" ? "Modo noturno" : "Modo claro"}</span>
+      <span className={compact ? "crm-sr-only" : undefined}>{next === "dark" ? "Modo noturno" : "Modo claro"}</span>
     </button>
   );
 }

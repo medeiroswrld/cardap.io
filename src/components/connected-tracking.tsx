@@ -15,8 +15,9 @@ import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
 import { GoogleReviewInvite, ProductFeedbackModal } from "./product-feedback";
 import { PixPayment } from "./pix-payment";
+import { ModeToggle } from "./mode-toggle";
 import { useMenuTheme } from "./use-menu-theme";
-import type { MenuTheme } from "@/lib/menu-theme";
+import { hasOwnStyle, type MenuTheme } from "@/lib/menu-theme";
 export function ConnectedTracking({
   restaurantId,
   slug,
@@ -74,9 +75,12 @@ export function ConnectedTracking({
   }, [refresh]);
   return (
     <main className="standalone connected-tracking">
-      <Link href={`/r/${slug}`} className="back-link">
-        <ArrowLeft size={18} /> Voltar ao cardápio
-      </Link>
+      <div className="tracking-top">
+        <Link href={`/r/${slug}`} className="back-link">
+          <ArrowLeft size={18} /> Voltar ao cardápio
+        </Link>
+        {!hasOwnStyle(theme) && <ModeToggle compact className="tracking-mode-toggle" />}
+      </div>
       <span className="eyebrow">
         {orders.some((o) => o.fulfillment !== "mesa")
           ? "Da cozinha para você"

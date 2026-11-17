@@ -28,12 +28,14 @@ import {
   X,
 } from "lucide-react";
 import { useDemo, type OnlineChoice } from "./demo-provider";
+import { hasOwnStyle } from "@/lib/menu-theme";
 import { useMenuTheme } from "./use-menu-theme";
 import { Brand, DemoBanner } from "./brand";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
 import { ProductMedia } from "./product-media";
 import { ImmersiveMenu } from "./immersive-menu";
+import { ModeToggle } from "./mode-toggle";
 import { ProductFeedbackModal } from "./product-feedback";
 import { money } from "@/lib/utils";
 import {
@@ -213,6 +215,7 @@ export function MenuApp() {
           <Link href={`/r/${slug}/pedidos`}>Meus pedidos</Link>
         </nav>
         <div className="header-actions">
+          {!hasOwnStyle(state.settings.theme) && <ModeToggle compact />}
           <button className="table-pill" onClick={() => setInfoOpen(true)}>
             <MapPin size={16} />
             <span>Mesa {String(table).padStart(2, "0")}</span>
@@ -477,6 +480,7 @@ export function MenuApp() {
       {view === "feed" ? (
         <ImmersiveMenu
           logoUrl={state.settings.theme?.logo_url}
+          showModeToggle={!hasOwnStyle(state.settings.theme)}
           ready={ready}
           items={items}
           categories={categories}

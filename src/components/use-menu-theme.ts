@@ -11,10 +11,15 @@ export function useMenuTheme(theme?: MenuTheme | null) {
     const variables = themeVariables(parsed);
     const root = document.documentElement;
     for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
-    if (Object.keys(variables).length) root.style.colorScheme = resolveTheme(parsed).mode;
+    if (Object.keys(variables).length) {
+      root.style.colorScheme = resolveTheme(parsed).mode;
+      root.dataset.ownTheme = "1";
+    }
     return () => {
       for (const name of Object.keys(variables)) root.style.removeProperty(name);
-      root.style.removeProperty("color-scheme");
+      delete root.dataset.ownTheme;
+      // A scope that remains active keeps following the user's mode.
+      root.style.colorScheme = root.dataset.app ? (root.dataset.mode ?? "") : "";
     };
   }, [key]);
 }

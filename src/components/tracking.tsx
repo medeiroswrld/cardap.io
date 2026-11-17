@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useDemo } from "./demo-provider";
+import { ModeToggle } from "./mode-toggle";
 import { Brand, DemoBanner } from "./brand";
 import { money, shortTime } from "@/lib/utils";
 import { statusNames, statusFlow } from "@/lib/types";
@@ -27,10 +28,13 @@ export function TrackingPage({ id }: { id?: string }) {
       <DemoBanner />
       <header className="customer-header">
         <Brand />
-        <Link href="/r/demo" className="button button-outline">
-          <ArrowLeft size={16} />
-          Voltar ao cardápio
-        </Link>
+        <div className="tracking-header-actions">
+          <ModeToggle compact className="tracking-mode-toggle" />
+          <Link href="/r/demo" className="button button-outline">
+            <ArrowLeft size={16} />
+            Voltar<span className="tracking-back-extra">&nbsp;ao cardápio</span>
+          </Link>
+        </div>
       </header>
       <main className="tracking-main">
         {!ready ? (

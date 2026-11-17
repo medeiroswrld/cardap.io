@@ -118,3 +118,9 @@ export function themeVariables(theme?: MenuTheme | null): Record<string, string>
     "--font-heading": HEADING_FONTS[r.heading_font].family,
   };
 }
+
+// True when the restaurant chose its own look (any style key), so the menu
+// keeps its theme instead of the Fome Play design system.
+export function hasOwnStyle(theme?: MenuTheme | null) {
+  return Object.keys(themeVariables(theme)).length > 0;
+}
