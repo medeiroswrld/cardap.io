@@ -32,7 +32,7 @@ Aplicados por `data-mode="dark" | "light"` no `<html>`. Os nomes reaproveitam as
 | `--warning-bg` / `--warning-text` | `#78350f` / `#fde68a` | `#fef3c7` / `#92400e` |
 | `--danger-bg` / `--danger-text` | `#7f1d1d` / `#fecaca` | `#fee2e2` / `#991b1b` |
 
-- O vermelho da marca é `#d32f2f` e não o `#e23d32` da prévia. O branco sobre `#e23d32` dá cerca de 4,1:1, abaixo do mínimo de 4,5:1. Sobre `#d32f2f`, passa de 4,5:1. Visualmente fica praticamente igual.
+- O vermelho da marca é `#d32f2f` e não o `#e23d32` da prévia. O branco sobre `#e23d32` dá cerca de 4,2:1, abaixo do mínimo de 4,5:1. Sobre `#d32f2f`, dá cerca de 5,0:1. Visualmente fica praticamente igual.
 - **Raio:** cartões `20px` (`--radius-card`), controles `14px` (`--radius`), chips e busca `999px`.
 - **Fonte:** **Poppins**, self-hosted via `@fontsource/poppins` nos pesos 400, 500, 600 e 700, como `--font-sans` e `--font-heading` padrão. Ela substitui a Manrope.
 - **Sombras:** nenhuma no noturno. No claro, apenas `0 1px 2px rgba(0,0,0,.06)` nos cartões.
