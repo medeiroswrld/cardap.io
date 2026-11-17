@@ -22,30 +22,36 @@ export function FulfillmentFields({
   const delivering = draft.fulfillment === "entrega" && options.delivery;
   return (
     <div className="form-stack fulfillment-fields">
-      <fieldset className="choice-group fulfillment-choice">
+      <fieldset className="choice-group fulfillment-choice segmented-choice">
         <legend>Como você quer receber?</legend>
-        {options.pickup && (
-          <label className="checkbox-label">
-            <input
-              type="radio"
-              name="fulfillment"
-              checked={draft.fulfillment === "retirada"}
-              onChange={() => set({ fulfillment: "retirada" })}
-            />
-            <span>Retirada</span>
-          </label>
-        )}
-        {options.delivery && (
-          <label className="checkbox-label">
-            <input
-              type="radio"
-              name="fulfillment"
-              checked={draft.fulfillment === "entrega"}
-              onChange={() => set({ fulfillment: "entrega" })}
-            />
-            <span>Entrega</span>
-          </label>
-        )}
+        <div className="segmented-track">
+          {options.pickup && (
+            <label
+              className={`checkbox-label${draft.fulfillment === "retirada" ? " is-checked" : ""}`}
+            >
+              <input
+                type="radio"
+                name="fulfillment"
+                checked={draft.fulfillment === "retirada"}
+                onChange={() => set({ fulfillment: "retirada" })}
+              />
+              <span>Retirada</span>
+            </label>
+          )}
+          {options.delivery && (
+            <label
+              className={`checkbox-label${draft.fulfillment === "entrega" ? " is-checked" : ""}`}
+            >
+              <input
+                type="radio"
+                name="fulfillment"
+                checked={draft.fulfillment === "entrega"}
+                onChange={() => set({ fulfillment: "entrega" })}
+              />
+              <span>Entrega</span>
+            </label>
+          )}
+        </div>
       </fieldset>
       {unavailable && (
         <p className="notice small" role="alert">

@@ -17,6 +17,7 @@ import { ModeToggle } from "./mode-toggle";
 import { Brand, DemoBanner } from "./brand";
 import { money, shortTime } from "@/lib/utils";
 import { statusNames, statusFlow } from "@/lib/types";
+import { statusTone } from "@/lib/order-flow";
 export function TrackingPage({ id }: { id?: string }) {
   const { state, ready, session } = useDemo();
   const orders = state.orders.filter(
@@ -59,7 +60,7 @@ export function TrackingPage({ id }: { id?: string }) {
                       Mesa {o.table} • {shortTime(o.createdAt)}
                     </span>
                   </div>
-                  <span className={`status-pill ${o.status}`}>
+                  <span className={`status-pill ${o.status} tone-${statusTone(o.status)}`}>
                     {statusNames[o.status]}
                   </span>
                   <strong>{money(o.total)}</strong>

@@ -10,6 +10,7 @@ import {
   paymentLabel,
   paysFirst,
   statusLabel,
+  statusTone,
 } from "@/lib/order-flow";
 import { money } from "@/lib/utils";
 import { requestJson } from "@/lib/client-api";
@@ -114,7 +115,9 @@ export function ConnectedTracking({
         <article className="panel connected-order" key={order.id}>
           <div className="panel-heading">
             <h2>Pedido #{order.number}</h2>
-            <span className="status-pill">{statusLabel(order.status, order.fulfillment)}</span>
+            <span className={`status-pill tone-${statusTone(order.status)}`}>
+              {statusLabel(order.status, order.fulfillment)}
+            </span>
           </div>
           <p>
             {fulfillmentLabel({
