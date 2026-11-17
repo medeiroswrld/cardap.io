@@ -85,6 +85,7 @@ export function AdminOverview({
           <div className="admin-panel connected-stat"><span>Pedidos entregues</span><strong>{delivered.length}</strong></div>
           <div className="admin-panel connected-stat"><span>Total entregue</span><strong>{money(delivered.reduce((s, o) => s + o.total_cents, 0))}</strong></div>
         </div>
+        <p className="field-help">Resumo dos últimos {data.orders.length} pedidos carregados (limite: 200).</p>
         {owner && (
           <section>
             <h2 className="overview-title">Pratos mais pedidos</h2>

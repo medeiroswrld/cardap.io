@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
 import { isGestaoPath } from "@/lib/color-mode";
 
@@ -7,7 +7,7 @@ import { isGestaoPath } from "@/lib/color-mode";
 // layout persists, so the head script only runs once).
 export function AppScope() {
   const pathname = usePathname();
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     if (isGestaoPath(pathname)) {
       root.dataset.app = "gestao";

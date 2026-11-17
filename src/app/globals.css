@@ -5484,6 +5484,7 @@ html[data-app="gestao"] {
   --brand: #d32f2f;
   --brand-dark: #b3261e;
   --brand-contrast: #ffffff;
+  --brand-text: var(--brand);
   --success-bg: #dcfce7;
   --success-text: #166534;
   --warning-bg: #fef3c7;
@@ -5505,6 +5506,7 @@ html[data-app="gestao"][data-mode="dark"] {
   --border: #38383d;
   --text: #f4f4f5;
   --muted: #a1a1aa;
+  --brand-text: #f87171;
   --success-bg: #14532d;
   --success-text: #bbf7d0;
   --warning-bg: #78350f;
@@ -5626,6 +5628,7 @@ html[data-app="gestao"] .button-ghost:hover {
 }
 html[data-app="gestao"] .button-secondary {
   background: var(--surface-2);
+  color: var(--brand-text);
 }
 html[data-app="gestao"] .button-ghost {
   color: var(--text);
@@ -5633,12 +5636,16 @@ html[data-app="gestao"] .button-ghost {
 html[data-app="gestao"] .button-danger {
   background: var(--danger-bg);
   color: var(--danger-text);
+  border: 1px solid var(--danger-text);
 }
 html[data-app="gestao"] .switch {
   background: var(--border);
 }
 html[data-app="gestao"] .switch.checked {
   background: var(--green);
+}
+html[data-app="gestao"][data-mode="dark"] .switch.checked {
+  background: #16a34a;
 }
 html[data-app="gestao"] .status-pill {
   background: var(--surface-2);
@@ -5677,7 +5684,7 @@ html[data-app="gestao"] .status-pill.tone-neutral {
   padding: 0 0 6px;
 }
 html[data-app="gestao"] .connected-content .results-big {
-  color: var(--brand);
+  color: var(--brand-text);
 }
 html[data-app="gestao"] .results-card {
   padding: 20px 22px;
@@ -5841,4 +5848,25 @@ html[data-app="gestao"] .connected-content .overview-search input:not([type="che
   .overview-table .status-pill {
     white-space: normal;
   }
+}
+
+/* Spec K — brand red as text/icon uses --brand-text (readable on dark surfaces); fills keep --brand. */
+html[data-app="gestao"] .panel-heading > a,
+html[data-app="gestao"] .panel-heading > svg,
+html[data-app="gestao"] .panel-link,
+html[data-app="gestao"] .settings-tabs button.active,
+html[data-app="gestao"] .order-card-items > div > span,
+html[data-app="gestao"] .login-form-panel form > svg,
+html[data-app="gestao"] .text-link,
+html[data-app="gestao"] .feedback-comment small,
+html[data-app="gestao"] .admin-nav-item.active,
+html[data-app="gestao"] .category-row-icon,
+html[data-app="gestao"] .restaurant-avatar,
+html[data-app="gestao"] .role-card > svg,
+html[data-app="gestao"] .view-switch button.active,
+html[data-app="gestao"] .demo-helper svg,
+html[data-app="gestao"] .demo-helper a,
+html[data-app="gestao"] .promo-icon,
+html[data-app="gestao"] .restaurant-quick-links button {
+  color: var(--brand-text);
 }
