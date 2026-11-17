@@ -1,12 +1,12 @@
 "use client";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { resolveTheme, themeVariables, type MenuTheme } from "@/lib/menu-theme";
 
 // Writes the restaurant's variables on <html> while a customer screen is open,
 // so modals rendered in portals inherit them. Removed on unmount.
 export function useMenuTheme(theme?: MenuTheme | null) {
   const key = JSON.stringify(theme ?? {});
-  useEffect(() => {
+  useLayoutEffect(() => {
     const parsed = JSON.parse(key) as MenuTheme;
     const variables = themeVariables(parsed);
     const root = document.documentElement;

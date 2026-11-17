@@ -90,9 +90,9 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
-  /* Height of the fixed category strip (names reserve two lines) + safe-area growth; bag, toast and page padding sit above it. */
+  /* Height of the fixed category strip (names are one line) + safe-area growth; bag, toast and page padding sit above it. */
   :root {
-    --category-strip: calc(121px + max(0px, env(safe-area-inset-bottom) - 12px));
+    --category-strip: calc(107px + max(0px, env(safe-area-inset-bottom) - 12px));
   }
   .option-card {
     align-items: flex-start;
@@ -3319,14 +3319,11 @@ tr:last-child > td {
     color: var(--muted);
   }
   .mobile-categories .category-button > span:not(.category-thumb) {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    display: block;
+    max-width: 100%;
+    white-space: nowrap;
     overflow: hidden;
-    min-height: 2.4em;
-    overflow-wrap: break-word;
-    word-break: normal;
-    hyphens: auto;
+    text-overflow: ellipsis;
   }
   .mobile-categories .category-thumb {
     width: 56px;
@@ -5609,6 +5606,7 @@ html[data-app="menu"][data-mode="dark"]:not([data-own-theme]) {
   --text: #f4f4f5;
   --muted: #a1a1aa;
   --brand-text: #f87171;
+  --green: #4ade80;
   --success-bg: #14532d;
   --success-text: #bbf7d0;
   --warning-bg: #78350f;
@@ -5647,10 +5645,10 @@ html[data-app="gestao"] body {
   background: var(--surface);
   color: var(--text);
 }
-.status-pill.tone-success { background: var(--success-bg); color: var(--success-text); }
-.status-pill.tone-warning { background: var(--warning-bg); color: var(--warning-text); }
-.status-pill.tone-danger { background: var(--danger-bg); color: var(--danger-text); }
-.status-pill.tone-neutral { background: var(--surface-2); color: var(--muted); }
+html:not([data-own-theme]) .status-pill.tone-success { background: var(--success-bg); color: var(--success-text); }
+html:not([data-own-theme]) .status-pill.tone-warning { background: var(--warning-bg); color: var(--warning-text); }
+html:not([data-own-theme]) .status-pill.tone-danger { background: var(--danger-bg); color: var(--danger-text); }
+html:not([data-own-theme]) .status-pill.tone-neutral { background: var(--surface-2); color: var(--muted); }
 .login-mode-toggle { position: absolute; top: 16px; right: 16px; }
 .login-form-panel { position: relative; }
 html[data-app="gestao"][data-mode="dark"] .login-brand-panel {
@@ -6117,6 +6115,23 @@ html[data-app="menu"]:not([data-own-theme]) .connected-steps li {
   color: var(--muted);
 }
 html[data-app="menu"]:not([data-own-theme]) .connected-steps li.complete {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+/* Spec K phase 2 — menu dark: brand red text uses --brand-text; demo tracking icons follow the success tokens. */
+html[data-app="menu"][data-mode="dark"]:not([data-own-theme]) :is(.restaurant-quick-links a, .restaurant-quick-links button, .button-secondary, .header-nav a.current, .view-switch button.active, .food-tag, .preview-badge, .text-link) {
+  color: var(--brand-text);
+}
+html[data-app="menu"]:not([data-own-theme]) .tracking-icon {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+html[data-app="menu"]:not([data-own-theme]) .tracking-icon.cancelled {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon {
   background: var(--success-bg);
   color: var(--success-text);
 }

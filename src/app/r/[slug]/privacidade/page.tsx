@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { readCatalog } from "@/lib/catalog";
 import { isCatalogSlug } from "@/lib/catalog-cache";
+import { OwnThemeFlag } from "@/components/own-theme-flag";
+import { MenuThemeScope } from "@/components/menu-theme-scope";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
@@ -15,6 +17,8 @@ export default async function Page({
   const r = catalog.restaurant;
   return (
     <main className="standalone">
+      <OwnThemeFlag theme={r.menu_theme} />
+      <MenuThemeScope theme={r.menu_theme} />
       <Link href={`/r/${slug}`}>Voltar ao cardápio</Link>
       <h1>Privacidade no {r.name}</h1>
       <p>
