@@ -37,6 +37,12 @@ export function statusLabel(status: OrderStatus, fulfillment: Fulfillment) {
   return names[status];
 }
 
+export function statusTone(status: OrderStatus): "success" | "warning" | "danger" | "neutral" {
+  if (status === "entregue") return "success";
+  if (status === "cancelado" || status === "recusado") return "danger";
+  return "warning";
+}
+
 // paysFirst: the order was created waiting for an advance Pix payment.
 export function customerSteps(fulfillment: Fulfillment, paysFirst = false): OrderStatus[] {
   if (fulfillment === "mesa")

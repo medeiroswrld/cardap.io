@@ -221,3 +221,11 @@ test("online options carry the advance Pix flag", () => {
   assert.equal(draft.onlineOptions(r, []).pixOnline, false);
   assert.equal(draft.onlineOptions(r, [], true).pixOnline, true);
 });
+
+test("status tones follow the design system", () => {
+  assert.equal(flow.statusTone("entregue"), "success");
+  for (const s of ["aguardando_pagamento", "aguardando_aceite", "recebido", "em_preparo", "pronto", "saiu_para_entrega"])
+    assert.equal(flow.statusTone(s), "warning", s);
+  assert.equal(flow.statusTone("cancelado"), "danger");
+  assert.equal(flow.statusTone("recusado"), "danger");
+});

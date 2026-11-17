@@ -1639,13 +1639,13 @@ button:hover:not(:disabled) {
 }
 .admin-app {
   min-height: 100vh;
-  background: #fcfaf7;
+  background: var(--background);
 }
 .admin-sidebar {
   width: 232px;
   position: fixed;
   inset: 0 auto 0 0;
-  background: #fffaf5;
+  background: var(--sidebar);
   border-right: 1px solid var(--border);
   z-index: 50;
   display: flex;
@@ -1670,8 +1670,8 @@ button:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #f3ece4;
-  border: 1px solid #e9e0d5;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 9px;
   padding: 12px 9px;
   margin-bottom: 28px;
@@ -1683,7 +1683,7 @@ button:hover:not(:disabled) {
   width: 33px;
   height: 33px;
   border-radius: 7px;
-  background: #e5d5c5;
+  background: var(--soft);
   color: var(--brand);
 }
 .restaurant-switch > div {
@@ -1720,17 +1720,17 @@ button:hover:not(:disabled) {
   min-height: 45px;
   padding: 11px 13px;
   border-radius: 8px;
-  color: #74645a;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 550;
 }
 .admin-nav-item.active {
   color: var(--brand);
-  background: #f5e4dd;
+  background: var(--surface-2);
   font-weight: 750;
 }
 .admin-nav-item:hover {
-  background: #f7eee7;
+  background: var(--surface-2);
 }
 .nav-count {
   margin-left: auto;
@@ -1800,8 +1800,8 @@ button:hover:not(:disabled) {
   padding: 17px 0;
 }
 .sidebar-user > span {
-  background: #eaddcf;
-  color: #7f5f4b;
+  background: var(--surface-2);
+  color: var(--muted);
   width: 33px;
   height: 33px;
   display: grid;
@@ -1828,7 +1828,7 @@ button:hover:not(:disabled) {
 }
 .admin-topbar {
   min-height: 75px;
-  background: #fff;
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1908,7 +1908,7 @@ button:hover:not(:disabled) {
   padding: 20px 18px;
   border: 1px solid var(--border);
   border-radius: 11px;
-  background: white;
+  background: var(--surface);
   min-width: 0;
 }
 .stat > div {
@@ -1917,10 +1917,10 @@ button:hover:not(:disabled) {
   justify-content: space-between;
   gap: 10px;
   font-size: 9px;
-  color: #756558;
+  color: var(--muted);
 }
 .stat > div > svg {
-  color: #ac9584;
+  color: var(--muted);
 }
 .stat > strong {
   display: block;
@@ -1953,7 +1953,7 @@ html[data-mode="dark"][data-app="gestao"] .admin-panel {
 .admin-panel {
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: white;
+  background: var(--surface);
   overflow: hidden;
 }
 .panel-heading {
@@ -1999,14 +1999,13 @@ th {
   color: var(--muted);
   font-weight: 600;
   padding: 12px 18px;
-  background: #fcfaf6;
-  border-top: 1px solid #f0e9e1;
-  border-bottom: 1px solid #f0e9e1;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
 }
 td {
   font-size: 10px;
   padding: 16px 18px;
-  border-bottom: 1px solid #f2ece5;
+  border-bottom: 1px solid var(--border);
 }
 td > strong {
   font-size: 10px;
@@ -2074,7 +2073,7 @@ tr:last-child > td {
   align-items: center;
   gap: 5px;
   font-size: 7px;
-  color: #817163;
+  color: var(--muted);
   padding: 15px 20px;
   border-top: 1px solid var(--border);
 }
@@ -2093,7 +2092,7 @@ tr:last-child > td {
   align-items: center;
   gap: 12px;
   padding: 14px 0;
-  border-bottom: 1px solid #f0e9e1;
+  border-bottom: 1px solid var(--border);
 }
 .popular-product:last-child {
   border-bottom: 0;
@@ -2139,7 +2138,7 @@ tr:last-child > td {
   color: var(--brand);
 }
 .menu-promo {
-  background: #f3e5d7;
+  background: var(--surface-2);
   border-radius: 12px;
   display: flex;
   overflow: hidden;
@@ -2163,7 +2162,7 @@ tr:last-child > td {
 }
 .menu-promo p {
   font-size: 9px;
-  color: #816c59;
+  color: var(--muted);
   margin-top: 10px;
   line-height: 1.8;
 }
@@ -2195,12 +2194,12 @@ tr:last-child > td {
   flex-shrink: 0;
 }
 .setup-check {
-  background: #e8efdf;
-  color: var(--green);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 .setup-number {
-  background: #f6eee5;
-  color: #9a7c61;
+  background: var(--surface-2);
+  color: var(--muted);
 }
 .getting-started > a > div {
   flex: 1;
@@ -2256,7 +2255,7 @@ tr:last-child > td {
   border: 1px solid var(--border);
   padding: 4px;
   border-radius: 9px;
-  background: #f1ebe4;
+  background: var(--surface-2);
 }
 .segmented-control > button {
   font-size: 10px;
@@ -2266,7 +2265,7 @@ tr:last-child > td {
   color: var(--muted);
 }
 .segmented-control > button.active {
-  background: white;
+  background: var(--surface);
   color: var(--text);
   box-shadow: 0 2px 4px #251c1a08;
 }
@@ -2291,8 +2290,8 @@ tr:last-child > td {
   grid-template-columns: minmax(230px, 350px);
 }
 .kanban-column {
-  background: #f3eee7;
-  border-radius: 10px;
+  background: var(--soft);
+  border-radius: var(--radius-card);
   min-height: 460px;
   padding: 13px 11px;
 }
@@ -2309,7 +2308,7 @@ tr:last-child > td {
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  background: white;
+  background: var(--surface);
   display: grid;
   place-items: center;
   font-size: 9px;
@@ -2319,19 +2318,19 @@ tr:last-child > td {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #b99556;
+  background: var(--warning-text);
 }
 .em_preparo .column-dot {
-  background: #b66d4e;
+  background: var(--warning-text);
 }
 .pronto .column-dot {
-  background: #60874b;
+  background: var(--success-text);
 }
 .entregue .column-dot {
-  background: #8a9583;
+  background: var(--muted);
 }
 .cancelado .column-dot {
-  background: #b23c3c;
+  background: var(--danger-text);
 }
 .kanban-cards {
   display: flex;
@@ -2339,8 +2338,8 @@ tr:last-child > td {
   gap: 12px;
 }
 .order-card {
-  border-radius: 9px;
-  background: white;
+  border-radius: var(--radius);
+  background: var(--surface);
   padding: 14px 12px;
   box-shadow: 0 2px 3px #251c1a04;
 }
@@ -2398,7 +2397,7 @@ tr:last-child > td {
 }
 .order-card-items small {
   display: block;
-  background: #fcf2de;
+  background: var(--surface-2);
   padding: 6px;
   border-radius: 4px;
   color: var(--muted);
@@ -2602,7 +2601,7 @@ tr:last-child > td {
   height: 47px;
   display: grid;
   place-items: center;
-  background: #f7eee5;
+  background: var(--surface-2);
   color: var(--brand);
   border-radius: 10px;
 }
@@ -2637,7 +2636,7 @@ tr:last-child > td {
 }
 .consent-event {
   padding: 15px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -3799,7 +3798,7 @@ tr:last-child > td {
   min-height: 100dvh;
 }
 .login-brand-panel {
-  background: #f0e0ce;
+  background: var(--soft);
   padding: 45px 10%;
   display: flex;
   flex-direction: column;
@@ -3813,7 +3812,7 @@ tr:last-child > td {
 }
 .login-brand-panel p {
   font-size: 14px;
-  color: #795f4c;
+  color: var(--muted);
   line-height: 1.9;
 }
 .login-brand-panel > span {
@@ -4240,7 +4239,7 @@ tr:last-child > td {
 .connected-toolbar > input {
   max-width: 380px;
   min-height: 46px;
-  background: white;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 14px;
@@ -4321,7 +4320,7 @@ tr:last-child > td {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px;
-  background: white;
+  background: var(--surface-2);
   min-height: 44px;
 }
 .connected-table-wrap {
@@ -4339,7 +4338,7 @@ tr:last-child > td {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  background: #faf6f2;
+  background: transparent;
 }
 .connected-table th,
 .connected-table td {
@@ -5546,4 +5545,152 @@ html[data-app="gestao"][data-mode="dark"] .login-brand-panel {
 }
 html[data-app="gestao"][data-mode="dark"] .login-brand-panel p {
   color: var(--muted);
+}
+
+/* Spec K — management components (scoped overrides; the menu keeps the shared rules above). */
+html[data-app="gestao"][data-mode="dark"] {
+  --green: #4ade80;
+}
+html[data-app="gestao"] .connected-content .form-label input,
+html[data-app="gestao"] .connected-content .form-label select,
+html[data-app="gestao"] .connected-content .form-label textarea,
+html[data-app="gestao"] .connected-content select,
+html[data-app="gestao"] .connected-content textarea,
+html[data-app="gestao"] .login-page .form-label input,
+html[data-app="gestao"] .login-page .form-label select,
+html[data-app="gestao"] .login-page .form-label textarea,
+html[data-app="gestao"] .admin-app input,
+html[data-app="gestao"] .admin-app select,
+html[data-app="gestao"] .admin-app textarea {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+html[data-app="gestao"] .connected-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]) {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+html[data-app="gestao"] .connected-content input::placeholder,
+html[data-app="gestao"] .login-page input::placeholder,
+html[data-app="gestao"] .admin-app input::placeholder,
+html[data-app="gestao"] .admin-app textarea::placeholder {
+  color: var(--muted);
+}
+html[data-app="gestao"] .connected-content input:focus,
+html[data-app="gestao"] .connected-content select:focus,
+html[data-app="gestao"] .connected-content textarea:focus,
+html[data-app="gestao"] .login-page input:focus,
+html[data-app="gestao"] .admin-app input:focus,
+html[data-app="gestao"] .admin-app select:focus,
+html[data-app="gestao"] .admin-app textarea:focus {
+  border-color: var(--brand);
+}
+html[data-app="gestao"] .connected-content th,
+html[data-app="gestao"] .admin-app th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  background: transparent;
+}
+html[data-app="gestao"] .connected-content td,
+html[data-app="gestao"] .admin-app td {
+  border-bottom: 1px solid var(--border);
+}
+html[data-app="gestao"] .connected-content tbody tr:last-child td,
+html[data-app="gestao"] .admin-app tbody tr:last-child td {
+  border-bottom: 0;
+}
+html[data-app="gestao"] .notice {
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: var(--radius);
+}
+html[data-app="gestao"] .form-error {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+html[data-app="gestao"] .button {
+  border-radius: var(--radius);
+}
+html[data-app="gestao"] .button-outline {
+  background: var(--surface);
+  color: var(--text);
+}
+html[data-app="gestao"] .button-outline:hover,
+html[data-app="gestao"] .button-ghost:hover {
+  background: var(--surface-2);
+}
+html[data-app="gestao"] .button-secondary {
+  background: var(--surface-2);
+}
+html[data-app="gestao"] .button-ghost {
+  color: var(--text);
+}
+html[data-app="gestao"] .button-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+html[data-app="gestao"] .switch {
+  background: var(--border);
+}
+html[data-app="gestao"] .switch.checked {
+  background: var(--green);
+}
+html[data-app="gestao"] .status-pill {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+html[data-app="gestao"] .status-pill.recebido,
+html[data-app="gestao"] .status-pill.em_preparo,
+html[data-app="gestao"] .status-pill.tone-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+html[data-app="gestao"] .status-pill.pronto,
+html[data-app="gestao"] .status-pill.entregue,
+html[data-app="gestao"] .status-pill.tone-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+html[data-app="gestao"] .status-pill.cancelado,
+html[data-app="gestao"] .status-pill.tone-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+html[data-app="gestao"] .status-pill.draft,
+html[data-app="gestao"] .status-pill.tone-neutral {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.order-card .panel-heading {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px 10px;
+  padding: 0 0 6px;
+}
+html[data-app="gestao"] .connected-content .results-big {
+  color: var(--brand);
+}
+html[data-app="gestao"] .results-card {
+  padding: 20px 22px;
+}
+html[data-app="gestao"][data-mode="dark"] .admin-panel.results-highlight {
+  border-color: var(--brand);
+}
+html[data-app="gestao"] .demo-banner {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+html[data-app="gestao"] .demo-dot {
+  background: var(--brand);
+}
+html[data-app="gestao"] .admin-app .search-field input,
+html[data-app="gestao"] .connected-content .search-field input {
+  background: transparent;
+  border: 0;
 }

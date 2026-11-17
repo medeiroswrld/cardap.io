@@ -9,6 +9,7 @@ import {
   paymentNames,
   paysFirst,
   statusLabel,
+  statusTone,
   type OrderStatus,
 } from "@/lib/order-flow";
 import { boardColumns, columnTitle, minutesWaiting, modalKind } from "@/lib/order-board";
@@ -95,6 +96,9 @@ export function OrderBoard({
                     <article className="order-card" key={order.id}>
                       <div className="panel-heading">
                         <strong>#{order.number}</strong>
+                        <span className={`status-pill tone-${statusTone(order.status)}`}>
+                          {statusLabel(order.status, order.fulfillment)}
+                        </span>
                         <span>
                           {fulfillmentLabel({
                             fulfillment: order.fulfillment,
