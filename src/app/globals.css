@@ -4533,6 +4533,19 @@ tr:last-child > td {
   overflow: hidden;
   background: #111;
 }
+/* The list, built in the background while the reels are open (menu-app.tsx). */
+.list-host.list-warming,
+.list-host.list-parked {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+.list-host.list-parked {
+  content-visibility: hidden;
+}
 .reels-heading {
   position: absolute;
   width: 1px;

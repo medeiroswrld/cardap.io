@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowDown,
   ArrowRight,
   Check,
   ChevronDown,
@@ -37,7 +36,11 @@ import { ProductMedia } from "./product-media";
 import { ImmersiveMenu } from "./immersive-menu";
 import { ProductFeedbackModal } from "./product-feedback";
 import { money } from "@/lib/utils";
-import { isValidChange, missingForMinimum, orderTotals } from "@/lib/online-order";
+import {
+  isValidChange,
+  missingForMinimum,
+  orderTotals,
+} from "@/lib/online-order";
 import {
   draftToChoice,
   initialDraft,
@@ -61,7 +64,10 @@ export function MenuApp() {
   const { state, ready, add, notify, mode, slug, online } = useDemo();
   useMenuTheme(state.settings.theme);
   const rawCover = state.settings.theme?.cover_url;
-  const safeCover = rawCover && /^https:\/\/[^"'()\\\s]+$/.test(rawCover) ? rawCover : undefined;
+  const safeCover =
+    rawCover && /^https:\/\/[^"'()\\\s]+$/.test(rawCover)
+      ? rawCover
+      : undefined;
   const [category, setCategory] = useState("todos");
   const [query, setQuery] = useState("");
   // Each restaurant picks how its menu opens; the demo keeps the reels.
@@ -77,22 +83,40 @@ export function MenuApp() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [table, setTable] = useState(mode === "demo" ? 4 : 1);
   const [hasTable, setHasTable] = useState(false);
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  // The list is costly to lay out the first time (text and images of every
+  // dish). While the reels are open it is built once in the background,
+  // invisible ("warming"), then parked with content-visibility so it costs
+  // nothing until the customer switches to it.
+  const [listState, setListState] = useState<"off" | "warming" | "parked">(
+    () => (view === "list" ? "parked" : "off"),
+  );
+  const showList = () => {
+    setListState("parked");
+    setView("list");
+  };
   useEffect(() => {
-    feedRef.current?.scrollTo({ top: 0, behavior: "instant" });
-  }, [category, query, view]);
-  function moveReel(direction: number) {
-    const feed = feedRef.current;
-    if (!feed) return;
-    const index = Math.round(feed.scrollTop / feed.clientHeight);
-    feed.scrollTo({
-      top: (index + direction) * feed.clientHeight,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
-  }
+    if (view !== "feed" || !ready || listState === "parked") return;
+    if (listState === "warming") {
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setListState("parked"));
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    // Safari has no requestIdleCallback: there the delay alone schedules it.
+    const hasIdle = typeof requestIdleCallback === "function";
+    let idle = 0;
+    const delay = setTimeout(() => {
+      if (hasIdle)
+        idle = requestIdleCallback(() => setListState("warming"), {
+          timeout: 3000,
+        });
+      else setListState("warming");
+    }, 1500);
+    return () => {
+      clearTimeout(delay);
+      if (hasIdle && idle) cancelIdleCallback(idle);
+    };
+  }, [view, ready, listState]);
   useEffect(() => {
     queueMicrotask(() => {
       const value = Number(
@@ -123,7 +147,8 @@ export function MenuApp() {
   const closedMessage =
     state.settings.closedMessage ?? "Estamos com os pedidos pausados.";
   const videoItems = state.products.filter(
-    (p) => p.published && p.video && categories.some((c) => c.id === p.categoryId),
+    (p) =>
+      p.published && p.video && categories.some((c) => c.id === p.categoryId),
   );
   const openReels = (productId: string) => {
     setCategory("todos");
@@ -138,7 +163,6 @@ export function MenuApp() {
         .querySelector(".mobile-categories .category-button.active")
         ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
     );
-    feedRef.current?.scrollTo({ top: 0, behavior: "instant" });
   };
   const quickAdd = (p: Product) => {
     if (p.removableIngredients?.length || p.addOns?.length) {
@@ -189,15 +213,6 @@ export function MenuApp() {
           <Link href={`/r/${slug}/pedidos`}>Meus pedidos</Link>
         </nav>
         <div className="header-actions">
-          {view === "feed" && (
-            <button
-              className="reels-house-info"
-              aria-label="Sobre a casa"
-              onClick={() => setInfoOpen(true)}
-            >
-              <Info size={20} />
-            </button>
-          )}
           <button className="table-pill" onClick={() => setInfoOpen(true)}>
             <MapPin size={16} />
             <span>Mesa {String(table).padStart(2, "0")}</span>
@@ -214,45 +229,37 @@ export function MenuApp() {
         </div>
       </header>
       <main className="menu-main">
-        {view === "feed" && (
-          <h1 className="reels-heading">Cardápio de {state.settings.name}</h1>
-        )}
-        {view === "list" && (
-          <div
-            className={`menu-intro${safeCover ? " has-cover" : ""}`}
-            style={safeCover ? { backgroundImage: `url("${safeCover}")` } : undefined}
-          >
-            <div>
-              <div className="open-label">
-                <span
-                  className={
-                    state.settings.accepting ? "open-dot" : "closed-dot"
-                  }
-                />
-                {state.settings.accepting
-                  ? "A casa está aberta"
-                  : "Pedidos pausados"}
-                <span className="intro-dot">·</span>
-                <span>Feito na hora, pra você</span>
-              </div>
-              <h1>
-                Deu fome?{" "}
-                <span>
-                  {mode === "demo"
-                    ? "Deixa com a Brasa."
-                    : `Escolha no ${state.settings.name}.`}
-                </span>
-              </h1>
-              <p>Conheça os sabores da casa. Seu próximo favorito está aqui.</p>
+        <div
+          className={`menu-intro${safeCover ? " has-cover" : ""}`}
+          style={
+            safeCover ? { backgroundImage: `url("${safeCover}")` } : undefined
+          }
+        >
+          <div>
+            <div className="open-label">
+              <span
+                className={state.settings.accepting ? "open-dot" : "closed-dot"}
+              />
+              {state.settings.accepting
+                ? "A casa está aberta"
+                : "Pedidos pausados"}
+              <span className="intro-dot">·</span>
+              <span>Feito na hora, pra você</span>
             </div>
-            <button
-              className="restaurant-info"
-              onClick={() => setInfoOpen(true)}
-            >
-              <Info size={17} /> Sobre a casa
-            </button>
+            <h1>
+              Deu fome?{" "}
+              <span>
+                {mode === "demo"
+                  ? "Deixa com a Brasa."
+                  : `Escolha no ${state.settings.name}.`}
+              </span>
+            </h1>
+            <p>Conheça os sabores da casa. Seu próximo favorito está aqui.</p>
           </div>
-        )}
+          <button className="restaurant-info" onClick={() => setInfoOpen(true)}>
+            <Info size={17} /> Sobre a casa
+          </button>
+        </div>
         {!state.settings.accepting && (
           <div className="notice closed-notice" role="status">
             <Clock3 size={18} />
@@ -265,7 +272,7 @@ export function MenuApp() {
             </div>
           </div>
         )}
-        {view === "list" && videoItems.length > 0 && (
+        {videoItems.length > 0 && (
           <section className="video-strip" aria-label="Pratos em vídeo">
             <h2>Veja em vídeo</h2>
             <div className="video-strip-row">
@@ -333,18 +340,16 @@ export function MenuApp() {
               </label>
               <div className="view-switch" aria-label="Modo de visualização">
                 <button
-                  className={view === "feed" ? "active" : ""}
                   aria-label="Visualizar feed"
-                  aria-pressed={view === "feed"}
+                  aria-pressed={false}
                   onClick={() => setView("feed")}
                 >
                   <Clapperboard size={18} />
                 </button>
                 <button
-                  className={view === "list" ? "active" : ""}
+                  className="active"
                   aria-label="Visualizar lista"
-                  aria-pressed={view === "list"}
-                  onClick={() => setView("list")}
+                  aria-pressed={true}
                 >
                   <List size={19} />
                 </button>
@@ -361,42 +366,9 @@ export function MenuApp() {
               <span>{items.length} opções</span>
             </div>
             <div
-              ref={feedRef}
-              className={view === "feed" ? "product-feed" : "product-list"}
+              className="product-list"
               role="region"
-              aria-label={
-                view === "feed" ? "Cardápio em reels" : "Cardápio em lista"
-              }
-              tabIndex={view === "feed" ? 0 : undefined}
-              onScroll={
-                view === "feed"
-                  ? (event) => {
-                      const feed = event.currentTarget;
-                      setActiveIndex(
-                        Math.round(feed.scrollTop / feed.clientHeight),
-                      );
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                view === "feed"
-                  ? (event) => {
-                      if (event.target !== event.currentTarget) return;
-                      if (
-                        ["ArrowDown", "PageDown", "ArrowUp", "PageUp"].includes(
-                          event.key,
-                        )
-                      ) {
-                        event.preventDefault();
-                        moveReel(
-                          event.key === "ArrowDown" || event.key === "PageDown"
-                            ? 1
-                            : -1,
-                        );
-                      }
-                    }
-                  : undefined
-              }
+              aria-label="Cardápio em lista"
             >
               {items.length === 0 ? (
                 <div className="empty-state">
@@ -421,60 +393,22 @@ export function MenuApp() {
                     aria-label={`${p.name}, ${index + 1} de ${items.length}`}
                   >
                     <div className="food-visual">
-                      <ProductMedia key={p.video || p.image} product={p} />
-                      {view === "feed" && (
-                        <>
-                          <div className="food-image-shade" />
-                          <div className="food-top-label">
-                            {p.tag ? (
-                              <span className="food-tag">
-                                <Flame size={14} />
-                                {p.tag}
-                              </span>
-                            ) : (
-                              <span className="food-tag">
-                                {
-                                  categories.find((c) => c.id === p.categoryId)
-                                    ?.name
-                                }
-                              </span>
-                            )}
-                            <button
-                              className="image-info"
-                              aria-label={`Ver detalhes de ${p.name}`}
-                              onClick={() => setSelected(p)}
-                            >
-                              <Info size={19} />
-                            </button>
-                          </div>
-                          <div className="food-image-caption">
-                            <span>
-                              {
-                                categories.find((c) => c.id === p.categoryId)
-                                  ?.name
-                              }
-                            </span>
-                            <h2>{p.name}</h2>
-                            <p>{p.description}</p>
-                            <button onClick={() => setSelected(p)}>
-                              Conhecer os ingredientes{" "}
-                              <ChevronRight size={14} />
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      {/* Parked in the background: no photo views are counted. */}
+                      <ProductMedia
+                        key={p.video || p.image}
+                        product={p}
+                        suspended={view !== "list"}
+                      />
                     </div>
                     <div className="food-bottom">
-                      {view === "list" && (
-                        <div className="list-product-info">
-                          <h2>
-                            <button onClick={() => setSelected(p)}>
-                              {p.name}
-                            </button>
-                          </h2>
-                          <p>{p.description}</p>
-                        </div>
-                      )}
+                      <div className="list-product-info">
+                        <h2>
+                          <button onClick={() => setSelected(p)}>
+                            {p.name}
+                          </button>
+                        </h2>
+                        <p>{p.description}</p>
+                      </div>
                       <div className="price-block">
                         <span>
                           {p.available ? "Feito na hora" : "Volta em breve"}
@@ -498,34 +432,10 @@ export function MenuApp() {
                         </span>
                       </Button>
                     </div>
-                    {view === "feed" && (
-                      <div className="feed-card-footer">
-                        <span>
-                          <ArrowDown size={14} />{" "}
-                          {index < items.length - 1
-                            ? "Deslize para ver mais"
-                            : "Você viu todos os pratos"}
-                        </span>
-                        <span>
-                          {String(index + 1).padStart(2, "0")} /{" "}
-                          {String(items.length).padStart(2, "0")}
-                        </span>
-                      </div>
-                    )}
                   </article>
                 ))
               )}
             </div>
-            {view === "feed" && items.length > 1 && (
-              <button
-                className="scroll-hint"
-                aria-label="Próximo prato"
-                disabled={activeIndex >= items.length - 1}
-                onClick={() => moveReel(1)}
-              >
-                <ArrowDown size={20} /> <span>Próximo prato</span>
-              </button>
-            )}
           </section>
           <aside className="bag-aside">
             <Bag onCheckout={() => setCheckoutOpen(true)} />
@@ -592,11 +502,18 @@ export function MenuApp() {
           onProduct={setSelected}
           onBag={() => setBagOpen(true)}
           onInfo={() => setInfoOpen(true)}
-          onList={() => setView("list")}
+          onList={showList}
           onFeedback={setFeedbackProduct}
         />
-      ) : (
-        regularCatalog
+      ) : null}
+      {listState !== "off" && (
+        <div
+          className={`list-host${view === "list" ? "" : ` list-${listState}`}`}
+          inert={view !== "list"}
+          aria-hidden={view !== "list" || undefined}
+        >
+          {regularCatalog}
+        </div>
       )}
       <ProductFeedbackModal
         restaurantId={feedbackProduct?.restaurantId || ""}
@@ -736,7 +653,11 @@ export function Bag({
   const showPrompt = prompting && count > 0;
   const change = (index: number, delta: number) => {
     const nextCount = state.bag.reduce(
-      (sum, b, i) => sum + (i === index ? Math.max(0, Math.min(20, b.quantity + delta)) : b.quantity),
+      (sum, b, i) =>
+        sum +
+        (i === index
+          ? Math.max(0, Math.min(20, b.quantity + delta))
+          : b.quantity),
       0,
     );
     if (nextCount === 0) setPrompting(false);
@@ -788,7 +709,11 @@ export function Bag({
           >
             {offers.hasOffers ? "Não, obrigado, finalizar" : "Finalizar pedido"}
           </Button>
-          <button type="button" className="button button-ghost" onClick={() => setPrompting(false)}>
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => setPrompting(false)}
+          >
             Voltar para a sacola
           </button>
         </div>
@@ -1025,7 +950,9 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
   // The flow is fixed when the checkout opens; a catalog refresh must not
   // silently turn an online order into a table order (or vice versa).
   const [useOnline] = useState(() => !!online && !hasTable);
-  const [draft, setDraft] = useState(() => (online ? initialDraft(online) : null));
+  const [draft, setDraft] = useState(() =>
+    online ? initialDraft(online) : null,
+  );
   if (draft && online) {
     const reconciled = reconcileDraft(draft, online);
     if (reconciled !== draft) setDraft(reconciled);
@@ -1200,7 +1127,8 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
       <p className="privacy-note">
         Seu nome e WhatsApp serão usados para atender este pedido. O número
         informado não é verificado.{" "}
-        {useOnline && draft?.fulfillment === "entrega" &&
+        {useOnline &&
+          draft?.fulfillment === "entrega" &&
           "O endereço é usado apenas para entregar este pedido. "}
         <Link href="/privacidade">Entenda sua privacidade</Link>.
       </p>
