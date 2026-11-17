@@ -1,6 +1,6 @@
 "use client";
 import { OrderChoices } from "./order-choices";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useDemo, type OnlineChoice } from "./demo-provider";
+import { categoryThumb } from "@/lib/menu-look";
 import { hasOwnStyle } from "@/lib/menu-theme";
 import { useMenuTheme } from "./use-menu-theme";
 import { Brand, DemoBanner } from "./brand";
@@ -135,6 +136,13 @@ export function MenuApp() {
       c.visible &&
       state.products.some((p) => p.categoryId === c.id && p.published),
   );
+  const thumbs = useMemo(
+    () =>
+      new Map(
+        state.categories.map((c) => [c.id, categoryThumb(state.products, c.id)] as const),
+      ),
+    [state.categories, state.products],
+  );
   const items = state.products.filter(
     (p) =>
       p.published &&
@@ -183,19 +191,28 @@ export function MenuApp() {
         className={`category-button ${category === "todos" ? "active" : ""}`}
         onClick={() => choose("todos")}
       >
-        <Utensils size={21} />
+        <span className="category-thumb" aria-hidden="true">
+          <Utensils size={21} />
+        </span>
         <span>Para você</span>
         <ChevronRight size={16} />
       </button>
       {categories.map((c) => {
         const Icon = categoryIcons[c.icon] || Utensils;
+        const thumb = thumbs.get(c.id);
         return (
           <button
             key={c.id}
             className={`category-button ${category === c.id ? "active" : ""}`}
             onClick={() => choose(c.id)}
           >
-            <Icon size={21} />
+            <span className="category-thumb" aria-hidden="true">
+              {thumb ? (
+                <img src={thumb} alt="" width={56} height={56} loading="lazy" decoding="async" />
+              ) : (
+                <Icon size={21} />
+              )}
+            </span>
             <span>{c.name}</span>
             <ChevronRight size={16} />
           </button>
