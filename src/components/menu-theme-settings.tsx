@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/menu-fonts";
 import { useState, type CSSProperties } from "react";
 import { Button } from "./ui/button";
 import { browserClient } from "@/lib/supabase/browser";

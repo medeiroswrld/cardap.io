@@ -5,7 +5,7 @@ import { DemoContext, type Checkout } from "./demo-provider";
 import { catalogState, type Catalog } from "@/lib/connected-types";
 import type { BagItem, DemoState } from "@/lib/types";
 import { ApiRequestError, apiErrorMessages, requestJson } from "@/lib/client-api";
-import { ensureGuestSession } from "@/lib/guest-session";
+import { ensureGuestSession, forgetGuestSession } from "@/lib/guest-session";
 import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
 export function ConnectedMenuProvider({
@@ -239,6 +239,9 @@ export function ConnectedMenuProvider({
         },
       ));
     } catch (error) {
+      // Expired guest session: the next attempt creates a new one.
+      if (error instanceof ApiRequestError && error.status === 401)
+        forgetGuestSession(catalog.restaurant.id);
       if (
         data.online?.fulfillment === "entrega" &&
         error instanceof ApiRequestError &&
