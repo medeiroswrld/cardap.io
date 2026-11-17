@@ -1876,7 +1876,8 @@ button:hover:not(:disabled) {
 .page-heading h1 {
   font-size: 25px;
   line-height: 1.35;
-  font-weight: 800;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .page-heading p {
   font-size: 10px;
@@ -1940,6 +1941,14 @@ button:hover:not(:disabled) {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
   gap: 23px;
+}
+html[data-app="gestao"] .admin-panel {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--card-shadow);
+}
+html[data-mode="dark"][data-app="gestao"] .admin-panel {
+  border-color: transparent;
 }
 .admin-panel {
   border: 1px solid var(--border);
@@ -4084,7 +4093,7 @@ tr:last-child > td {
   position: sticky;
   top: 0;
   height: 100dvh;
-  background: #fffdfb;
+  background: var(--sidebar);
   border-right: 1px solid var(--border);
   padding: 28px 20px;
   display: flex;
@@ -4108,17 +4117,23 @@ tr:last-child > td {
   gap: 12px;
   padding: 13px 14px;
   min-height: 46px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   text-align: left;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
+  color: var(--muted);
 }
 .connected-sidebar nav button.active {
-  background: #f5e5df;
-  color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-contrast);
 }
 .connected-sidebar nav button:hover {
-  background: #f9eeea;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.connected-sidebar nav button.active:hover {
+  background: var(--brand-dark);
+  color: var(--brand-contrast);
 }
 .connected-sidebar-foot {
   margin-top: auto;
@@ -4137,7 +4152,7 @@ tr:last-child > td {
   border-bottom: 1px solid var(--border);
   gap: 16px;
   font-size: 12px;
-  background: #fffdfb;
+  background: var(--background);
 }
 .connected-top > span {
   display: flex;
@@ -4154,12 +4169,14 @@ tr:last-child > td {
 }
 .connected-content h1 {
   font-size: 32px;
-  letter-spacing: -1px;
+  letter-spacing: 0;
+  font-weight: 600;
   margin: 8px 0;
 }
 .connected-content h2 {
   font-size: 20px;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
+  font-weight: 600;
 }
 .connected-content p {
   color: var(--muted);
@@ -5434,4 +5451,79 @@ h3,
   background: var(--brand);
   color: var(--brand-contrast);
   font-weight: 700;
+}
+
+/* Spec K — Fome Play design system (management area only in phase 1). */
+html[data-app="gestao"] {
+  --background: #f6f5f3;
+  --sidebar: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #efece8;
+  --soft: #f1efec;
+  --border: #e7e3de;
+  --text: #1d1d1f;
+  --muted: #6b6b70;
+  --brand: #d32f2f;
+  --brand-dark: #b3261e;
+  --brand-contrast: #ffffff;
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --danger-bg: #fee2e2;
+  --danger-text: #991b1b;
+  --radius: 14px;
+  --radius-card: 20px;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --font-sans: "Poppins", sans-serif;
+  --font-heading: "Poppins", sans-serif;
+}
+html[data-app="gestao"][data-mode="dark"] {
+  --background: #161618;
+  --sidebar: #1f1f22;
+  --surface: #242427;
+  --surface-2: #2e2e32;
+  --soft: #2a2a2e;
+  --border: #38383d;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --success-bg: #14532d;
+  --success-text: #bbf7d0;
+  --warning-bg: #78350f;
+  --warning-text: #fde68a;
+  --danger-bg: #7f1d1d;
+  --danger-text: #fecaca;
+  --card-shadow: none;
+}
+html[data-app="gestao"] body {
+  font-weight: 400;
+}
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mode-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.status-pill.tone-success { background: var(--success-bg); color: var(--success-text); }
+.status-pill.tone-warning { background: var(--warning-bg); color: var(--warning-text); }
+.status-pill.tone-danger { background: var(--danger-bg); color: var(--danger-text); }
+.status-pill.tone-neutral { background: var(--surface-2); color: var(--muted); }
+.login-mode-toggle { position: absolute; top: 16px; right: 16px; }
+.login-form-panel { position: relative; }
+html[data-app="gestao"][data-mode="dark"] .login-brand-panel {
+  background: var(--surface);
+}
+html[data-app="gestao"][data-mode="dark"] .login-brand-panel p {
+  color: var(--muted);
 }

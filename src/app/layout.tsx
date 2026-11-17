@@ -3,6 +3,10 @@ import "@fontsource-variable/manrope";
 import "./globals.css";
 import { MODE_SCRIPT } from "@/lib/color-mode";
 import { AppScope } from "@/components/app-scope";
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/500.css";
+import "@fontsource/poppins/600.css";
+import "@fontsource/poppins/700.css";
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",

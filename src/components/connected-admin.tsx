@@ -51,6 +51,7 @@ import { useOrderPrinting } from "./use-order-printing";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
 import { ResultsReportPanel } from "./results-report";
+import { ModeToggle } from "./mode-toggle";
 type Save = (body: unknown) => Promise<void>;
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
@@ -195,6 +196,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
           ))}
         </nav>
         <div className="connected-sidebar-foot">
+          <ModeToggle />
           {data && (
             <Link href={`/r/${data.restaurant.slug}`} target="_blank">
               Ver cardápio <ArrowUpRight size={17} />

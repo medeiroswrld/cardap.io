@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
+import { ModeToggle } from "./mode-toggle";
 export function LoginForm({ configured }: { configured: boolean }) {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "recover" | "signup">("login");
@@ -33,6 +34,7 @@ export function LoginForm({ configured }: { configured: boolean }) {
         <span>Do primeiro olhar à última mordida.</span>
       </div>
       <div className="login-form-panel">
+        <ModeToggle className="login-mode-toggle" />
         <Link className="login-back" href="/r/demo">
           ← Voltar ao cardápio
         </Link>
