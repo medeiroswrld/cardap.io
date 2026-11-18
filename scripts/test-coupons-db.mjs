@@ -11,7 +11,8 @@ const a = "17000000-0000-4000-8000-0000000000a1",
   cat = "37000000-0000-4000-8000-0000000000a1",
   burger = "47000000-0000-4000-8000-000000000001",
   table = "67000000-0000-4000-8000-0000000000a1",
-  zone = "97000000-0000-4000-8000-0000000000a1";
+  zone = "97000000-0000-4000-8000-0000000000a1",
+  zoneFree = "97000000-0000-4000-8000-0000000000a2";
 const allDay = JSON.stringify(
   Array.from({ length: 7 }, (_, day) => ({ day, open: "00:00", close: "23:59:59" })),
 );
@@ -123,10 +124,20 @@ await ok("fixed coupon larger than the subtotal discounts the subtotal", async (
   // Discount would equal the whole subtotal: a free pickup order is rejected (total must stay positive)...
   await rejects(
     () => place(pickup({ items: items(1), coupon_code: "FIXO30", expected_discount_cents: 2500 })),
-    "COUPON_MIN_ORDER",
+    "COUPON_EXCEEDS_TOTAL",
+  );
+  // ...and so is a delivery to a zone with no fee.
+  await root();
+  await db.query(
+    "insert into delivery_zones(id,restaurant_id,name,fee_cents,estimate_minutes,active) values($1,$2,'Grátis',0,40,true)",
+    [zoneFree, a],
+  );
+  await coupon(ownerA, null, { code: "FIXO80", kind: "fixed", value: 8000 });
+  await rejects(
+    () => place(delivery({ address: { zone_id: zoneFree, street: "Rua das Flores", number: "120" }, expected_fee_cents: 0, coupon_code: "FIXO80", expected_discount_cents: 5000 })),
+    "COUPON_EXCEEDS_TOTAL",
   );
   // ...while a delivery still pays the fee, so the discount is capped at the subtotal.
-  await coupon(ownerA, null, { code: "FIXO80", kind: "fixed", value: 8000 });
   const capped = await place(delivery({ coupon_code: "FIXO80", expected_discount_cents: 5000 }));
   assert.equal(capped.discount_cents, 5000);
   assert.equal(capped.total_cents, 700);
@@ -177,6 +188,17 @@ await ok("idempotent replay returns the same order with its discount", async () 
   assert.equal(second.id, first.id);
   assert.equal(second.total_cents, first.total_cents);
   assert.equal(second.discount_cents, 500);
+});
+
+await ok("replaying a key with a different coupon or origin is an idempotency conflict", async () => {
+  const key = crypto.randomUUID();
+  const token = await guest();
+  await place(pickup({ coupon_code: "BEM10", expected_discount_cents: 500 }), key, token);
+  await rejects(() => place(pickup({ coupon_code: "FIXO30", expected_discount_cents: 3000 }), key, token), "IDEMPOTENCY_CONFLICT");
+  const key2 = crypto.randomUUID();
+  const token2 = await guest();
+  await place(pickup({ origin: "instagram" }), key2, token2);
+  await rejects(() => place(pickup({ origin: "ifood" }), key2, token2), "IDEMPOTENCY_CONFLICT");
 });
 
 await ok("orders without a coupon keep a zero discount", async () => {
@@ -259,13 +281,21 @@ await ok("only the owner calls owner functions; others are blocked", async () =>
   await rejects(() => db.query("select place_guest_order($1,'x',$2,'{}')", [a, crypto.randomUUID()]), "permission denied");
 });
 
-await ok("check_coupon is public and does not leak other data", async () => {
+await ok("check_coupon is API-only: anon and authenticated are denied, the service role works", async () => {
   await anon();
+  await rejects(() => db.query("select check_coupon($1,'BEM10')", [a]), "permission denied");
+  await login(ownerA);
+  await rejects(() => db.query("select check_coupon($1,'BEM10')", [a]), "permission denied");
+  await root();
+  await db.exec("set role service_role");
   const r = (await db.query("select check_coupon($1,' bem10 ') as r", [a])).rows[0].r;
-  assert.deepEqual(r, { code: "BEM10", kind: "percent", value: 10, min_order_cents: 0 });
+  assert.deepEqual(r, { code: "BEM10", kind: "percent", value: 10, min_order_cents: 0, valid_until: null });
+  const dated = (await db.query("select check_coupon($1,'HOJE') as r", [a])).rows[0].r;
+  assert.match(dated.valid_until, /^\d{4}-\d{2}-\d{2}$/);
   await rejects(() => db.query("select check_coupon($1,'PAUSADO')", [a]), "COUPON_INVALID");
   await rejects(() => db.query("select check_coupon($1,'VENCIDO')", [a]), "COUPON_EXPIRED");
   await rejects(() => db.query("select check_coupon($1,'BEM10')", [b]), "COUPON_INVALID");
+  await anon();
   await rejects(() => db.query("select * from coupons"), "permission denied");
 });
 
@@ -287,6 +317,11 @@ await ok("save_origin builds unique slugs and enforces the limit", async () => {
   assert.equal(await slug("Instagram"), "instagram-2");
   assert.equal(await slug("Promoção São João"), "promocao-sao-joao");
   assert.equal(await slug("!!"), "origem");
+  assert.equal(await slug("ÁGUA Viva"), "agua-viva");
+  assert.equal(await slug("Direto"), "direto-2");
+  const long = await slug("abcdefghijklmnopqrstuvwxy zzzzzzzzzzzzz");
+  assert.equal(long, "abcdefghijklmnopqrstuvwxy");
+  assert.ok(!long.endsWith("-"));
   await rejects(() => db.query("select save_origin($1,'a')", [a]), "INVALID_INPUT");
   const { rows } = await db.query("select count(*)::int n from order_origins where restaurant_id=$1", [a]);
   for (let i = rows[0].n; i < 20; i++) await slug("Origem Extra " + String.fromCharCode(65 + i));

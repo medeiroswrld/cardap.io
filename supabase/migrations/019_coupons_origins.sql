@@ -17,13 +17,14 @@ create policy member_read on public.coupons for select to authenticated using (i
 create table public.order_origins (
  id uuid primary key default gen_random_uuid(),
  restaurant_id uuid not null references public.restaurants(id) on delete cascade,
- slug text not null check (slug ~ '^[a-z0-9-]{2,30}$' and slug not in ('mesa','ifood','instagram')),
+ slug text not null check (slug ~ '^[a-z0-9-]{2,30}$' and slug not in ('mesa','ifood','instagram','direto')),
  name text not null check (length(trim(name)) between 2 and 40),
  created_at timestamptz not null default now(),
  unique (restaurant_id, slug)
 );
 alter table public.order_origins enable row level security;
 create policy member_read on public.order_origins for select to authenticated using (is_member(restaurant_id));
+revoke all on public.coupons, public.order_origins from anon, authenticated;
 grant select on public.coupons,public.order_origins to authenticated;
 
 alter table public.orders add column coupon_code text,
@@ -32,19 +33,20 @@ alter table public.orders add column coupon_code text,
 
 -- Shared rule: returns the discount in cents or raises COUPON_*.
 create function public.coupon_discount(p_restaurant uuid,p_code text,p_subtotal integer) returns integer
-language plpgsql stable security definer set search_path=public as $$
+language plpgsql volatile security definer set search_path=public as $$
 declare c coupons; tz text;
 begin
- select * into c from coupons where restaurant_id=p_restaurant and code=upper(trim(coalesce(p_code,''))) and active;
+ -- Lock the coupon row so a concurrent delete/rename waits for this order transaction.
+ select * into c from coupons where restaurant_id=p_restaurant and code=upper(trim(coalesce(p_code,''))) and active for share;
  if not found then raise exception 'COUPON_INVALID'; end if;
  select timezone into tz from restaurants where id=p_restaurant;
  if c.valid_until is not null and (now() at time zone tz)::date > c.valid_until then raise exception 'COUPON_EXPIRED'; end if;
  if p_subtotal < c.min_order_cents then raise exception 'COUPON_MIN_ORDER'; end if;
- return case when c.kind='percent' then floor(p_subtotal*c.value/100.0)::int else least(c.value,p_subtotal) end;
+ return case when c.kind='percent' then floor(p_subtotal::bigint*c.value/100.0)::int else least(c.value,p_subtotal) end;
 end $$;
 revoke all on function public.coupon_discount(uuid,text,integer) from public,anon,authenticated;
 
--- Public preview for the menu (no subtotal check here; the menu checks the minimum itself and the order revalidates).
+-- Preview for the menu, served through the API (no subtotal check here; the menu checks the minimum itself and the order revalidates).
 create function public.check_coupon(p_restaurant uuid,p_code text) returns jsonb
 language plpgsql stable security definer set search_path=public as $$
 declare c coupons; tz text;
@@ -53,10 +55,11 @@ begin
  if not found then raise exception 'COUPON_INVALID'; end if;
  select timezone into tz from restaurants where id=p_restaurant;
  if c.valid_until is not null and (now() at time zone tz)::date > c.valid_until then raise exception 'COUPON_EXPIRED'; end if;
- return jsonb_build_object('code',c.code,'kind',c.kind,'value',c.value,'min_order_cents',c.min_order_cents);
+ return jsonb_build_object('code',c.code,'kind',c.kind,'value',c.value,'min_order_cents',c.min_order_cents,'valid_until',c.valid_until);
 end $$;
-revoke all on function public.check_coupon(uuid,text) from public;
-grant execute on function public.check_coupon(uuid,text) to anon,authenticated,service_role;
+-- Called only by the Next.js API with the service client (which rate-limits it).
+revoke all on function public.check_coupon(uuid,text) from public,anon,authenticated;
+grant execute on function public.check_coupon(uuid,text) to service_role;
 
 create function public.save_coupon(p_restaurant uuid,p_id uuid,p_coupon jsonb) returns uuid
 language plpgsql security definer set search_path=public as $$
@@ -74,7 +77,8 @@ begin
  on conflict(id) do update set code=excluded.code,kind=excluded.kind,value=excluded.value,min_order_cents=excluded.min_order_cents,valid_until=excluded.valid_until,active=excluded.active
  returning id into saved;
  return saved;
-exception when check_violation or invalid_text_representation or numeric_value_out_of_range or datetime_field_overflow then raise exception 'INVALID_INPUT';
+exception when check_violation or invalid_text_representation or numeric_value_out_of_range or datetime_field_overflow or not_null_violation then raise exception 'INVALID_INPUT';
+ when unique_violation then raise exception 'COUPON_DUPLICATE';
 end $$;
 revoke all on function public.save_coupon(uuid,uuid,jsonb) from public,anon;
 grant execute on function public.save_coupon(uuid,uuid,jsonb) to authenticated;
@@ -108,12 +112,13 @@ language plpgsql security definer set search_path=public as $$
 declare base text; candidate text; n int:=1; created order_origins;
 begin
  if not is_member(p_restaurant,true) then raise exception 'FORBIDDEN'; end if;
+ perform 1 from restaurants where id=p_restaurant for update;
  if length(trim(coalesce(p_name,''))) not between 2 and 40 then raise exception 'INVALID_INPUT'; end if;
  if (select count(*) from order_origins where restaurant_id=p_restaurant)>=20 then raise exception 'LIMIT_REACHED'; end if;
- base:=left(trim(both '-' from regexp_replace(lower(translate(trim(p_name),'áàâãäéèêëíìîïóòôõöúùûüçñ','aaaaaeeeeiiiiooooouuuucn')),'[^a-z0-9]+','-','g')),26);
+ base:=trim(both '-' from left(trim(both '-' from regexp_replace(translate(lower(trim(p_name)),'áàâãäéèêëíìîïóòôõöúùûüçñ','aaaaaeeeeiiiiooooouuuucn'),'[^a-z0-9]+','-','g')),26));
  if length(base)<2 then base:='origem'; end if;
  candidate:=base;
- while candidate in ('mesa','ifood','instagram') or exists(select 1 from order_origins where restaurant_id=p_restaurant and slug=candidate) loop
+ while candidate in ('mesa','ifood','instagram','direto') or exists(select 1 from order_origins where restaurant_id=p_restaurant and slug=candidate) loop
   n:=n+1; candidate:=base||'-'||n;
  end loop;
  insert into order_origins(restaurant_id,slug,name) values(p_restaurant,candidate,trim(p_name)) returning * into created;
@@ -235,8 +240,8 @@ begin
   fee:=zone.fee_cents;
  end if;
  total:=total-discount+fee;
- -- A coupon that would make the order free is rejected: orders.total_cents must stay positive.
- if total<=0 then raise exception 'COUPON_MIN_ORDER'; end if;
+ -- A coupon worth the whole order is rejected: orders.total_cents must stay positive.
+ if total<=0 then raise exception 'COUPON_EXCEEDS_TOTAL'; end if;
  origin_slug:=nullif(p_payload->>'origin','');
  if not (kind<>'mesa' and origin_slug is not null and (origin_slug in ('ifood','instagram') or exists(select 1 from order_origins where restaurant_id=p_restaurant and slug=origin_slug))) then origin_slug:=null; end if;
  if change_for is not null and (payment<>'dinheiro' or change_for<total) then raise exception 'INVALID_CHANGE'; end if;
