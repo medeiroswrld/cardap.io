@@ -57,17 +57,46 @@ export function dropsCoupon(code: string | undefined): boolean {
 export function couponLink(slug: string, code: string): string {
   return `${SITE_URL}/r/${slug}?cupom=${encodeURIComponent(code)}`;
 }
+// Money typed by a restaurant owner -> cents, or null when ambiguous/invalid.
+// Accepts 1.234,56 / 1234,56 / 5 / 5,5, and a lone dot with 1-2 decimals (5.00, 2.5).
+export function parseMoneyInput(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  let intPart: string;
+  let frac = "";
+  if (t.includes(",")) {
+    const parts = t.split(",");
+    if (parts.length !== 2) return null;
+    intPart = parts[0];
+    frac = parts[1];
+    if (!/^\d{1,2}$/.test(frac)) return null;
+    if (!/^(\d+|\d{1,3}(\.\d{3})+)$/.test(intPart)) return null;
+    intPart = intPart.replaceAll(".", "");
+  } else if (/^\d+$/.test(t)) {
+    intPart = t;
+  } else if (/^\d+\.\d{1,2}$/.test(t)) {
+    [intPart, frac] = t.split(".");
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(t)) {
+    intPart = t.replaceAll(".", "");
+  } else {
+    return null;
+  }
+  const cents = Number(intPart) * 100 + Number(frac.padEnd(2, "0") || "0");
+  return Number.isSafeInteger(cents) ? cents : null;
+}
 export function winBackMessage(
   template: string,
   vars: { nome: string; restaurante: string; link: string },
 ): string {
   const first = vars.nome.trim().split(/\s+/)[0] ?? "";
-  // An empty name must not leave "Oi !" behind.
-  return template
-    .replaceAll("{nome}", first)
-    .replace(/[ 	]+([,!.?])/g, "$1")
-    .replaceAll("{restaurante}", vars.restaurante)
-    .replaceAll("{link}", vars.link);
+  // An empty name must not leave "Oi !" or a leading ", " behind; function replacers keep "$" literal.
+  const text = template
+    .replaceAll("{nome}", () => first)
+    .replace(/[ \t]+([,!.?])/g, "$1")
+    .replaceAll("{restaurante}", () => vars.restaurante)
+    .replaceAll("{link}", () => vars.link)
+    .replace(/^[\s,;:.!?-]+/, "");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 export function whatsappUrl(phone: string, text: string): string {
   return `https://wa.me/55${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;

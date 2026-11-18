@@ -55,7 +55,14 @@ export function OriginsPanel({
     queueMicrotask(() => void load());
   }, [load]);
 
+  useEffect(() => {
+    if (!note) return;
+    const t = setTimeout(() => setNote(""), 3000);
+    return () => clearTimeout(t);
+  }, [note]);
+
   async function copy(slugValue: string, label: string) {
+    setNote("");
     try {
       await navigator.clipboard.writeText(originLink(slug, slugValue));
       setNote(`Link de ${label} copiado.`);

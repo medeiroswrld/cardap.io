@@ -45,6 +45,23 @@ test("win-back message uses first name only and replaces every placeholder", () 
   });
   assert.equal(text, "Oi Maria! Faz tempo no Pizzaria: https://x/y Maria");
 });
+test("win-back message with empty name and special characters", () => {
+  assert.equal(c.winBackMessage("{nome}, volta!", { nome: "  ", restaurante: "X", link: "l" }), "Volta!");
+  assert.equal(c.winBackMessage("Oi {nome}! Vem.", { nome: "", restaurante: "X", link: "l" }), "Oi! Vem.");
+  assert.equal(
+    c.winBackMessage("{restaurante}: {link}", { nome: "A", restaurante: "Pizza $& Cia $1", link: "https://x/?a=$&" }),
+    "Pizza $& Cia $1: https://x/?a=$&",
+  );
+});
+test("parseMoneyInput", () => {
+  const ok = {
+    "5": 500, "5,5": 550, "5,50": 550, "1234,56": 123456, "1.234,56": 123456, "5.00": 500, "2.5": 250,
+    "1.000": 100000, "1.000,50": 100050, "0,01": 1, " 7 ": 700, "1.000.000": 100000000,
+  };
+  for (const [k, v] of Object.entries(ok)) assert.equal(c.parseMoneyInput(k), v, k);
+  const bad = ["", "  ", "abc", "-1", "5,", ",5", "1,2,3", "5,555", "1.23.4", "1.2345", "12.3456", "1..000", "R$ 5", "1,000.50", "1e3"];
+  for (const b of bad) assert.equal(c.parseMoneyInput(b), null, b);
+});
 test("wa.me link keeps digits only and encodes the text", () => {
   assert.equal(c.whatsappUrl("(15) 99999-1234", "Oi, tudo bem?"), "https://wa.me/5515999991234?text=Oi%2C%20tudo%20bem%3F");
 });

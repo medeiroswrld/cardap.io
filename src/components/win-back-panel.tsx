@@ -48,7 +48,8 @@ export function WinBackPanel({
   const latest = useRef(0);
   const today = todayIn(timezone);
   const usable = coupons.filter((c) => c.active && !couponExpired(c, today));
-  const link = couponCode ? couponLink(slug, couponCode) : `${SITE_URL}/r/${slug}`;
+  const selected = usable.some((c) => c.code === couponCode) ? couponCode : "";
+  const link = selected ? couponLink(slug, selected) : `${SITE_URL}/r/${slug}`;
 
   const load = useCallback(
     async (offset: number) => {
@@ -61,7 +62,11 @@ export function WinBackPanel({
         );
         if (id !== latest.current) return;
         setTotal(page.total);
-        setRows((prev) => (offset === 0 ? page.rows : [...prev, ...page.rows]));
+        setRows((prev) => {
+          if (offset === 0) return page.rows;
+          const seen = new Set(prev.map((r) => r.id));
+          return [...prev, ...page.rows.filter((r) => !seen.has(r.id))];
+        });
       } catch {
         if (id === latest.current) setError("Não foi possível carregar a lista. Tente novamente.");
       } finally {
@@ -100,7 +105,7 @@ export function WinBackPanel({
       </div>
       <label className="form-label">
         Cupom para enviar
-        <select value={couponCode} onChange={(e) => setCouponCode(e.target.value)}>
+        <select value={selected} onChange={(e) => setCouponCode(e.target.value)}>
           <option value="">Sem cupom</option>
           {usable.map((c) => (
             <option key={c.id} value={c.code}>

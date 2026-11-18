@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
-import { couponLink, normalizeCode, type CouponRow, type CouponStats } from "@/lib/coupons";
+import { couponLink, normalizeCode, parseMoneyInput, type CouponRow, type CouponStats } from "@/lib/coupons";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/dialog";
 
@@ -23,9 +23,9 @@ export function couponExpired(c: { valid_until: string | null }, today: string) 
 function valueText(c: CouponRow) {
   return c.kind === "percent" ? `${c.value}%` : money(c.value);
 }
-function centsFrom(text: string): number {
-  const n = Number(text.replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? Math.round(n * 100) : NaN;
+const MONEY_INVALID = "Valor inválido. Use vírgula, ex.: 5,00";
+function formMessage(message: string) {
+  return message === "INVALID_INPUT" ? "Confira os campos do cupom." : message;
 }
 function reaisText(cents: number) {
   return cents ? (cents / 100).toFixed(2).replace(".", ",") : "";
@@ -50,19 +50,33 @@ export function CouponsAdmin({
   const [editing, setEditing] = useState<CouponRow | "new" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [statsError, setStatsError] = useState(false);
   const today = todayIn(timezone);
+
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(""), 3000);
+    return () => clearTimeout(t);
+  }, [message]);
 
   useEffect(() => {
     let active = true;
     requestJson<CouponStats>(`/api/restaurants/${restaurantId}/coupon-stats`)
-      .then((s) => active && setStats(s))
-      .catch(() => undefined);
+      .then((s) => {
+        if (!active) return;
+        setStats(s);
+        setStatsError(false);
+      })
+      .catch(() => {
+        if (active) setStatsError(true);
+      });
     return () => {
       active = false;
     };
   }, [restaurantId, coupons]);
 
   async function copy(c: CouponRow) {
+    setMessage("");
     try {
       await navigator.clipboard.writeText(couponLink(slug, c.code));
       setMessage(`Link do cupom ${c.code} copiado.`);
@@ -104,13 +118,23 @@ export function CouponsAdmin({
           <h2 id="coupons-title">Cupons de desconto</h2>
           <p className="field-help">O cliente aplica o código na finalização ou entra pelo link do cupom.</p>
         </div>
-        <Button onClick={() => setEditing("new")}>
+        <Button
+          onClick={() => {
+            setMessage("");
+            setEditing("new");
+          }}
+        >
           <Plus size={17} /> Novo cupom
         </Button>
       </div>
       {error && (
         <p role="alert" className="form-error">
           {error}
+        </p>
+      )}
+      {statsError && (
+        <p role="status" className="field-help">
+          Não foi possível carregar o uso dos cupons.
         </p>
       )}
       {message && (
@@ -146,7 +170,14 @@ export function CouponsAdmin({
                   <Button variant="outline" size="sm" onClick={() => void copy(c)}>
                     <Copy size={15} /> Copiar link
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setEditing(c)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMessage("");
+                      setEditing(c);
+                    }}
+                  >
                     <Pencil size={15} /> Editar
                   </Button>
                   <Button variant="outline" size="sm" disabled={busy} onClick={() => void toggle(c)}>
@@ -211,12 +242,18 @@ function CouponForm({
       amount = Number(value);
       if (!Number.isInteger(amount) || amount < 1 || amount > 90) return setError("O desconto deve ser de 1% a 90%.");
     } else {
-      amount = centsFrom(value);
-      if (!Number.isFinite(amount) || amount < 1 || amount > 50000)
-        return setError("O desconto deve ser de R$ 0,01 a R$ 500,00.");
+      const cents = parseMoneyInput(value);
+      if (cents === null) return setError(MONEY_INVALID);
+      if (cents < 1 || cents > 50000) return setError("O desconto deve ser de R$ 0,01 a R$ 500,00.");
+      amount = cents;
     }
-    const minCents = min.trim() ? centsFrom(min) : 0;
-    if (!Number.isFinite(minCents) || minCents < 0) return setError("Confira o pedido mínimo.");
+    let minCents = 0;
+    if (min.trim()) {
+      const m = parseMoneyInput(min);
+      if (m === null) return setError(MONEY_INVALID);
+      if (m < 0 || m > 100000) return setError("O pedido mínimo vai até R$ 1.000,00.");
+      minCents = m;
+    }
     try {
       await save({
         action: "save_coupon",
@@ -230,7 +267,7 @@ function CouponForm({
       });
       onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(formMessage((err as Error).message));
     }
   }
 
