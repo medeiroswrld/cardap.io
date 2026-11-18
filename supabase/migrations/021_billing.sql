@@ -73,9 +73,11 @@ language sql stable security definer set search_path=public as $$
    and restaurant_billing_state(restaurant_id)<>'cancelado'))::int
 $$;
 -- Default privileges on Supabase grant EXECUTE directly to anon, so revoke from anon explicitly.
-revoke all on function public.restaurant_billing_state(uuid) from public, anon;
+-- The state (bloqueado, cancel_at...) is billing detail: service role only. restaurant_plan is public
+-- (the anonymous menu needs it) and reads the state internally as its definer.
+revoke all on function public.restaurant_billing_state(uuid) from public, anon, authenticated;
 revoke all on function public.restaurant_plan(uuid) from public, anon;
-grant execute on function public.restaurant_billing_state(uuid) to authenticated, service_role;
+grant execute on function public.restaurant_billing_state(uuid) to service_role;
 grant execute on function public.restaurant_plan(uuid) to anon, authenticated, service_role;
 revoke all on function public.founder_slots_left() from public, anon;
 grant execute on function public.founder_slots_left() to anon, authenticated, service_role;

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { enforcePublicLimit } from "@/lib/rate-limit";
 import { serviceClient } from "@/lib/supabase/server";
-import { billingState, restaurantPlan } from "@/lib/billing-server";
+import { readBilling } from "@/lib/billing-server";
 import { gateOrder } from "@/lib/plans";
 import { orderPayload } from "@/lib/order-payload";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
@@ -24,7 +24,8 @@ async function handlePOST(
     else await enforcePublicLimit(request, id, "order_online", hash(token));
     // Billing not in good standing pauses orders (the menu stays online); Essencial has no coupons.
     const service = serviceClient();
-    const [state, plan] = await Promise.all([billingState(id, service), restaurantPlan(id, service)]);
+    // A failing billing read must never stop orders: readBilling then answers profissional/ativo.
+    const { plan, state } = await readBilling(id);
     const gated = gateOrder(payload, plan, state);
     if (gated.blocked)
       return Response.json({ error: "CLOSED" }, { status: errorStatus("CLOSED"), headers: noStore });

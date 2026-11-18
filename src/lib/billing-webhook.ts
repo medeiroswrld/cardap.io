@@ -15,6 +15,8 @@ export type WebhookDeps = {
   asaas: () => Asaas;
   token: string | undefined;
   notify?: (restaurantId: string, plan: string) => Promise<void>;
+  // drops the cached public menu (its plan decides which upsell offers show)
+  invalidate?: (restaurantId: string) => Promise<void>;
   // detail: a short reason for `webhook_ignored`, the billing_events id for `webhook_unactivated` and `notify_failed`
   log?: (
     event: "billing.founder_overflow" | "billing.webhook_ignored" | "billing.webhook_unactivated" | "billing.notify_failed",
@@ -221,6 +223,7 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
         .from("restaurant_billing")
         .update({ subscription_claimed_at: null })
         .eq("restaurant_id", row.restaurant_id)
+        .eq("subscription_claimed_at", nowDate.toISOString()) // only our own lease
         .then(() => undefined, () => undefined);
       throw error;
     }
@@ -262,6 +265,14 @@ async function applyPatch(
       } catch {
         deps.log?.("billing.notify_failed", eventId);
       }
+    }
+  }
+  // plan or state changed: the public menu (cached 60 s) must not keep showing the old plan
+  if ("status" in decision.patch || "plan" in decision.patch) {
+    try {
+      await deps.invalidate?.(row.restaurant_id);
+    } catch {
+      // the 60 s window bounds staleness
     }
   }
   if (decision.cancelAsaasSubscription && row.asaas_subscription_id) {

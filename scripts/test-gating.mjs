@@ -6,9 +6,11 @@ import { loader } from "./lib/ts-loader.mjs";
 // Server-side plan gating: the feature map, the catalog action gate, requirePlan/billingState with a
 // fake Supabase client, order gating (billing state and coupons) and a source scan that every
 // Profissional route really calls requirePlan with the right feature.
+let service = null; // the fake service client of the test at hand
+const warnings = [];
 const load = loader({
-  "./supabase/server": { serviceClient: () => { throw new Error("real client must not be used"); } },
-  "./observability/logger": { logger: { warn() {}, error() {} } },
+  "./supabase/server": { serviceClient: () => { if (!service) throw new Error("real client must not be used"); return service; } },
+  "./observability/logger": { logger: { warn: (event, fields) => warnings.push([event, fields]), error() {} } },
 });
 const p = load("src/lib/plans.ts");
 const billing = load("src/lib/billing-server.ts");
@@ -73,6 +75,9 @@ test("catalog actions: the Profissional ones and the Essencial allowed set", () 
 
 test("catalog actions: upsell is gated only when it turns something on", () => {
   assert.equal(p.catalogActionFeature({ action: "save_option", offer_in_bag: true }), "upsell");
+  // already offered: renaming/repricing (the editor resends offer_in_bag: true) keeps working
+  assert.equal(p.catalogActionFeature({ action: "save_option", offer_in_bag: true }, true), null);
+  assert.equal(p.catalogActionFeature({ action: "save_option", offer_in_bag: false }, true), null);
   assert.equal(p.catalogActionFeature({ action: "save_option", offer_in_bag: false }), null);
   assert.equal(p.catalogActionFeature({ action: "save_option" }), null);
   assert.equal(p.catalogActionFeature({ action: "options_in_bag_all", offer: true }), "upsell");
@@ -81,13 +86,33 @@ test("catalog actions: upsell is gated only when it turns something on", () => {
   assert.equal(p.catalogActionFeature({ action: "bag_suggestions", product_ids: [] }), null);
 });
 
-test("menu_theme: Essencial may only send logo_url, cover_url and brand", () => {
-  const feature = (theme) => p.catalogActionFeature({ action: "menu_theme", theme });
-  assert.equal(feature({}), null);
-  assert.equal(feature({ logo_url: "https://x/a.png" }), null);
-  assert.equal(feature({ logo_url: "u", cover_url: "u", brand: "#aa0000" }), null);
-  for (const key of ["preset", "background", "surface", "text", "heading_font", "body_font", "radius", "mode"])
-    assert.equal(feature({ brand: "#aa0000", [key]: "x" }), "theme_full", key);
+// The payload menu-theme-settings.tsx really sends: every key it has, `mode` always derived from the background.
+const editorPayload = (over = {}) => ({
+  preset: "personalizado", brand: "#a63232", background: "#fff8f2", surface: "#ffffff", text: "#251c1a",
+  heading_font: "padrao", body_font: "manrope", radius: "suave", mode: "light",
+  logo_url: "https://x.supabase.co/storage/v1/object/public/restaurant-media/r/a.png", ...over,
+});
+
+test("menu_theme on Essencial: basic keys and mode are kept, repeated stored keys are dropped silently", () => {
+  assert.equal(p.catalogActionFeature({ action: "menu_theme" }), null); // decided by essencialTheme in the route
+  // fresh restaurant: logo + brand + the derived mode (what the editor sends after picking only those)
+  const fresh = p.essencialTheme({ brand: "#112233", logo_url: "u", cover_url: "c", mode: "dark" }, {});
+  assert.deepEqual(fresh, { theme: { brand: "#112233", logo_url: "u", cover_url: "c", mode: "dark" }, denied: false });
+  assert.deepEqual(p.essencialTheme({}, {}), { theme: {}, denied: false });
+  // a downgraded owner whose editor resends the stored Profissional theme but changes logo and brand
+  const stored = editorPayload({ heading_font: "forte", radius: "reto", preset: "noite" });
+  const resent = p.essencialTheme({ ...stored, brand: "#00aa00", logo_url: "new" }, stored);
+  assert.equal(resent.denied, false);
+  assert.deepEqual(resent.theme, { brand: "#00aa00", logo_url: "new", mode: "light" });
+});
+
+test("menu_theme on Essencial: a non-basic key that differs from the stored one is PLAN_REQUIRED territory", () => {
+  for (const key of ["preset", "background", "surface", "text", "heading_font", "body_font", "radius"]) {
+    assert.equal(p.essencialTheme(editorPayload({ [key]: "changed" }), editorPayload()).denied, true, key);
+    assert.equal(p.essencialTheme(editorPayload(), {}).denied, true, `${key}: nothing stored`);
+  }
+  assert.equal(p.essencialTheme(editorPayload(), null).denied, true);
+  assert.equal(p.essencialTheme(editorPayload(), editorPayload()).denied, false);
 });
 
 test("requirePlan: PLAN_REQUIRED on Essencial (also when the plan lapsed), fine on Profissional/cortesia", async () => {
@@ -121,14 +146,11 @@ test("requirePlan and billingState: one database call per request client", async
   await billing.requirePlan("r1", "crm", flaky);
 });
 
-test("catalog gate end to end: Essencial menu_theme with extra keys is refused, basic identity passes", async () => {
+test("catalog gate end to end: Profissional actions are refused on Essencial, the rest passes", async () => {
   const gate = async (plan, body) => {
     const feature = p.catalogActionFeature(body);
     if (feature) await billing.requirePlan("r1", feature, fakeClient(plan));
   };
-  await gate("essencial", { action: "menu_theme", theme: { logo_url: "u", cover_url: "u", brand: "#112233" } });
-  await assert.rejects(gate("essencial", { action: "menu_theme", theme: { brand: "#112233", radius: "reto" } }), { message: "PLAN_REQUIRED" });
-  await gate("profissional", { action: "menu_theme", theme: { brand: "#112233", radius: "reto" } });
   await assert.rejects(gate("essencial", { action: "save_coupon" }), { message: "PLAN_REQUIRED" });
   await gate("essencial", { action: "save_product" });
 });
@@ -184,7 +206,7 @@ test("every Profissional route calls requirePlan with its feature", () => {
   assert.ok(contact.lastIndexOf("requirePlan(") < contact.indexOf("crm_erase_customer"));
   // the catalog route applies the action map right after validating the body
   const catalog = read(`${API}/catalog/route.ts`);
-  assert.ok(catalog.indexOf("catalogActionFeature(body)") > catalog.indexOf("schema.parse"));
+  assert.ok(catalog.indexOf("catalogActionFeature(body, storedOffer)") > catalog.indexOf("schema.parse"));
   assert.ok(catalog.indexOf("requirePlan(id, feature, supabase)") < catalog.indexOf('body.action === "feedback_settings"'));
 });
 
@@ -205,4 +227,84 @@ test("workspace: staff only get billing_state; the owner also gets plan and a bi
   const columns = source.match(/\.from\("restaurant_billing"\)\s*\.select\(\s*"([^"]+)"\s*\)/)[1].split(",");
   assert.deepEqual(columns, ["plan", "cycle", "status", "founder", "price_cents", "current_period_end", "overdue_since", "cancel_at", "pending_plan", "pending_cycle"]);
   assert.equal(/asaas/i.test(columns.join()), false);
+});
+
+test("save_option reads the stored flag and only a false -> true change needs upsell", () => {
+  const route = read(`${API}/catalog/route.ts`);
+  assert.match(route, /body\.action === "save_option" && body\.offer_in_bag === true/);
+  assert.ok(route.includes("catalogActionFeature(body, storedOffer)"));
+  assert.ok(route.includes('.select("offer_in_bag")'));
+  assert.ok(route.indexOf("storedOffer = ") < route.indexOf("catalogActionFeature(body, storedOffer)"));
+  // menu_theme: Essencial goes through essencialTheme, the body is replaced by the filtered theme
+  assert.match(route, /essencialTheme\(body\.theme, stored\.menu_theme\)/);
+  assert.ok(route.includes("body.theme = basic.theme"));
+});
+
+test("readBilling fails open: a broken or missing billing function never blocks orders or the admin", async () => {
+  const missing = { code: "PGRST202", message: "Could not find the function" };
+  service = { rpc: async () => ({ data: null, error: missing }) };
+  warnings.length = 0;
+  let r = await billing.readBilling("r1");
+  assert.deepEqual(r, { plan: "profissional", state: "ativo", degraded: true });
+  assert.equal(warnings.filter(([e]) => e === "billing.state_unavailable").length, 1);
+  const coupon = { coupon_code: "X1Y", expected_discount_cents: 100 };
+  assert.equal(p.gateOrder(coupon, r.plan, r.state).blocked, false);
+  assert.equal(p.gateOrder(coupon, r.plan, r.state).payload.coupon_code, "X1Y");
+  // only one of the two reads fails: the other answer is kept
+  service = { rpc: async (fn) => (fn === "restaurant_plan" ? { data: "essencial", error: null } : { data: null, error: missing }) };
+  r = await billing.readBilling("r2");
+  assert.deepEqual(r, { plan: "essencial", state: "ativo", degraded: true });
+  // healthy
+  service = { rpc: async (fn) => ({ data: fn === "restaurant_plan" ? "essencial" : "bloqueado", error: null }) };
+  warnings.length = 0;
+  r = await billing.readBilling("r3");
+  assert.deepEqual(r, { plan: "essencial", state: "bloqueado", degraded: false });
+  assert.equal(warnings.length, 0);
+  // service client not configured
+  service = null;
+  assert.equal((await billing.readBilling("r4")).state, "ativo");
+});
+
+test("orders and workspace read billing through readBilling; the state function is service-role only", () => {
+  assert.ok(read(`${API}/orders/route.ts`).includes("await readBilling(id)"));
+  assert.ok(read(`${API}/workspace/route.ts`).includes("await readBilling(id, supabase)"));
+  assert.ok(read(`${API}/billing/route.ts`).includes("await billingState(id)"));
+  const sql = read("supabase/migrations/021_billing.sql");
+  assert.match(sql, /revoke all on function public\.restaurant_billing_state\(uuid\) from public, anon, authenticated;/);
+  assert.match(sql, /grant execute on function public\.restaurant_billing_state\(uuid\) to service_role;/);
+});
+
+test("catalog: a failed plan read serves profissional and is not cached", async () => {
+  const cache = new Map();
+  let planAnswer = { data: null, error: { code: "PGRST202" } };
+  const builder = (data) => {
+    const b = new Proxy({}, {
+      get: (_, key) =>
+        key === "then" ? (resolve, reject) => Promise.resolve({ data, error: null }).then(resolve, reject)
+        : key === "maybeSingle" ? () => Promise.resolve({ data, error: null })
+        : () => b,
+    });
+    return b;
+  };
+  const client = {
+    from: (table) => builder(table === "restaurants" ? { id: "r1", slug: "casa" } : []),
+    rpc: async (fn) => (fn === "restaurant_plan" ? planAnswer : { data: true, error: null }),
+  };
+  const catalogModule = loader({
+    "next/cache": { unstable_cache: (fn, key) => async () => { const k = key.join("/"); if (!cache.has(k)) cache.set(k, await fn()); return cache.get(k); } },
+    "@supabase/supabase-js": { createClient: () => client },
+    "./supabase/server": { isConfigured: () => true },
+    "./catalog-cache": { catalogTag: () => "tag" },
+    "./observability/logger": { logger: { warn: (e) => warnings.push([e]), error() {} } },
+  })("src/lib/catalog.ts");
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon";
+  warnings.length = 0;
+  const degraded = await catalogModule.readCatalog("casa");
+  assert.equal(degraded.plan, "profissional");
+  assert.equal(cache.size, 0); // the degraded answer was not stored
+  assert.ok(warnings.some(([e]) => e === "billing.state_unavailable"));
+  planAnswer = { data: "essencial", error: null };
+  assert.equal((await catalogModule.readCatalog("casa")).plan, "essencial");
+  assert.equal(cache.size, 1);
 });

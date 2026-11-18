@@ -90,16 +90,8 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
       errorCode: "DATABASE_ERROR",
     });
   }
-  // The plan decides which upsell offers the menu shows. A failed read falls back to Essencial (no offers)
-  // rather than breaking the menu.
-  if (planResult.error) {
-    logger.warn("dependency.failed", {
-      operation: "supabase.catalog",
-      errorCode: "DATABASE_ERROR",
-    });
-  }
-  return {
-    plan: planResult.data === "profissional" ? "profissional" : "essencial",
+  const catalog = {
+    plan: planResult.data === "essencial" ? "essencial" : "profissional",
     restaurant,
     options: options.data,
     optionLinks: optionLinks.data,
@@ -110,6 +102,15 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     zones: zones.data,
     pixOnline: pixEnabled.data === true,
   } as Catalog;
+  // A failed plan read must not hide offers a paying restaurant is entitled to, nor be remembered for 60 s:
+  // throwing keeps unstable_cache from storing it; readCatalog serves the catalog as profissional.
+  if (planResult.error) throw new PlanUnavailable(catalog);
+  return catalog;
+}
+export class PlanUnavailable extends Error {
+  constructor(readonly catalog: Catalog) {
+    super("PLAN_UNAVAILABLE");
+  }
 }
 
 // Short shared cache for the public menu; invalidated by owner mutations.
@@ -119,5 +120,10 @@ export function readCatalog(slug: string): Promise<Catalog | null> {
   return unstable_cache(() => fetchCatalog(slug), ["catalog", "v4", slug], {
     revalidate: 60,
     tags: [catalogTag(slug)],
-  })();
+  })().catch((error: unknown) => {
+    const unavailable = error as Partial<PlanUnavailable> | null;
+    if (unavailable?.message !== "PLAN_UNAVAILABLE" || !unavailable.catalog) throw error;
+    logger.warn("billing.state_unavailable", { operation: "supabase.catalog", errorCode: "DATABASE_ERROR" });
+    return unavailable.catalog;
+  });
 }

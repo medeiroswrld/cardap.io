@@ -13,6 +13,7 @@ export const events = [
   "server.error",
   "billing.founder_overflow",
   "billing.notify_failed",
+  "billing.state_unavailable",
   "billing.webhook_ignored",
   "billing.webhook_unactivated",
   "server.started",

@@ -4,7 +4,7 @@ import { requireMember, serviceClient } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 import { asaasConfigFromEnv, asaasFromEnv } from "@/lib/asaas";
 import { isValidDocument, normalizeDocument } from "@/lib/cpf-cnpj";
-import { provisionCheckout } from "@/lib/billing-server";
+import { billingState, provisionCheckout } from "@/lib/billing-server";
 import { isSellablePlan, todayBrt } from "@/lib/plans";
 import { decideChangePlan, type BillingRow } from "@/lib/billing-events";
 import { enforceRetryPaymentLimit } from "@/lib/rate-limit";
@@ -27,8 +27,7 @@ async function handleGET(_request: Request, { params }: Params) {
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
     const row = await loadRow(supabase, id);
-    const { data: state, error } = await supabase.rpc("restaurant_billing_state", { p_restaurant: id });
-    if (error) throw error;
+    const state = await billingState(id); // service role only; the owner was verified by requireMember
     // Invoices come straight from Asaas; a failure there must not hide the plan state.
     let invoices: {
       id: string;

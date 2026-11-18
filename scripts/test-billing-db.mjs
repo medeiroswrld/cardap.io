@@ -236,7 +236,9 @@ await ok("staff reads nothing in billing", async () => {
   const { rows } = await db.query("select * from restaurant_billing");
   assert.equal(rows.length, 0);
   await rejects(() => db.query("select * from billing_events"), "permission denied");
-  assert.equal(typeof (await state(r1)), "string");
+  // the state function is service-role only; the plan stays readable (menu) and works for staff
+  await rejects(() => state(r1), "permission denied");
+  assert.equal(await plan(r1), "profissional");
 });
 
 await ok("anon permissions", async () => {

@@ -1,6 +1,7 @@
 import "server-only";
 import { serviceClient } from "./supabase/server";
 import { logger } from "./observability/logger";
+import { errorCode } from "./observability/core";
 import { type Asaas } from "./asaas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, allows, firstChargeCents, todayBrt, type Cycle, type Feature, type Plan, type SellablePlan } from "./plans";
@@ -35,6 +36,27 @@ export async function restaurantPlan(id: string, client: Pick<Db, "rpc"> = servi
 export async function billingState(id: string, client: Pick<Db, "rpc"> = serviceClient()) {
   return ask(client, "restaurant_billing_state", id);
 }
+// Plan and state for paths that must not turn a billing-read failure into an outage (orders, workspace):
+// when a read fails (database down, function missing...) it is logged and the restaurant is treated as
+// fully entitled (profissional, ativo). The state is service-role only; the plan may use the request's client.
+export async function readBilling(id: string, member?: Pick<Db, "rpc">) {
+  let plan: Plan = "profissional";
+  let state = "ativo";
+  let degraded = false;
+  try {
+    const service = serviceClient();
+    const [p, s] = await Promise.allSettled([restaurantPlan(id, member ?? service), billingState(id, service)]);
+    if (p.status === "fulfilled") plan = p.value;
+    else degraded = true;
+    if (s.status === "fulfilled") state = s.value;
+    else degraded = true;
+    if (degraded) throw p.status === "rejected" ? p.reason : (s as PromiseRejectedResult).reason;
+  } catch (error) {
+    logger.warn("billing.state_unavailable", { operation: "supabase.billing", errorCode: errorCode(error) });
+  }
+  return { plan, state, degraded };
+}
+
 // Throws PLAN_REQUIRED (403, "Disponível no plano Profissional.") unless the restaurant's effective plan
 // includes the feature. Pass the request's Supabase client to share the per-request cache.
 export async function requirePlan(id: string, feature: Feature, client?: Pick<Db, "rpc">) {

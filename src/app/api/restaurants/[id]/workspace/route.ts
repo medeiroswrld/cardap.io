@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
 import { withOrderAddress } from "@/lib/embed";
-import { billingState, restaurantPlan } from "@/lib/billing-server";
+import { readBilling } from "@/lib/billing-server";
 import { allows } from "@/lib/plans";
 async function handleGET(
   _request: Request,
@@ -17,10 +17,8 @@ async function handleGET(
     const { supabase, role } = await requireMember(id);
     // Effective plan and billing state, computed by the database. Staff only learn the state (they need
     // it to see that orders are paused); the owner also gets the plan and the subscription summary.
-    const [plan, billing_state] = await Promise.all([
-      restaurantPlan(id, supabase),
-      billingState(id, supabase),
-    ]);
+    // A failing billing read degrades to profissional/ativo (logged), never to a 500 for the whole admin.
+    const { plan, state: billing_state } = await readBilling(id, supabase);
     const [
       restaurant,
       categories,
@@ -197,8 +195,10 @@ async function handleGET(
       ]);
       if (m.error || photos.error || reviews.error || couponRows.error || originRows.error)
         throw new Error("DATABASE_ERROR");
-      if (billingRow.error) throw new Error("DATABASE_ERROR");
-      billing = billingRow.data;
+      // The subscription summary is optional here: a failed read must not break the owner's admin.
+      if (billingRow.error)
+        logger.warn("billing.state_unavailable", { operation: "supabase.billing", errorCode: "DATABASE_ERROR" });
+      billing = billingRow.error ? null : billingRow.data;
       coupons = couponRows.data;
       origins = originRows.data;
       // Pix is optional: a failed read must not break the owner's admin.

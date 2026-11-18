@@ -7,8 +7,8 @@ import { normalizePixKey, pixText } from "@/lib/pix";
 import { crmSettingsBody } from "@/lib/crm-query";
 import { isFinanceDay } from "@/lib/finance";
 import { requireMember } from "@/lib/supabase/server";
-import { requirePlan } from "@/lib/billing-server";
-import { catalogActionFeature } from "@/lib/plans";
+import { requirePlan, restaurantPlan } from "@/lib/billing-server";
+import { allows, catalogActionFeature, essencialTheme } from "@/lib/plans";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
   id: z.uuid(),
@@ -190,8 +190,31 @@ async function handlePOST(
     const { supabase } = await requireMember(id, true);
     const body = schema.parse(await request.json());
     // Plan gating lives here, on the server: the admin UI locks are only a courtesy.
-    const feature = catalogActionFeature(body);
+    let storedOffer = false;
+    if (body.action === "save_option" && body.offer_in_bag === true) {
+      // Only switching the offer ON is a Profissional feature; editing an option already offered is not.
+      const { data: row, error } = await supabase
+        .from("product_options")
+        .select("offer_in_bag")
+        .eq("id", body.id)
+        .eq("restaurant_id", id)
+        .maybeSingle();
+      if (error) throw error;
+      storedOffer = row?.offer_in_bag === true;
+    }
+    const feature = catalogActionFeature(body, storedOffer);
     if (feature) await requirePlan(id, feature, supabase);
+    if (body.action === "menu_theme" && !allows(await restaurantPlan(id, supabase), "theme_full")) {
+      const { data: stored, error } = await supabase
+        .from("restaurants")
+        .select("menu_theme")
+        .eq("id", id)
+        .single();
+      if (error) throw error;
+      const basic = essencialTheme(body.theme, stored.menu_theme);
+      if (basic.denied) throw new Error("PLAN_REQUIRED");
+      body.theme = basic.theme;
+    }
     if (body.action === "feedback_settings") {
       const { error } = await supabase.rpc("set_feedback_enabled", {
         p_restaurant: id,

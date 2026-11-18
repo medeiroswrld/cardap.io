@@ -561,3 +561,28 @@ test("checkout retry: a charge Asaas still returns with deleted: true is not reu
   assert.equal(names(asaas).includes("deletePayment"), false);
   assert.equal(db.restaurant_billing[0].setup_payment_id, "pay_new1");
 });
+
+test("plan or state changes invalidate the public menu cache; other events do not", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  const invalidated = [];
+  t.deps.invalidate = async (id) => invalidated.push(id);
+  await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.deepEqual(invalidated, [RID]);
+  const quiet = setup(baseRow(), { pay_1: paid });
+  quiet.deps.invalidate = async (id) => invalidated.push(id);
+  await deliver(quiet.deps, evt("PAYMENT_CREATED", { id: "pay_1", customer: "cus_1" }));
+  assert.equal(invalidated.length, 1);
+  // a failing invalidation never fails the webhook
+  const broken = setup(baseRow(), { pay_1: paid });
+  broken.deps.invalidate = async () => { throw new Error("boom"); };
+  assert.equal((await deliver(broken.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }))).status, 200);
+});
+
+test("lease release is conditional: another claimant's lease is not cleared", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  t.asaas.fail.createSubscription = new Error("BILLING_UNAVAILABLE");
+  // while we are creating, a later claimant took the lease over
+  t.asaas.gate = Promise.resolve().then(() => { t.row().subscription_claimed_at = "2099-01-01T00:00:00.000Z"; });
+  await assert.rejects(deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" })));
+  assert.equal(t.row().subscription_claimed_at, "2099-01-01T00:00:00.000Z");
+});

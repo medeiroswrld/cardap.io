@@ -129,7 +129,7 @@ export function addDays(date: string, days: number) {
 
 // Server-side gating of the owner catalog route (POST /api/restaurants/[id]/catalog): the minimum
 // feature each action needs. null = available on every plan. Keep in sync with the action schema
-// there (scripts/test-plans.mjs fails when an action is missing from this map).
+// there (scripts/test-gating.mjs fails when an action is missing from this map).
 export const CATALOG_ACTIONS: Record<string, Feature | null> = {
   feedback_settings: "reviews",
   moderate_feedback: "reviews",
@@ -145,7 +145,7 @@ export const CATALOG_ACTIONS: Record<string, Feature | null> = {
   // LGPD: an owner must always be able to honour a marketing opt-out.
   revoke_marketing: null,
   save_pix: null,
-  menu_theme: null, // keys beyond BASIC_THEME_KEYS need "theme_full"
+  menu_theme: null, // Essencial: essencialTheme() keeps only BASIC_THEME_KEYS
   crm_settings: "crm",
   save_coupon: "coupons",
   delete_coupon: "coupons",
@@ -156,31 +156,46 @@ export const CATALOG_ACTIONS: Record<string, Feature | null> = {
   set_entry_paid: "finance",
   save_payment_fees: "finance",
 };
-// Essencial's identity is logo, cover and main color only.
-export const BASIC_THEME_KEYS = ["logo_url", "cover_url", "brand"] as const;
+// Essencial's identity is logo, cover and main color. `mode` rides along: the theme editor always
+// derives it from the background and sends it with every save.
+export const BASIC_THEME_KEYS = ["logo_url", "cover_url", "brand", "mode"] as const;
+
+// Essencial theme save: keeps the basic keys, silently drops other keys that merely repeat what is
+// stored (a downgraded owner's editor resends them), and reports `denied` when a non-basic key would
+// actually change (that is the Profissional identity).
+export function essencialTheme(
+  theme: Record<string, string>,
+  stored: Record<string, unknown> | null | undefined,
+): { theme: Record<string, string>; denied: boolean } {
+  const kept: Record<string, string> = {};
+  let denied = false;
+  for (const [key, value] of Object.entries(theme)) {
+    if ((BASIC_THEME_KEYS as readonly string[]).includes(key)) kept[key] = value;
+    else if (stored?.[key] !== value) denied = true;
+  }
+  return { theme: kept, denied };
+}
 
 type CatalogBody = {
   action: string;
   offer_in_bag?: boolean;
   offer?: boolean;
   product_ids?: unknown[];
-  theme?: Record<string, unknown>;
 };
 // The feature a catalog request needs (null = any plan). Turning offers off or clearing the
-// suggestion list is always allowed, so an owner who downgraded can switch them off.
-export function catalogActionFeature(body: CatalogBody): Feature | null {
+// suggestion list is always allowed, so an owner who downgraded can switch them off. `save_option`
+// needs upsell only when it switches offer_in_bag on (storedOfferInBag = what the row holds now), so
+// renaming or repricing an option that is already offered keeps working. menu_theme is handled by
+// essencialTheme in the route.
+export function catalogActionFeature(body: CatalogBody, storedOfferInBag = false): Feature | null {
   if (!Object.hasOwn(CATALOG_ACTIONS, body.action)) throw new Error("INVALID_INPUT");
   switch (body.action) {
     case "save_option":
-      return body.offer_in_bag === true ? "upsell" : null;
+      return body.offer_in_bag === true && !storedOfferInBag ? "upsell" : null;
     case "options_in_bag_all":
       return body.offer === true ? "upsell" : null;
     case "bag_suggestions":
       return (body.product_ids?.length ?? 0) > 0 ? "upsell" : null;
-    case "menu_theme":
-      return Object.keys(body.theme ?? {}).some((key) => !(BASIC_THEME_KEYS as readonly string[]).includes(key))
-        ? "theme_full"
-        : null;
     default:
       return CATALOG_ACTIONS[body.action];
   }

@@ -4,6 +4,7 @@ import { apiError } from "@/lib/server-security";
 import { asaasFromEnv } from "@/lib/asaas";
 import { processAsaasWebhook } from "@/lib/billing-webhook";
 import { notifyNewSubscriber } from "@/lib/billing-server";
+import { invalidateCatalog } from "@/lib/catalog-cache";
 
 async function handlePOST(request: Request) {
   try {
@@ -12,6 +13,7 @@ async function handlePOST(request: Request) {
       asaas: () => asaasFromEnv(),
       token: process.env.ASAAS_WEBHOOK_TOKEN,
       notify: notifyNewSubscriber,
+      invalidate: (restaurantId) => invalidateCatalog(serviceClient(), restaurantId),
       log: (event, detail) =>
         logger.warn(event, event === "billing.webhook_unactivated" || event === "billing.notify_failed" ? { eventId: detail } : undefined),
     });
