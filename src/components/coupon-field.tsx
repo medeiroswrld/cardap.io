@@ -96,7 +96,10 @@ export function useCoupon({
   return {
     enabled: !!restaurantId,
     input,
-    setInput,
+    setInput(value: string) {
+      setRetry(false);
+      setInput(value);
+    },
     preview,
     effective,
     discount,

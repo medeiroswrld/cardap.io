@@ -45,7 +45,7 @@ export function couponError(code: string, min?: number): string {
   return "Não foi possível aplicar o cupom. Tente novamente.";
 }
 export const COUPON_PRICE_CHANGED_TEXT =
-  "O desconto do cupom mudou. Confira o total e envie de novo.";
+  "Um preço ou o desconto do cupom mudou. Confira a sacola e o total antes de enviar de novo.";
 // After an order with a coupon fails with these codes, the preview may be stale.
 export function isCouponRefreshCode(code: string | undefined): boolean {
   return code === "PRICE_CHANGED" || !!code?.startsWith("COUPON_");
