@@ -351,7 +351,7 @@ test("every exported API method uses the wrapper with an allowlisted static rout
       }
     }
   }
-  assert.equal(count, 30);
+  assert.equal(count, 34);
 });
 
 test("rate-limit identity ignores untrusted forwarding and never stores raw identifiers", () => {
@@ -442,4 +442,10 @@ test("coupon and origin routes are allowlisted and their errors map to statuses"
     assert.equal(core.errorStatus(core.errorCode(new Error(code))), 400);
   for (const code of ["COUPON_DUPLICATE", "COUPON_USED", "LIMIT_REACHED"])
     assert.equal(core.errorStatus(core.errorCode(new Error(code))), 409);
+});
+
+test("finance routes are allowlisted and DUE_DATE_REQUIRED maps to 400", () => {
+  for (const route of ["finance/cash", "finance/month", "finance/bills", "finance/fees"])
+    assert.equal(core.safeAction("GET", `/api/restaurants/[id]/${route}`), `GET /api/restaurants/[id]/${route}`);
+  assert.equal(core.errorStatus(core.errorCode(new Error("DUE_DATE_REQUIRED"))), 400);
 });

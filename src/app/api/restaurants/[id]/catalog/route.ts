@@ -25,6 +25,29 @@ const product = z.object({
   available: z.boolean(),
   position: z.number().int().min(0).max(10000),
 });
+const financeDate = z
+  .string()
+  .regex(/^d{4}-d{2}-d{2}$/)
+  .refine((v) => v >= "2000-01-01" && v <= "2100-12-31" && !Number.isNaN(Date.parse(v)));
+const financeEntry = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("income"),
+    description: z.string().trim().min(2).max(60),
+    amount_cents: z.number().int().min(1).max(10000000),
+    entry_date: financeDate,
+  }),
+  z.object({
+    kind: z.literal("expense"),
+    description: z.string().trim().min(2).max(80),
+    category: z.enum(["insumos", "embalagens", "funcionarios", "aluguel", "contas", "marketing", "impostos", "outros"]),
+    amount_cents: z.number().int().min(1).max(100000000),
+    entry_date: financeDate,
+    due_date: financeDate.nullable().optional(),
+    paid: z.boolean(),
+    // Editing a paid expense must resend its existing paid_at, otherwise the DB resets it to entry_date.
+    paid_at: financeDate.nullable().optional(),
+  }),
+]);
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("feedback_settings"), enabled: z.boolean() }),
   z.object({
@@ -146,6 +169,14 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("delete_coupon"), id: z.uuid() }),
   z.object({ action: z.literal("save_origin"), name: z.string().trim().min(2).max(40) }),
   z.object({ action: z.literal("delete_origin"), id: z.uuid() }),
+  z.object({ action: z.literal("save_finance_entry"), id: z.uuid().nullable().optional(), entry: financeEntry }),
+  z.object({ action: z.literal("delete_finance_entry"), id: z.uuid() }),
+  z.object({ action: z.literal("set_entry_paid"), id: z.uuid(), paid: z.boolean() }),
+  z.object({
+    action: z.literal("save_payment_fees"),
+    card_fee_percent: z.number().min(0).max(15),
+    pix_fee_percent: z.number().min(0).max(15),
+  }),
 ]);
 async function handlePOST(
   request: Request,
@@ -335,7 +366,11 @@ async function handlePOST(
       body.action === "save_coupon" ||
       body.action === "delete_coupon" ||
       body.action === "save_origin" ||
-      body.action === "delete_origin"
+      body.action === "delete_origin" ||
+      body.action === "save_finance_entry" ||
+      body.action === "delete_finance_entry" ||
+      body.action === "set_entry_paid" ||
+      body.action === "save_payment_fees"
     ) {
       // Owner-only RPCs; domain errors (COUPON_*, LIMIT_REACHED) are returned as codes.
       let result: { data: unknown; error: { message?: string; code?: string } | null };
@@ -357,7 +392,37 @@ async function handlePOST(
         result = await supabase.rpc("delete_coupon", { p_restaurant: id, p_id: body.id });
       else if (body.action === "save_origin")
         result = await supabase.rpc("save_origin", { p_restaurant: id, p_name: body.name });
-      else result = await supabase.rpc("delete_origin", { p_restaurant: id, p_id: body.id });
+      else if (body.action === "delete_origin")
+        result = await supabase.rpc("delete_origin", { p_restaurant: id, p_id: body.id });
+      else if (body.action === "save_finance_entry") {
+        const { entry } = body;
+        result = await supabase.rpc("save_finance_entry", {
+          p_restaurant: id,
+          p_id: body.id ?? null,
+          p_entry:
+            entry.kind === "income"
+              ? { kind: "income", description: entry.description, amount_cents: entry.amount_cents, entry_date: entry.entry_date }
+              : {
+                  kind: "expense",
+                  description: entry.description,
+                  category: entry.category,
+                  amount_cents: entry.amount_cents,
+                  entry_date: entry.entry_date,
+                  due_date: entry.due_date ?? "",
+                  paid: entry.paid,
+                  paid_at: entry.paid_at ?? "",
+                },
+        });
+      } else if (body.action === "delete_finance_entry")
+        result = await supabase.rpc("delete_finance_entry", { p_restaurant: id, p_id: body.id });
+      else if (body.action === "set_entry_paid")
+        result = await supabase.rpc("set_entry_paid", { p_restaurant: id, p_id: body.id, p_paid: body.paid });
+      else
+        result = await supabase.rpc("save_payment_fees", {
+          p_restaurant: id,
+          p_card: body.card_fee_percent,
+          p_pix: body.pix_fee_percent,
+        });
       if (result.error) {
         const code = errorCode(result.error);
         if (errorStatus(code) >= 500) throw result.error;
@@ -365,7 +430,7 @@ async function handlePOST(
         return Response.json({ error: code }, { status: errorStatus(code), headers: noStore });
       }
       return Response.json(
-        body.action === "save_coupon"
+        body.action === "save_coupon" || body.action === "save_finance_entry"
           ? { ok: true, id: result.data }
           : body.action === "save_origin"
             ? { ok: true, origin: result.data }

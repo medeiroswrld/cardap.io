@@ -82,6 +82,7 @@ export const errorCodes = [
   "COUPON_DUPLICATE",
   "COUPON_USED",
   "LIMIT_REACHED",
+  "DUE_DATE_REQUIRED",
   "23505",
   "42501",
   "PGRST116",
@@ -130,6 +131,10 @@ const routes = new Set([
     "coupon-stats",
     "lapsed-customers",
     "origin-report",
+    "finance/cash",
+    "finance/month",
+    "finance/bills",
+    "finance/fees",
   ].map((part) => `/api/restaurants/[id]/${part}`),
 ]);
 export function safeAction(method: string, route: string) {
@@ -241,6 +246,7 @@ export function errorStatus(code: ErrorCode) {
       "COUPON_EXPIRED",
       "COUPON_MIN_ORDER",
       "COUPON_EXCEEDS_TOTAL",
+      "DUE_DATE_REQUIRED",
       "INVALID_PAYMENT",
       "INVALID_CHANGE",
       "AUTH_REJECTED",

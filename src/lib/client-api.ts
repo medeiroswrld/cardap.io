@@ -36,6 +36,7 @@ export const apiErrorMessages: Record<string, string> = {
   COUPON_EXCEEDS_TOTAL: "O desconto não pode ser maior que o pedido. Adicione mais itens.",
   COUPON_DUPLICATE: "Já existe um cupom com esse código.",
   COUPON_USED: "Este cupom já foi usado em pedidos. Você pode pausá-lo.",
+  DUE_DATE_REQUIRED: "Informe o vencimento da conta.",
   LIMIT_REACHED: "Limite de 20 origens atingido.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",

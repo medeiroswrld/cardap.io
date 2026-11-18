@@ -21,6 +21,7 @@ import {
   Ticket,
   Megaphone,
   Compass,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import QRCode from "qrcode";
@@ -85,6 +86,9 @@ const pages = [
   ["cupons", "Cupons", Ticket],
   ["reconquistar", "Reconquistar", Megaphone],
   ["origem", "Origem", Compass],
+  ["caixa", "Caixa do dia", Wallet],
+  ["mes", "Resultado do mês", Wallet],
+  ["contas", "Contas a pagar", Wallet],
   ["configuracoes", "Configurações", Settings],
   ["qr", "QR das mesas", QrCode],
 ] as const;
@@ -94,6 +98,7 @@ const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
   cardapio: Utensils,
   clientes: Users,
   relatorios: BarChart3,
+  financeiro: Wallet,
   configuracoes: Settings,
 };
 export function ConnectedAdmin({ id }: { id: string }) {
