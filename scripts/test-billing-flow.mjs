@@ -8,7 +8,7 @@ const load = loader({
   "./supabase/server": { serviceClient: () => { throw new Error("real client must not be used"); } },
   "./observability/logger": { logger: { warn() {}, error() {} } },
 });
-const { processAsaasWebhook } = load("src/lib/billing-webhook.ts");
+const { processAsaasWebhook, processingClaimFilter, subscriptionClaimFilter } = load("src/lib/billing-webhook.ts");
 const { provisionCheckout } = load("src/lib/billing-server.ts");
 const { toReais } = load("src/lib/asaas.ts");
 
@@ -26,9 +26,12 @@ class Query {
   in(c, vs) { this.filters.push((r) => vs.includes(r[c])); return this; }
   is(c, v) { this.filters.push((r) => (r[c] ?? null) === v); return this; }
   or(expr) {
-    const tests = expr.split(",").map((part) => {
-      const [c, op, ...rest] = part.split(".");
-      const v = rest.join(".");
+    (this.db.orFilters ??= []).push(expr);
+    // PostgREST reads a quoted value as one literal, so ":" and "." inside it are not separators.
+    const parts = expr.match(/(?:[^,"]|"[^"]*")+/g) ?? [];
+    const tests = parts.map((part) => {
+      const [c, op, ...rest] = part.split(/\.(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+      const v = rest.join(".").replace(/^"(.*)"$/, "$1");
       if (op === "is") return (r) => (r[c] ?? null) === (v === "null" ? null : v);
       if (op === "lt") return (r) => r[c] != null && r[c] < v;
       throw new Error("unsupported or(): " + part);
@@ -104,6 +107,7 @@ function fakeAsaas(payments = {}) {
     async deletePayment(id) { calls.push(["deletePayment", id]); store.delete(id); return { deleted: true, id }; },
     async createSubscription(input) {
       calls.push(["createSubscription", input]);
+      if (api.gate) await api.gate;
       if (fail.createSubscription) throw fail.createSubscription;
       return { id: "sub_1" };
     },
@@ -469,10 +473,11 @@ test("RECEIVED_IN_CASH counts as paid for activation", async () => {
 test("a failing renewal-notice switch is logged and does not undo the activation", async () => {
   const t = setup(baseRow(), { pay_1: paid });
   t.asaas.fail.updateCustomer = new Error("BILLING_UNAVAILABLE");
-  const res = await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  const e = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const res = await deliver(t.deps, e);
   assert.equal(res.status, 200);
   assert.equal(t.row().status, "ativo");
-  assert.ok(t.logs.some(([e]) => e === "billing.notify_failed"));
+  assert.deepEqual(t.logs.find(([ev]) => ev === "billing.notify_failed"), ["billing.notify_failed", e.id]);
 });
 
 test("Asaas rejections and DB constraint errors are non-transient (200); outages stay transient; unactivated paid setup charges are flagged", async () => {
@@ -495,4 +500,64 @@ test("Asaas rejections and DB constraint errors are non-transient (200); outages
   const unpaid = setup(baseRow(), { pay_1: { ...paid, status: "PENDING" } });
   await deliver(unpaid.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
   assert.equal(unpaid.logs.some(([ev]) => ev === "billing.webhook_unactivated"), false);
+});
+
+test("claim filters quote the timestamp so PostgREST reads it as one value", async () => {
+  const iso = "2026-11-18T12:34:56.789Z";
+  assert.equal(processingClaimFilter(iso), `processing_started_at.is.null,processing_started_at.lt."${iso}"`);
+  assert.equal(subscriptionClaimFilter(iso), `subscription_claimed_at.is.null,subscription_claimed_at.lt."${iso}"`);
+  // the filter the handler really sends when it claims a known, unfinished event
+  const t = setup(baseRow(), { pay_1: paid });
+  const e = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  t.db.billing_events.push({ id: e.id, restaurant_id: RID, type: e.event, payload: e, payment_id: "pay_1", processed_at: null, processing_started_at: new Date(Date.now() - 5 * 60_000).toISOString() });
+  await deliver(t.deps, e);
+  assert.equal(t.row().status, "ativo");
+  const [eventFilter, claimFilter] = t.db.orFilters;
+  assert.match(eventFilter, /^processing_started_at\.is\.null,processing_started_at\.lt\."\d{4}-\d{2}-\d{2}T[\d:.]+Z"$/);
+  assert.match(claimFilter, /^subscription_claimed_at\.is\.null,subscription_claimed_at\.lt\."\d{4}-\d{2}-\d{2}T[\d:.]+Z"$/);
+});
+
+test("subscription race: CONFIRMED and RECEIVED (distinct events) create ONE subscription", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  let release;
+  t.asaas.gate = new Promise((resolve) => (release = resolve));
+  const confirmed = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const received = evt("PAYMENT_RECEIVED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const both = Promise.allSettled([deliver(t.deps, confirmed), deliver(t.deps, received)]);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  release();
+  const results = await both;
+  assert.equal(names(t.asaas).filter((n) => n === "createSubscription").length, 1);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  const loser = results.find((r) => r.status === "rejected");
+  assert.equal(loser.reason.message, "BILLING_UNAVAILABLE"); // retryable: Asaas redelivers
+  assert.equal(t.row().asaas_subscription_id, "sub_1");
+  assert.equal(t.row().status, "ativo");
+  // the retried loser finds the saved subscription and creates nothing more
+  await deliver(t.deps, loser === results[0] ? confirmed : received);
+  assert.equal(names(t.asaas).filter((n) => n === "createSubscription").length, 1);
+  assert.equal(t.notified.length, 1);
+});
+
+test("subscription lease: a fresh claim blocks, an expired one is taken over, a failed creation frees it", async () => {
+  const e = () => evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const held = setup(baseRow({ subscription_claimed_at: new Date(Date.now() - 10_000).toISOString() }), { pay_1: paid });
+  await assert.rejects(deliver(held.deps, e()), { message: "BILLING_UNAVAILABLE" });
+  assert.equal(names(held.asaas).includes("createSubscription"), false);
+  assert.equal(held.row().status, "pendente");
+  const stale = setup(baseRow({ subscription_claimed_at: new Date(Date.now() - 10 * 60_000).toISOString() }), { pay_1: paid });
+  await deliver(stale.deps, e());
+  assert.equal(stale.row().asaas_subscription_id, "sub_1");
+  const failing = setup(baseRow(), { pay_1: paid });
+  failing.asaas.fail.createSubscription = new Error("BILLING_UNAVAILABLE");
+  await assert.rejects(deliver(failing.deps, e()));
+  assert.equal(failing.row().subscription_claimed_at, null);
+});
+
+test("checkout retry: a charge Asaas still returns with deleted: true is not reusable", async () => {
+  const db = newDb(baseRow());
+  const asaas = fakeAsaas({ pay_1: { id: "pay_1", customer: "cus_1", value: 546, status: "PENDING", dueDate: "2026-11-20", invoiceUrl: "https://www.asaas.com/i/pay_1", deleted: true } });
+  assert.equal(await provisionCheckout(asaas, input(), fakeService(db), TODAY), "https://www.asaas.com/i/pay_new1");
+  assert.equal(names(asaas).includes("deletePayment"), false);
+  assert.equal(db.restaurant_billing[0].setup_payment_id, "pay_new1");
 });

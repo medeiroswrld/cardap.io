@@ -8,8 +8,12 @@ import type { Product } from "@/lib/types";
 
 export function useBagOffers() {
   const { state, update, add, notify } = useDemo();
-  const combos = comboOffers(state.bag, state.products);
-  const suggestions = bagSuggestions(state.bag, state.products, state.categories, state.settings.bagSuggestions);
+  // Upsell (combo offers and bag suggestions) is a Profissional feature.
+  const upsell = state.settings.plan !== "essencial";
+  const combos = upsell ? comboOffers(state.bag, state.products) : [];
+  const suggestions = upsell
+    ? bagSuggestions(state.bag, state.products, state.categories, state.settings.bagSuggestions)
+    : [];
   const acceptCombo = (index: number, optionId: string) => {
     try {
       update((s) => {

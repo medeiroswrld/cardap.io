@@ -16,6 +16,8 @@ create table public.restaurant_billing (
  pending_cycle text check (pending_cycle in ('mensal','anual')),
  pending_since date,
  founder_claimed_at timestamptz,
+ -- lease: the webhook delivery that is creating the Asaas subscription (see billing-webhook.ts)
+ subscription_claimed_at timestamptz,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now()
 );
@@ -137,7 +139,7 @@ begin
    founder=excluded.founder, price_cents=excluded.price_cents,
    created_at=case when holds then restaurant_billing.created_at else now() end,
    founder_claimed_at=case when claimed then now() else restaurant_billing.founder_claimed_at end,
-   cancel_at=null, overdue_since=null, pending_plan=null, pending_cycle=null, pending_since=null,
+   cancel_at=null, overdue_since=null, pending_plan=null, pending_cycle=null, pending_since=null, subscription_claimed_at=null,
    asaas_customer_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_customer_id end,
    asaas_subscription_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_subscription_id end,
    setup_payment_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.setup_payment_id end,

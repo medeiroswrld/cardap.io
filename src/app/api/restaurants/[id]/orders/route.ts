@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { enforcePublicLimit } from "@/lib/rate-limit";
 import { serviceClient } from "@/lib/supabase/server";
+import { billingState, restaurantPlan } from "@/lib/billing-server";
+import { gateOrder } from "@/lib/plans";
 import { orderPayload } from "@/lib/order-payload";
 import { apiError, checkOrigin, hash, noStore } from "@/lib/server-security";
 async function handlePOST(
@@ -20,14 +22,20 @@ async function handlePOST(
     if (payload.fulfillment === "mesa")
       await enforcePublicLimit(request, id, "order_table", payload.table_id);
     else await enforcePublicLimit(request, id, "order_online", hash(token));
+    // Billing not in good standing pauses orders (the menu stays online); Essencial has no coupons.
+    const service = serviceClient();
+    const [state, plan] = await Promise.all([billingState(id, service), restaurantPlan(id, service)]);
+    const gated = gateOrder(payload, plan, state);
+    if (gated.blocked)
+      return Response.json({ error: "CLOSED" }, { status: errorStatus("CLOSED"), headers: noStore });
     // Table orders omit `fulfillment` so the idempotency fingerprint of
     // pre-deploy pending orders still matches; the DB defaults it to 'mesa'.
-    const { fulfillment, ...rest } = payload;
-    const { data, error } = await serviceClient().rpc("place_guest_order", {
+    const { fulfillment, ...rest } = gated.payload;
+    const { data, error } = await service.rpc("place_guest_order", {
       p_restaurant: id,
       p_token_hash: hash(token),
       p_key: payload.key,
-      p_payload: fulfillment === "mesa" ? rest : payload,
+      p_payload: fulfillment === "mesa" ? rest : gated.payload,
     });
     if (error) {
       const code = errorCode(error);

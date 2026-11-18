@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 import { crmSaveBody } from "@/lib/crm-query";
 
@@ -12,6 +13,7 @@ async function handleGET(_request: Request, { params }: Context) {
     z.uuid().parse(id);
     z.uuid().parse(contactId);
     const { supabase } = await requireMember(id, true);
+    await requirePlan(id, "crm", supabase);
     const { data, error } = await supabase.rpc("crm_customer", { p_restaurant: id, p_contact: contactId });
     if (error) throw error;
     return Response.json(data, { headers: noStore });
@@ -29,6 +31,7 @@ async function handlePOST(request: Request, { params }: Context) {
     const { supabase } = await requireMember(id, true);
     const body = crmSaveBody.parse(await request.json());
     if (body.action === "save") {
+      await requirePlan(id, "crm", supabase);
       const { error } = await supabase.rpc("crm_save_customer", {
         p_restaurant: id,
         p_contact: contactId,
@@ -38,6 +41,7 @@ async function handlePOST(request: Request, { params }: Context) {
       if (error) throw error;
       return Response.json({ ok: true }, { headers: noStore });
     }
+    // Erasing a customer is an LGPD right of the data subject: available on every plan.
     const { data, error } = await supabase.rpc("crm_erase_customer", { p_restaurant: id, p_contact: contactId });
     if (error) throw error;
     return Response.json(data, { headers: noStore });

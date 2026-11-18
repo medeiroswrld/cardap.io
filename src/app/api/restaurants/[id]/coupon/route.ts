@@ -6,6 +6,8 @@ import { rateLimitAddress } from "@/lib/rate-limit-identity";
 import { serviceClient } from "@/lib/supabase/server";
 import { normalizeCode } from "@/lib/coupons";
 import { apiError, noStore } from "@/lib/server-security";
+import { restaurantPlan } from "@/lib/billing-server";
+import { allows } from "@/lib/plans";
 
 // Public preview for the menu. check_coupon is granted to service_role only, so
 // every lookup is rate-limited per client before it reaches the database.
@@ -22,7 +24,11 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
     );
     if (!/^[A-Z0-9]{3,20}$/.test(code))
       return Response.json({ error: "COUPON_INVALID" }, { status: 400, headers: noStore });
-    const { data, error } = await serviceClient().rpc("check_coupon", {
+    // Essencial has no coupons: every code is simply unknown.
+    const service = serviceClient();
+    if (!allows(await restaurantPlan(id, service), "coupons"))
+      return Response.json({ error: "COUPON_INVALID" }, { status: 400, headers: noStore });
+    const { data, error } = await service.rpc("check_coupon", {
       p_restaurant: id,
       p_code: code,
     });

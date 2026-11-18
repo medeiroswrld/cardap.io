@@ -24,7 +24,7 @@ export function apiError(error: unknown) {
       error:
         message === "RATE_LIMITED"
           ? "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe."
-          : ["PLAN_REQUIRED", "EMAIL_IN_USE", "INVALID_DOCUMENT", "BILLING_UNAVAILABLE", "FOUNDER_CONFIRM_REQUIRED", "WEAK_PASSWORD"].includes(message)
+          : ["PLAN_REQUIRED", "EMAIL_IN_USE", "INVALID_DOCUMENT", "BILLING_UNAVAILABLE", "FOUNDER_CONFIRM_REQUIRED", "WEAK_PASSWORD", "ASAAS_REJECTED"].includes(message)
             ? apiErrorMessages[message]
           : message === "CUSTOMER_HAS_OPEN_ORDERS"
             ? "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir os dados."

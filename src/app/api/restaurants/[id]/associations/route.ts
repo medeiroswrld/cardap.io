@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
 import { apiError, noStore } from "@/lib/server-security";
 async function handleGET(
   request: Request,
@@ -13,6 +14,7 @@ async function handleGET(
       .refine((n) => n === 7 || n === 30)
       .parse(new URL(request.url).searchParams.get("days") || 30);
     const { supabase } = await requireMember(id, true);
+    await requirePlan(id, "metrics", supabase);
     const { data, error } = await supabase.rpc("video_associations", {
       p_restaurant: id,
       p_days: days,

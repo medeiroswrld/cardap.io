@@ -226,6 +226,7 @@ export function errorStatus(code: ErrorCode) {
   if (code === "RATE_LIMIT_UNAVAILABLE") return 503;
   if (code === "RATE_LIMITED") return 429;
   if (code === "STATE_CONFLICT") return 409;
+  if (code === "ASAAS_REJECTED") return 502;
   if (["UNAUTHORIZED", "GUEST_SESSION_EXPIRED"].includes(code)) return 401;
   if (
     ["FORBIDDEN", "ORIGIN_REJECTED", "FEEDBACK_DISABLED", "PLAN_REQUIRED", "42501"].includes(

@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
 import { apiError, noStore } from "@/lib/server-security";
 
 const query = z.object({
@@ -12,6 +13,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   try {
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
+    await requirePlan(id, "lapsed", supabase);
     const search = new URL(request.url).searchParams;
     const { days, offset } = query.parse({
       days: search.get("days") ?? undefined,

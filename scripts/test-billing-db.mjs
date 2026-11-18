@@ -471,6 +471,19 @@ await ok("billing_events: processed_at and payment_id columns", async () => {
   await db.query("delete from billing_events where id='evp1'");
 });
 
+await ok("subscription lease: the claim on the billing row is one conditional UPDATE", async () => {
+  await root();
+  await db.query("update restaurant_billing set asaas_subscription_id=null, subscription_claimed_at=null where restaurant_id=$1", [r1]);
+  const claim = "update restaurant_billing set subscription_claimed_at=now() where restaurant_id=$1 and asaas_subscription_id is null and (subscription_claimed_at is null or subscription_claimed_at < now() - interval '2 minutes') returning restaurant_id";
+  assert.equal((await db.query(claim, [r1])).rows.length, 1);
+  assert.equal((await db.query(claim, [r1])).rows.length, 0); // fresh lease held
+  await db.query("update restaurant_billing set subscription_claimed_at=now()-interval '3 minutes' where restaurant_id=$1", [r1]);
+  assert.equal((await db.query(claim, [r1])).rows.length, 1); // expired: taken over
+  await db.query("update restaurant_billing set asaas_subscription_id='sub_lease', subscription_claimed_at=null where restaurant_id=$1", [r1]);
+  assert.equal((await db.query(claim, [r1])).rows.length, 0); // already has a subscription
+  await db.query("update restaurant_billing set asaas_subscription_id=null where restaurant_id=$1", [r1]);
+});
+
 await ok("consume_billing_rate_limit: caller-chosen limit per window, service role only", async () => {
   await root();
   await db.exec("set role service_role");

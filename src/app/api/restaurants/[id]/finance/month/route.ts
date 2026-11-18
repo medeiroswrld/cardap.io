@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
 import { apiError, noStore } from "@/lib/server-security";
 import { isFinanceDay } from "@/lib/finance";
 
@@ -8,6 +9,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   try {
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
+    await requirePlan(id, "finance", supabase);
     const month = new URL(request.url).searchParams.get("month") ?? "";
     if (!/^\d{4}-\d{2}-01$/.test(month) || !isFinanceDay(month) || month < "2000-01-01" || month > "2100-12-01")
       throw new Error("INVALID_INPUT");

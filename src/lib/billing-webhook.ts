@@ -15,7 +15,7 @@ export type WebhookDeps = {
   asaas: () => Asaas;
   token: string | undefined;
   notify?: (restaurantId: string, plan: string) => Promise<void>;
-  // detail: a short reason for `webhook_ignored`, the billing_events id for `webhook_unactivated`
+  // detail: a short reason for `webhook_ignored`, the billing_events id for `webhook_unactivated` and `notify_failed`
   log?: (
     event: "billing.founder_overflow" | "billing.webhook_ignored" | "billing.webhook_unactivated" | "billing.notify_failed",
     detail?: string,
@@ -88,6 +88,15 @@ function isTransient(error: unknown) {
   if (typeof e.code === "string" && e.code.startsWith("23")) return false;
   // PostgREST/network errors carry a string `code` (possibly empty); plain Errors do not.
   return typeof e.code === "string";
+}
+
+// PostgREST `or` filter for a claimable row. The timestamp is quoted: an ISO value contains ":" and "."
+// and must reach the parser as one value.
+export function processingClaimFilter(expiredIso: string) {
+  return `processing_started_at.is.null,processing_started_at.lt."${expiredIso}"`;
+}
+export function subscriptionClaimFilter(expiredIso: string) {
+  return `subscription_claimed_at.is.null,subscription_claimed_at.lt."${expiredIso}"`;
 }
 
 const ok = (extra: Record<string, unknown> = {}) =>
@@ -165,7 +174,7 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     }
     // Trust Asaas's own due date over the webhook body.
     payment.dueDate = remote.dueDate ?? payment.dueDate;
-    if (body.event === "PAYMENT_OVERDUE") return applyPatch(deps, row, decision);
+    if (body.event === "PAYMENT_OVERDUE") return applyPatch(deps, row, decision, body.id);
     const again = decideWebhook(row, body.event, payment, { subscriptionId: body.subscription?.id, confirmedAlready });
     if (!again) return;
     decision = again;
@@ -177,19 +186,44 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     let nextDueDate = addCycle(due, row.cycle);
     if (nextDueDate < today) nextDueDate = today;
     const label = row.plan === "profissional" ? "Profissional" : "Essencial";
+    // Two deliveries (CONFIRMED and RECEIVED) can arrive together. Whoever flips the lease on the billing
+    // row first creates the subscription; the other answers a retryable error and, when retried, finds
+    // the saved subscription id (the lease also expires if the claimant dies).
+    const nowDate = (deps.now ?? (() => new Date()))();
+    const expired = new Date(nowDate.getTime() - (deps.leaseSeconds ?? 120) * 1000).toISOString();
+    const claim = await service
+      .from("restaurant_billing")
+      .update({ subscription_claimed_at: nowDate.toISOString() })
+      .eq("restaurant_id", row.restaurant_id)
+      .is("asaas_subscription_id", null)
+      .or(subscriptionClaimFilter(expired))
+      .select("restaurant_id");
+    if (claim.error) throw claim.error;
+    if (!claim.data || claim.data.length === 0) throw new Error("BILLING_UNAVAILABLE");
     // A crash between creating the subscription and saving its id must not leave a second one on retry:
     // reuse the customer's live subscription when Asaas already has it.
-    const live = await deps.asaas().listSubscriptions({ customer: row.asaas_customer_id, status: "ACTIVE" });
-    const subscription =
-      live[0] ??
-      (await deps.asaas().createSubscription({
-        customer: row.asaas_customer_id,
-        valueCents: row.price_cents,
-        nextDueDate,
-        cycle: row.cycle,
-        description: `Fome Play ${label} - assinatura ${row.cycle}`,
-        externalReference: row.restaurant_id,
-      }));
+    let subscription: { id: string };
+    try {
+      const live = await deps.asaas().listSubscriptions({ customer: row.asaas_customer_id, status: "ACTIVE" });
+      subscription =
+        live[0] ??
+        (await deps.asaas().createSubscription({
+          customer: row.asaas_customer_id,
+          valueCents: row.price_cents,
+          nextDueDate,
+          cycle: row.cycle,
+          description: `Fome Play ${label} - assinatura ${row.cycle}`,
+          externalReference: row.restaurant_id,
+        }));
+    } catch (error) {
+      // Nothing was created: free the lease so the retry does not have to wait for it to expire.
+      await service
+        .from("restaurant_billing")
+        .update({ subscription_claimed_at: null })
+        .eq("restaurant_id", row.restaurant_id)
+        .then(() => undefined, () => undefined);
+      throw error;
+    }
     const saved = await service
       .from("restaurant_billing")
       .update({ asaas_subscription_id: subscription.id })
@@ -197,10 +231,15 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     if (saved.error) throw saved.error;
   }
 
-  await applyPatch(deps, row, decision);
+  await applyPatch(deps, row, decision, body.id);
 }
 
-async function applyPatch(deps: WebhookDeps, row: BillingRow, decision: NonNullable<ReturnType<typeof decideWebhook>>) {
+async function applyPatch(
+  deps: WebhookDeps,
+  row: BillingRow,
+  decision: NonNullable<ReturnType<typeof decideWebhook>>,
+  eventId: string,
+) {
   const { service } = deps;
   if (Object.keys(decision.patch).length > 0) {
     const { error } = await service.from("restaurant_billing").update(decision.patch).eq("restaurant_id", row.restaurant_id);
@@ -221,7 +260,7 @@ async function applyPatch(deps: WebhookDeps, row: BillingRow, decision: NonNulla
       try {
         await deps.asaas().updateCustomer(row.asaas_customer_id, { notificationDisabled: false });
       } catch {
-        deps.log?.("billing.notify_failed");
+        deps.log?.("billing.notify_failed", eventId);
       }
     }
   }
@@ -262,7 +301,7 @@ export async function processAsaasWebhook(request: Request, deps: WebhookDeps): 
       .update({ processing_started_at: now.toISOString() })
       .eq("id", body.id)
       .is("processed_at", null)
-      .or(`processing_started_at.is.null,processing_started_at.lt.${expired}`)
+      .or(processingClaimFilter(expired))
       .select("id");
     if (claimed.error) throw claimed.error;
     if (!claimed.data || claimed.data.length === 0) {

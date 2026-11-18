@@ -126,3 +126,79 @@ export function addDays(date: string, days: number) {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+
+// Server-side gating of the owner catalog route (POST /api/restaurants/[id]/catalog): the minimum
+// feature each action needs. null = available on every plan. Keep in sync with the action schema
+// there (scripts/test-plans.mjs fails when an action is missing from this map).
+export const CATALOG_ACTIONS: Record<string, Feature | null> = {
+  feedback_settings: "reviews",
+  moderate_feedback: "reviews",
+  save_option: null, // offer_in_bag: true needs "upsell", see catalogActionFeature
+  options_in_bag_all: null, // offer: true needs "upsell"
+  bag_suggestions: null, // a non-empty list needs "upsell"
+  save_product: null,
+  archive_product: null,
+  save_category: null,
+  remove_category: null,
+  settings: null,
+  save_delivery_zone: null,
+  // LGPD: an owner must always be able to honour a marketing opt-out.
+  revoke_marketing: null,
+  save_pix: null,
+  menu_theme: null, // keys beyond BASIC_THEME_KEYS need "theme_full"
+  crm_settings: "crm",
+  save_coupon: "coupons",
+  delete_coupon: "coupons",
+  save_origin: "origin",
+  delete_origin: "origin",
+  save_finance_entry: "finance",
+  delete_finance_entry: "finance",
+  set_entry_paid: "finance",
+  save_payment_fees: "finance",
+};
+// Essencial's identity is logo, cover and main color only.
+export const BASIC_THEME_KEYS = ["logo_url", "cover_url", "brand"] as const;
+
+type CatalogBody = {
+  action: string;
+  offer_in_bag?: boolean;
+  offer?: boolean;
+  product_ids?: unknown[];
+  theme?: Record<string, unknown>;
+};
+// The feature a catalog request needs (null = any plan). Turning offers off or clearing the
+// suggestion list is always allowed, so an owner who downgraded can switch them off.
+export function catalogActionFeature(body: CatalogBody): Feature | null {
+  if (!Object.hasOwn(CATALOG_ACTIONS, body.action)) throw new Error("INVALID_INPUT");
+  switch (body.action) {
+    case "save_option":
+      return body.offer_in_bag === true ? "upsell" : null;
+    case "options_in_bag_all":
+      return body.offer === true ? "upsell" : null;
+    case "bag_suggestions":
+      return (body.product_ids?.length ?? 0) > 0 ? "upsell" : null;
+    case "menu_theme":
+      return Object.keys(body.theme ?? {}).some((key) => !(BASIC_THEME_KEYS as readonly string[]).includes(key))
+        ? "theme_full"
+        : null;
+    default:
+      return CATALOG_ACTIONS[body.action];
+  }
+}
+
+// Orders: billing that is not in good standing pauses them (CLOSED); Essencial has no coupons, so a
+// coupon on the order is dropped (the customer is simply not discounted; the preview already said
+// COUPON_INVALID). `cortesia`, `ativo` and `atrasado` never block.
+export function gateOrder<T extends { coupon_code?: string | null; expected_discount_cents?: number | null }>(
+  payload: T,
+  plan: Plan,
+  state: string,
+): { blocked: boolean; payload: T } {
+  if (stateBlocks(state)) return { blocked: true, payload };
+  if (allows(plan, "coupons") || (!payload.coupon_code && payload.expected_discount_cents == null))
+    return { blocked: false, payload };
+  const { coupon_code: _code, expected_discount_cents: _discount, ...rest } = payload;
+  void _code;
+  void _discount;
+  return { blocked: false, payload: rest as T };
+}

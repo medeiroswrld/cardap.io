@@ -14,6 +14,8 @@ export type AsaasPayment = {
   invoiceUrl: string | null;
   description?: string | null;
   externalReference?: string | null;
+  // Asaas keeps removed charges readable with deleted: true
+  deleted?: boolean;
 };
 export type AsaasSubscription = {
   id: string;

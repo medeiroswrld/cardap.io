@@ -6,6 +6,8 @@ import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, noStore } from "@/lib/server-security";
 import { withOrderAddress } from "@/lib/embed";
+import { billingState, restaurantPlan } from "@/lib/billing-server";
+import { allows } from "@/lib/plans";
 async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -13,6 +15,12 @@ async function handleGET(
   try {
     const id = z.uuid().parse((await params).id);
     const { supabase, role } = await requireMember(id);
+    // Effective plan and billing state, computed by the database. Staff only learn the state (they need
+    // it to see that orders are paused); the owner also gets the plan and the subscription summary.
+    const [plan, billing_state] = await Promise.all([
+      restaurantPlan(id, supabase),
+      billingState(id, supabase),
+    ]);
     const [
       restaurant,
       categories,
@@ -136,9 +144,12 @@ async function handleGET(
     let pix: unknown = null;
     let coupons: unknown[] = [];
     let origins: unknown[] = [];
+    let billing: unknown = null;
     if (role === "owner") {
-      const [m, photos, reviews, pixRow, couponRows, originRows] = await Promise.all([
-        supabase
+      // Data of Profissional features is not even read on Essencial.
+      const locked = Promise.resolve({ data: [] as never[], error: null });
+      const [m, photos, reviews, pixRow, couponRows, originRows, billingRow] = await Promise.all([
+        !allows(plan, "metrics") ? locked : supabase
           .from("video_view_sessions")
           .select(
             "product_id,media_id,media_version,watched_seconds,coverage,qualified,created_at",
@@ -146,14 +157,14 @@ async function handleGET(
           .eq("restaurant_id", id)
           .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
           .limit(10000),
-        supabase
+        !allows(plan, "metrics") ? locked : supabase
           .from("photo_view_sessions")
           .select("product_id,photo_url,visible_seconds,qualified,created_at")
           .eq("restaurant_id", id)
           .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString())
           .order("created_at", { ascending: false })
           .limit(10000),
-        supabase
+        !allows(plan, "reviews") ? locked : supabase
           .from("product_feedback")
           .select(
             "id,product_id,liked,comment,comment_hidden,updated_at,products(name)",
@@ -167,19 +178,27 @@ async function handleGET(
           .select("pix_key,merchant_name,merchant_city")
           .eq("restaurant_id", id)
           .maybeSingle(),
-        supabase
+        !allows(plan, "coupons") ? locked : supabase
           .from("coupons")
           .select("*")
           .eq("restaurant_id", id)
           .order("created_at", { ascending: false }),
-        supabase
+        !allows(plan, "origin") ? locked : supabase
           .from("order_origins")
           .select("*")
           .eq("restaurant_id", id)
           .order("created_at"),
+        // Never the Asaas ids: only what the plan screen shows.
+        supabase
+          .from("restaurant_billing")
+          .select("plan,cycle,status,founder,price_cents,current_period_end,overdue_since,cancel_at,pending_plan,pending_cycle")
+          .eq("restaurant_id", id)
+          .maybeSingle(),
       ]);
       if (m.error || photos.error || reviews.error || couponRows.error || originRows.error)
         throw new Error("DATABASE_ERROR");
+      if (billingRow.error) throw new Error("DATABASE_ERROR");
+      billing = billingRow.data;
       coupons = couponRows.data;
       origins = originRows.data;
       // Pix is optional: a failed read must not break the owner's admin.
@@ -197,6 +216,8 @@ async function handleGET(
       {
         restaurant: restaurant.data,
         role,
+        billing_state,
+        ...(role === "owner" ? { plan, billing } : {}),
         categories: categories.data,
         options: options.data,
         optionLinks: optionLinks.data,

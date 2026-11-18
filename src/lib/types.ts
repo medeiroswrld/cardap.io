@@ -80,6 +80,8 @@ export type Settings = {
   hours: string;
   privacyEmail: string;
   bagSuggestions?: string[];
+  // Effective plan of a connected menu; Essencial shows no bag upsell. Absent in the demo.
+  plan?: "essencial" | "profissional";
   // Why ordering is unavailable ("Fechado agora · abre hoje às 18:00"), null when open.
   closedMessage?: string | null;
   weeklyHours?: string;

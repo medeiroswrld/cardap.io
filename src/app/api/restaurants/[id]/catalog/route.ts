@@ -7,6 +7,8 @@ import { normalizePixKey, pixText } from "@/lib/pix";
 import { crmSettingsBody } from "@/lib/crm-query";
 import { isFinanceDay } from "@/lib/finance";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
+import { catalogActionFeature } from "@/lib/plans";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
   id: z.uuid(),
@@ -187,6 +189,9 @@ async function handlePOST(
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
     const body = schema.parse(await request.json());
+    // Plan gating lives here, on the server: the admin UI locks are only a courtesy.
+    const feature = catalogActionFeature(body);
+    if (feature) await requirePlan(id, feature, supabase);
     if (body.action === "feedback_settings") {
       const { error } = await supabase.rpc("set_feedback_enabled", {
         p_restaurant: id,

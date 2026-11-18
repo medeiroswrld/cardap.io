@@ -3,10 +3,43 @@ import { serviceClient } from "./supabase/server";
 import { logger } from "./observability/logger";
 import { type Asaas } from "./asaas";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addDays, firstChargeCents, todayBrt, type Cycle, type SellablePlan } from "./plans";
+import { addDays, allows, firstChargeCents, todayBrt, type Cycle, type Feature, type Plan, type SellablePlan } from "./plans";
 
 export type CustomerInput = { name: string; cpfCnpj: string; email: string; mobilePhone?: string };
 type Db = SupabaseClient;
+
+// Plan and billing state as the database computes them (restaurant_plan / restaurant_billing_state).
+// Answers are cached per client object: routes build one Supabase client per request, so a request
+// that asks twice (gate + order checks) hits the database once. Without a client the service role is used.
+const answers = new WeakMap<object, Map<string, Promise<string>>>();
+function ask(client: Pick<Db, "rpc">, fn: "restaurant_plan" | "restaurant_billing_state", id: string) {
+  let perClient = answers.get(client);
+  if (!perClient) answers.set(client, (perClient = new Map()));
+  const key = `${fn}:${id}`;
+  let pending = perClient.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const { data, error } = await client.rpc(fn, { p_restaurant: id });
+      if (error) throw error;
+      if (typeof data !== "string") throw new Error("DATABASE_ERROR");
+      return data;
+    })();
+    perClient.set(key, pending);
+    pending.catch(() => perClient.delete(key));
+  }
+  return pending;
+}
+export async function restaurantPlan(id: string, client: Pick<Db, "rpc"> = serviceClient()) {
+  return (await ask(client, "restaurant_plan", id)) as Plan;
+}
+export async function billingState(id: string, client: Pick<Db, "rpc"> = serviceClient()) {
+  return ask(client, "restaurant_billing_state", id);
+}
+// Throws PLAN_REQUIRED (403, "Disponível no plano Profissional.") unless the restaurant's effective plan
+// includes the feature. Pass the request's Supabase client to share the per-request cache.
+export async function requirePlan(id: string, feature: Feature, client?: Pick<Db, "rpc">) {
+  if (!allows(await restaurantPlan(id, client), feature)) throw new Error("PLAN_REQUIRED");
+}
 
 async function save(service: Db, restaurantId: string, patch: Record<string, unknown>) {
   const { error } = await service.from("restaurant_billing").update(patch).eq("restaurant_id", restaurantId);
@@ -52,6 +85,8 @@ export async function provisionCheckout(
     } catch (error) {
       if (!(error instanceof Error && error.message === "NOT_FOUND")) throw error;
     }
+    // A charge Asaas still returns with deleted: true is gone: never reuse it.
+    if (existing?.deleted) existing = null;
     if (existing) {
       // Anything but a plainly open charge (paid, in risk analysis, received in cash...) is not ours to replace.
       if (existing.status !== "PENDING" && existing.status !== "OVERDUE") throw new Error("STATE_CONFLICT");

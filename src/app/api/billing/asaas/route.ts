@@ -13,7 +13,7 @@ async function handlePOST(request: Request) {
       token: process.env.ASAAS_WEBHOOK_TOKEN,
       notify: notifyNewSubscriber,
       log: (event, detail) =>
-        logger.warn(event, event === "billing.webhook_unactivated" ? { eventId: detail } : undefined),
+        logger.warn(event, event === "billing.webhook_unactivated" || event === "billing.notify_failed" ? { eventId: detail } : undefined),
     });
   } catch (error) {
     return apiError(error);

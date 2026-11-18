@@ -24,7 +24,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     throw new Error("DATABASE_ERROR");
   }
   if (!restaurant) return null;
-  const [categories, products, media, tables, options, optionLinks, zones, pixEnabled] =
+  const [categories, products, media, tables, options, optionLinks, zones, pixEnabled, planResult] =
     await Promise.all([
       client
         .from("categories")
@@ -70,6 +70,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
         .eq("active", true)
         .order("position"),
       client.rpc("restaurant_pix_enabled", { p_restaurant: restaurant.id }),
+      client.rpc("restaurant_plan", { p_restaurant: restaurant.id }),
     ]);
   if (
     [categories, products, media, tables, options, optionLinks, zones].some(
@@ -89,7 +90,16 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
       errorCode: "DATABASE_ERROR",
     });
   }
+  // The plan decides which upsell offers the menu shows. A failed read falls back to Essencial (no offers)
+  // rather than breaking the menu.
+  if (planResult.error) {
+    logger.warn("dependency.failed", {
+      operation: "supabase.catalog",
+      errorCode: "DATABASE_ERROR",
+    });
+  }
   return {
+    plan: planResult.data === "profissional" ? "profissional" : "essencial",
     restaurant,
     options: options.data,
     optionLinks: optionLinks.data,
@@ -105,8 +115,8 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
 // Short shared cache for the public menu; invalidated by owner mutations.
 export function readCatalog(slug: string): Promise<Catalog | null> {
   if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
-  // Bump "v3" whenever the Catalog shape changes so old cached entries are ignored.
-  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v3", slug], {
+  // Bump "v4" whenever the Catalog shape changes so old cached entries are ignored.
+  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v4", slug], {
     revalidate: 60,
     tags: [catalogTag(slug)],
   })();

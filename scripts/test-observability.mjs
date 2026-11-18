@@ -459,7 +459,7 @@ test("billing routes are allowlisted and billing errors map to statuses and mess
     ["POST", "/api/restaurants/[id]/billing"],
   ])
     assert.equal(core.safeAction(method, route), `${method} ${route}`);
-  const expected = { PLAN_REQUIRED: 403, EMAIL_IN_USE: 409, INVALID_DOCUMENT: 400, BILLING_UNAVAILABLE: 503, FOUNDER_CONFIRM_REQUIRED: 409 };
+  const expected = { PLAN_REQUIRED: 403, EMAIL_IN_USE: 409, INVALID_DOCUMENT: 400, BILLING_UNAVAILABLE: 503, FOUNDER_CONFIRM_REQUIRED: 409, ASAAS_REJECTED: 502 };
   const security = loader({ "./observability/logger": { logFailure: () => {} } })("src/lib/server-security.ts");
   for (const [code, status] of Object.entries(expected)) {
     assert.equal(core.errorStatus(core.errorCode(new Error(code))), status, code);
@@ -467,4 +467,6 @@ test("billing routes are allowlisted and billing errors map to statuses and mess
     assert.equal(response.status, status);
     assert.notEqual((await response.json()).error, "Ocorreu uma falha interna. Tente novamente em instantes.");
   }
+  assert.equal((await security.apiError(new Error("ASAAS_REJECTED")).json()).error, "O Asaas recusou a operação. Confira os dados e tente de novo.");
+  assert.equal((await security.apiError(new Error("PLAN_REQUIRED")).json()).error, "Disponível no plano Profissional.");
 });

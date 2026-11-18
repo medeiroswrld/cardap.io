@@ -168,6 +168,8 @@ export type Workspace = {
   }[];
 };
 export type Catalog = {
+  // Effective plan (restaurant_plan): Essencial menus show no upsell offers.
+  plan: "essencial" | "profissional";
   restaurant: RestaurantRow;
   options: OptionRow[];
   optionLinks: OptionLink[];
@@ -250,6 +252,7 @@ export function catalogState(catalog: Catalog): {
         .join(" • "),
       privacyEmail: catalog.restaurant.privacy_email,
       bagSuggestions: catalog.restaurant.bag_suggestions ?? [],
+      plan: catalog.plan,
       closedMessage: openingMessage(catalog.restaurant),
       weeklyHours: weeklyHours(catalog.restaurant.opening_hours),
       startView: catalog.restaurant.menu_start_view ?? "lista",

@@ -1,6 +1,7 @@
 import { withRequestLogging } from "@/lib/observability/logger";
 import { z } from "zod";
 import { requireMember } from "@/lib/supabase/server";
+import { requirePlan } from "@/lib/billing-server";
 import { apiError, noStore } from "@/lib/server-security";
 import { crmCampaignQuery, searchParamsObject } from "@/lib/crm-query";
 
@@ -8,6 +9,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   try {
     const id = z.uuid().parse((await params).id);
     const { supabase } = await requireMember(id, true);
+    await requirePlan(id, "crm", supabase);
     const q = crmCampaignQuery.parse(searchParamsObject(new URL(request.url)));
     const { data, error } = await supabase.rpc("crm_campaign", {
       p_restaurant: id,
