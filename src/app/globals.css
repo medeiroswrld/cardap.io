@@ -1277,6 +1277,26 @@ button:hover:not(:disabled) {
 .dialog-wide {
   max-width: 780px;
 }
+.print-kit {
+  display: grid;
+  gap: 16px;
+  justify-items: start;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.print-kit p {
+  margin: 0;
+}
+.print-kit ol {
+  margin: 0;
+  padding-left: 20px;
+  list-style: decimal;
+  display: grid;
+  gap: 8px;
+}
+.print-kit .field-help {
+  margin: 0;
+}
 .dialog-heading {
   display: flex;
   align-items: start;

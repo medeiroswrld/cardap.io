@@ -76,6 +76,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [printHelp, setPrintHelp] = useState(false);
   const refresh = useCallback(async () => {
     try {
       const next = await requestJson<Workspace>(
@@ -308,6 +309,13 @@ export function ConnectedAdmin({ id }: { id: string }) {
                       />{" "}
                       Imprimir pedidos novos automaticamente
                     </label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPrintHelp(true)}
+                    >
+                      Imprimir sem abrir janela (Windows)
+                    </Button>
                     <label className="form-label inline-label">
                       Papel
                       <select
@@ -388,6 +396,36 @@ export function ConnectedAdmin({ id }: { id: string }) {
           {toast}
         </div>
       )}
+      <Modal
+        open={printHelp}
+        onOpenChange={setPrintHelp}
+        title="Impressão automática sem janela"
+      >
+        <div className="print-kit">
+          <p>
+            No computador ao lado da impressora, os pedidos saem sozinhos quando
+            ficam &quot;Recebido&quot;, sem abrir a janela de impressão.
+          </p>
+          <ol>
+            <li>Baixe o instalador e dê dois cliques nele.</li>
+            <li>Escolha a impressora térmica na lista.</li>
+            <li>
+              Entre com o e-mail e a senha do restaurante na janela que abrir.
+              Pronto: ela abre sozinha quando o computador ligar.
+            </li>
+          </ol>
+          <Button asChild>
+            <a href="/downloads/fomeplay-impressora.zip" download>
+              Baixar instalador
+            </a>
+          </Button>
+          <p className="field-help">
+            Se o Windows mostrar um aviso azul, clique em &quot;Mais
+            informações&quot; e depois em &quot;Executar assim mesmo&quot;.
+            Deixe a janela do Fome Play aberta (pode minimizar).
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ordersToPrint, ticketHtml, type PaperWidth, type TicketOrder } from "@/lib/order-ticket";
 
-const AUTO_KEY = "gestao:impressao:auto";
+export const AUTO_KEY = "gestao:impressao:auto";
 const WIDTH_KEY = "gestao:impressao:largura";
 
 function read(key: string) {
