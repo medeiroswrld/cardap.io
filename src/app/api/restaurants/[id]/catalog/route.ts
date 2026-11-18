@@ -5,6 +5,7 @@ import { isGoogleReviewUrl } from "@/lib/feedback";
 import { invalidateCatalog } from "@/lib/catalog-cache";
 import { normalizePixKey, pixText } from "@/lib/pix";
 import { crmSettingsBody } from "@/lib/crm-query";
+import { isFinanceDay } from "@/lib/finance";
 import { requireMember } from "@/lib/supabase/server";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 const product = z.object({
@@ -27,8 +28,7 @@ const product = z.object({
 });
 const financeDate = z
   .string()
-  .regex(/^d{4}-d{2}-d{2}$/)
-  .refine((v) => v >= "2000-01-01" && v <= "2100-12-31" && !Number.isNaN(Date.parse(v)));
+  .refine((v) => isFinanceDay(v) && v >= "2000-01-01" && v <= "2100-12-31");
 const financeEntry = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("income"),
