@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "build:print-kit": "powershell -NoProfile -Command \"Compress-Archive -Force -Path 'scripts/print-kit/Instalar impressao Fome Play.bat' -DestinationPath public/downloads/fomeplay-impressora.zip\"",
     "test": "playwright test",
-    "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs && node scripts/test-crm.mjs && node scripts/test-upsell-db.mjs && node scripts/test-menu-view-db.mjs && node scripts/test-results-db.mjs && node scripts/test-menu-theme-db.mjs && node scripts/test-coupons-db.mjs && node scripts/test-finance-db.mjs",
+    "test:database": "node scripts/test-database.mjs && node scripts/test-online-orders.mjs && node scripts/test-crm.mjs && node scripts/test-upsell-db.mjs && node scripts/test-menu-view-db.mjs && node scripts/test-results-db.mjs && node scripts/test-menu-theme-db.mjs && node scripts/test-coupons-db.mjs && node scripts/test-finance-db.mjs && node scripts/test-billing-db.mjs",
     "check:connections": "node scripts/check-connections.mjs",
     "test:observability": "node --test scripts/test-observability.mjs",
     "test:foundation": "node --test scripts/test-foundation.mjs",

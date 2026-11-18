@@ -22,10 +22,24 @@ export const MIGRATIONS = [
   "018_menu_theme.sql",
   "019_coupons_origins.sql",
   "020_finance.sql",
+  "021_billing.sql",
 ];
 
 // Supabase-owned schemas/roles are represented locally; business SQL is unchanged.
-export async function createTestDatabase() {
+export async function applyMigration(db, file) {
+  const sql = readFileSync(
+    new URL("../../supabase/migrations/" + file, import.meta.url),
+    "utf8",
+  )
+    .replace("create extension if not exists pgcrypto;", "")
+    .replace(
+      "alter publication supabase_realtime add table public.orders;",
+      "",
+    );
+  await db.exec(sql);
+}
+
+export async function createTestDatabase(files = MIGRATIONS) {
   const db = new PGlite();
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
  create schema auth;create schema storage;create schema extensions;
@@ -38,17 +52,6 @@ export async function createTestDatabase() {
  create function extensions.digest(text,text) returns bytea language sql immutable as $$select convert_to(md5($1),'UTF8')$$;
  grant usage on schema public,auth,storage to anon,authenticated,service_role;
 `);
-  for (const file of MIGRATIONS) {
-    const sql = readFileSync(
-      new URL("../../supabase/migrations/" + file, import.meta.url),
-      "utf8",
-    )
-      .replace("create extension if not exists pgcrypto;", "")
-      .replace(
-        "alter publication supabase_realtime add table public.orders;",
-        "",
-      );
-    await db.exec(sql);
-  }
+  for (const file of files) await applyMigration(db, file);
   return db;
 }
