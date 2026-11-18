@@ -19,6 +19,9 @@ const DAYS = [30, 60, 90] as const;
 const DEFAULT_MESSAGE =
   "Oi {nome}! Faz tempo que você não pede no {restaurante}. Preparamos um desconto pra você voltar: {link}";
 
+const DEFAULT_MESSAGE_NO_COUPON =
+  "Oi {nome}! Faz tempo que você não pede no {restaurante}. Bateu saudade? Peça por aqui: {link}";
+
 function dateText(iso: string, timeZone: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone, day: "2-digit", month: "2-digit", year: "numeric" }).format(
     new Date(iso),
@@ -40,7 +43,7 @@ export function WinBackPanel({
 }) {
   const [days, setDays] = useState<30 | 60 | 90>(30);
   const [couponCode, setCouponCode] = useState("");
-  const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [message, setMessage] = useState<string | null>(null);
   const [rows, setRows] = useState<Lapsed[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,7 @@ export function WinBackPanel({
   const today = todayIn(timezone);
   const usable = coupons.filter((c) => c.active && !couponExpired(c, today));
   const selected = usable.some((c) => c.code === couponCode) ? couponCode : "";
+  const text = message ?? (selected ? DEFAULT_MESSAGE : DEFAULT_MESSAGE_NO_COUPON);
   const link = selected ? couponLink(slug, selected) : `${SITE_URL}/r/${slug}`;
 
   const load = useCallback(
@@ -115,8 +119,8 @@ export function WinBackPanel({
         </select>
       </label>
       <label className="form-label">
-        Mensagem ({message.length}/500) — use {"{nome}"}, {"{restaurante}"} e {"{link}"}
-        <textarea maxLength={500} value={message} onChange={(e) => setMessage(e.target.value)} />
+        Mensagem ({text.length}/500) — use {"{nome}"}, {"{restaurante}"} e {"{link}"}
+        <textarea maxLength={500} value={text} onChange={(e) => setMessage(e.target.value)} />
       </label>
       {error && (
         <p role="alert" className="form-error">
@@ -161,7 +165,7 @@ export function WinBackPanel({
                         <a
                           href={whatsappUrl(
                             r.phone,
-                            winBackMessage(message, { nome: r.name, restaurante: restaurantName, link }),
+                            winBackMessage(text, { nome: r.name, restaurante: restaurantName, link }),
                           )}
                           target="_blank"
                           rel="noopener noreferrer"

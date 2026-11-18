@@ -7,7 +7,9 @@ import { money } from "@/lib/utils";
 import { monthOptions } from "@/lib/results-report";
 import { BUILTIN_ORIGINS, originLabel, originLink, type OriginReportRow, type OriginRow } from "@/lib/origins";
 import { Button } from "./ui/button";
+import { formMessage } from "./coupons-admin";
 
+const ORIGIN_NAME_ERROR = "O nome da origem precisa ter de 2 a 40 letras.";
 type Save = (body: unknown) => Promise<void>;
 
 export function OriginsPanel({
@@ -91,12 +93,13 @@ export function OriginsPanel({
     e.preventDefault();
     const clean = name.trim();
     if (!clean) return setFormError("Digite um nome para a origem.");
+    if (clean.length < 2 || clean.length > 40) return setFormError(ORIGIN_NAME_ERROR);
     setFormError("");
     try {
       await save({ action: "save_origin", name: clean });
       setName("");
     } catch (err) {
-      setFormError((err as Error).message);
+      setFormError(formMessage((err as Error).message, ORIGIN_NAME_ERROR));
     }
   }
   async function remove(o: OriginRow) {
@@ -105,7 +108,7 @@ export function OriginsPanel({
     try {
       await save({ action: "delete_origin", id: o.id });
     } catch (err) {
-      setFormError((err as Error).message);
+      setFormError(formMessage((err as Error).message, ORIGIN_NAME_ERROR));
     }
   }
 
@@ -122,7 +125,7 @@ export function OriginsPanel({
           Use um link ou QR diferente em cada lugar (embalagem, Instagram, panfleto) e veja qual traz mais pedidos.
         </p>
         <ul className="coupon-list">
-          <li className="coupon-row">
+          <li className="admin-coupon-item">
             <div className="coupon-main">
               <strong>Mesa</strong>
               <span className="status-pill tone-neutral">automática</span>
@@ -130,7 +133,7 @@ export function OriginsPanel({
             <p className="field-help">Todo pedido feito pelo QR da mesa entra aqui sozinho.</p>
           </li>
           {rows.map((o) => (
-            <li key={o.slug} className="coupon-row">
+            <li key={o.slug} className="admin-coupon-item">
               <div className="coupon-main">
                 <strong>{o.name}</strong>
               </div>

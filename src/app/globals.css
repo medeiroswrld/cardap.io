@@ -6200,6 +6200,11 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
   font-size: 12px;
   text-transform: uppercase;
 }
+@media (max-width: 700px) {
+  .coupon-row input {
+    font-size: 16px;
+  }
+}
 .coupon-row input::placeholder {
   text-transform: none;
 }
@@ -6252,8 +6257,8 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 
 /* Cupons, Reconquistar e Origem (gestão) */
 .coupon-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.coupon-row { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.coupon-row p { margin: 0; }
+.admin-coupon-item { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.admin-coupon-item p { margin: 0; }
 .coupon-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .coupon-code { font-size: 16px; letter-spacing: 0.04em; }
 .coupon-value { font-weight: 700; color: var(--text); }

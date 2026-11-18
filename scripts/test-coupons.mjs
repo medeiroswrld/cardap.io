@@ -53,6 +53,12 @@ test("win-back message with empty name and special characters", () => {
     "Pizza $& Cia $1: https://x/?a=$&",
   );
 });
+test("win-back message only capitalizes when the template starts with the name", () => {
+  const v = { nome: "", restaurante: "pizzaria do Zé", link: "https://x/y" };
+  assert.equal(c.winBackMessage("{restaurante} sente sua falta: {link}", v), "pizzaria do Zé sente sua falta: https://x/y");
+  assert.equal(c.winBackMessage("{link} te espera", v), "https://x/y te espera");
+  assert.equal(c.winBackMessage("{nome} volta!", { ...v, nome: "ana" }), "Ana volta!");
+});
 test("parseMoneyInput", () => {
   const ok = {
     "5": 500, "5,5": 550, "5,50": 550, "1234,56": 123456, "1.234,56": 123456, "5.00": 500, "2.5": 250,

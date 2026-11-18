@@ -96,7 +96,8 @@ export function winBackMessage(
     .replaceAll("{restaurante}", () => vars.restaurante)
     .replaceAll("{link}", () => vars.link)
     .replace(/^[\s,;:.!?-]+/, "");
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  // Only a template opening with the name needs its first letter fixed ("{nome}, volta!" -> "Volta!").
+  return template.startsWith("{nome}") ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 export function whatsappUrl(phone: string, text: string): string {
   return `https://wa.me/55${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;

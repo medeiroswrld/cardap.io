@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
-import { requestJson } from "@/lib/client-api";
+import { apiErrorMessages, requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
 import { couponLink, normalizeCode, parseMoneyInput, type CouponRow, type CouponStats } from "@/lib/coupons";
 import { Button } from "./ui/button";
@@ -24,8 +24,13 @@ function valueText(c: CouponRow) {
   return c.kind === "percent" ? `${c.value}%` : money(c.value);
 }
 const MONEY_INVALID = "Valor inválido. Use vírgula, ex.: 5,00";
-function formMessage(message: string) {
-  return message === "INVALID_INPUT" ? "Confira os campos do cupom." : message;
+// Never show a raw server code: map known codes, fall back to a generic text.
+export function formMessage(message: string, invalid = "Confira os campos do cupom.") {
+  if (!/^[A-Z][A-Z0-9_]+$/.test(message)) return message;
+  if (message === "INVALID_INPUT") return invalid;
+  return Object.hasOwn(apiErrorMessages, message)
+    ? apiErrorMessages[message]
+    : "Não foi possível concluir. Tente novamente.";
 }
 function reaisText(cents: number) {
   return cents ? (cents / 100).toFixed(2).replace(".", ",") : "";
@@ -59,6 +64,7 @@ export function CouponsAdmin({
     return () => clearTimeout(t);
   }, [message]);
 
+  const codesKey = coupons.map((c) => c.code).sort().join(",");
   useEffect(() => {
     let active = true;
     requestJson<CouponStats>(`/api/restaurants/${restaurantId}/coupon-stats`)
@@ -73,7 +79,7 @@ export function CouponsAdmin({
     return () => {
       active = false;
     };
-  }, [restaurantId, coupons]);
+  }, [restaurantId, codesKey]);
 
   async function copy(c: CouponRow) {
     setMessage("");
@@ -98,7 +104,7 @@ export function CouponsAdmin({
         active: !c.active,
       });
     } catch (err) {
-      setError((err as Error).message);
+      setError(formMessage((err as Error).message));
     }
   }
   async function remove(c: CouponRow) {
@@ -107,7 +113,7 @@ export function CouponsAdmin({
     try {
       await save({ action: "delete_coupon", id: c.id });
     } catch (err) {
-      setError((err as Error).message);
+      setError(formMessage((err as Error).message));
     }
   }
 
@@ -151,7 +157,7 @@ export function CouponsAdmin({
             const expired = couponExpired(c, today);
             const uses = st?.uses ?? 0;
             return (
-              <li key={c.id} className="coupon-row">
+              <li key={c.id} className="admin-coupon-item">
                 <div className="coupon-main">
                   <strong className="coupon-code">{c.code}</strong>
                   <span className="coupon-value">{valueText(c)}</span>
