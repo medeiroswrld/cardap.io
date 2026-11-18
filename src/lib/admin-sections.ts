@@ -2,7 +2,7 @@
 export type PageKey =
   | "resumo" | "pedidos" | "produtos" | "opcionais" | "categorias" | "qr"
   | "contatos" | "avaliacoes" | "cupons" | "reconquistar"
-  | "resultados" | "metricas" | "origem" | "caixa" | "mes" | "contas" | "configuracoes";
+  | "resultados" | "metricas" | "origem" | "caixa" | "mes" | "contas" | "configuracoes" | "plano";
 export type SectionKey = "resumo" | "pedidos" | "cardapio" | "clientes" | "relatorios" | "financeiro" | "configuracoes";
 export type Section = { key: SectionKey; label: string; pages: PageKey[] };
 
@@ -13,7 +13,7 @@ export const SECTIONS: Section[] = [
   { key: "clientes", label: "Clientes", pages: ["contatos", "avaliacoes", "cupons", "reconquistar"] },
   { key: "relatorios", label: "Relatórios", pages: ["resultados", "metricas", "origem"] },
   { key: "financeiro", label: "Financeiro", pages: ["caixa", "mes", "contas"] },
-  { key: "configuracoes", label: "Configurações", pages: ["configuracoes"] },
+  { key: "configuracoes", label: "Configurações", pages: ["configuracoes", "plano"] },
 ];
 
 const STAFF_PAGES: PageKey[] = ["resumo", "pedidos"];

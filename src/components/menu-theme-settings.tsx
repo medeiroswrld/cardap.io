@@ -2,6 +2,7 @@
 import "@/lib/menu-fonts";
 import { useState, type CSSProperties } from "react";
 import { Button } from "./ui/button";
+import { PlanLockInline } from "./plan-lock";
 import { browserClient } from "@/lib/supabase/browser";
 import { optimizePhoto } from "@/lib/photo-optimizer";
 import type { Workspace } from "@/lib/connected-types";
@@ -25,7 +26,20 @@ const COLOR_FIELDS = [
   ["text", "Texto"],
 ] as const;
 
-export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save: Save; busy: boolean }) {
+export function MenuThemeSettings({
+  data,
+  save,
+  busy,
+  fullTheme = true,
+  onUpgrade,
+}: {
+  data: Workspace;
+  save: Save;
+  busy: boolean;
+  // Essencial only has logo, cover and main color; themes, other colors, fonts and corners are Profissional.
+  fullTheme?: boolean;
+  onUpgrade?: () => void;
+}) {
   const [theme, setTheme] = useState<MenuTheme>(data.restaurant.menu_theme ?? {});
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState<"" | "logo_url" | "cover_url">("");
@@ -81,6 +95,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
         Deixe o cardápio com a cara da sua marca. A gestão continua com o visual padrão.
       </p>
 
+      {fullTheme && (
       <fieldset className="choice-group">
         <legend>Temas prontos</legend>
         <div className="theme-presets">
@@ -105,6 +120,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
           })}
         </div>
       </fieldset>
+      )}
 
       <div className="form-columns">
         <label className="form-label">
@@ -123,7 +139,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
       </div>
 
       <div className="form-columns">
-        {COLOR_FIELDS.map(([field, label]) => (
+        {COLOR_FIELDS.filter(([field]) => fullTheme || field === "brand").map(([field, label]) => (
           <label key={field} className="form-label">
             {label}
             <input type="color" value={resolved[field]} onChange={(e) => setCustom({ [field]: e.target.value.toLowerCase() })} />
@@ -131,6 +147,16 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
         ))}
       </div>
 
+      {!fullTheme && (
+        <div className="theme-locked">
+          <PlanLockInline
+            title="Temas, cores, fontes e cantos"
+            benefit="Temas prontos, cores de fundo e texto, fontes e cantos arredondados do cardápio."
+            onUpgrade={() => onUpgrade?.()}
+          />
+        </div>
+      )}
+      {fullTheme && (
       <div className="form-columns">
         <label className="form-label">
           Fonte dos títulos
@@ -161,6 +187,7 @@ export function MenuThemeSettings({ data, save, busy }: { data: Workspace; save:
           </select>
         </label>
       </div>
+      )}
 
       <div
         className="theme-preview"

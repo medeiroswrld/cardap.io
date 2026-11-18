@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 import type { Workspace, OptionRow } from "@/lib/connected-types";
 import { money } from "@/lib/utils";
 import { Button } from "./ui/button";
@@ -10,10 +10,15 @@ export function ProductOptionsAdmin({
   data,
   save,
   busy,
+  canOfferInBag = true,
+  onUpgrade,
 }: {
   data: Workspace;
   save: (body: unknown) => Promise<void>;
   busy: boolean;
+  // Offering options in the bag is a Profissional feature (an option already offered stays editable).
+  canOfferInBag?: boolean;
+  onUpgrade?: () => void;
 }) {
   const [edit, setEdit] = useState<
     (OptionRow & { product_ids: string[] }) | null
@@ -65,10 +70,10 @@ export function ProductOptionsAdmin({
           </p>
           <Button
             variant="outline"
-            disabled={busy || data.options.every((o) => o.offer_in_bag)}
+            disabled={busy || !canOfferInBag || data.options.every((o) => o.offer_in_bag)}
             onClick={() => void save({ action: "options_in_bag_all", offer: true }).catch((err) => setError((err as Error).message))}
           >
-            Oferecer todos na sacola
+            {!canOfferInBag && <Lock size={14} aria-hidden="true" />} Oferecer todos na sacola
           </Button>
           <Button
             variant="ghost"
@@ -77,6 +82,14 @@ export function ProductOptionsAdmin({
           >
             Tirar todos da sacola
           </Button>
+          {!canOfferInBag && (
+            <p className="field-help">
+              Oferecer na sacola é do plano Profissional.{" "}
+              <button type="button" className="billing-link" onClick={() => onUpgrade?.()}>
+                Liberar no Profissional
+              </button>
+            </p>
+          )}
           {!edit && error && (
             <p role="alert" className="form-error">
               {error}
@@ -208,9 +221,13 @@ export function ProductOptionsAdmin({
               <input
                 type="checkbox"
                 checked={edit.offer_in_bag}
+                disabled={!canOfferInBag && !data.options.find((o) => o.id === edit.id)?.offer_in_bag}
                 onChange={(e) => setEdit({ ...edit, offer_in_bag: e.target.checked })}
               />
               Oferecer na sacola
+              {!canOfferInBag && !data.options.find((o) => o.id === edit.id)?.offer_in_bag && (
+                <Lock size={13} aria-label="Disponível no Profissional" />
+              )}
             </label>
             <p className="field-help">
               Na sacola, quem pediu um desses produtos sem este opcional vê

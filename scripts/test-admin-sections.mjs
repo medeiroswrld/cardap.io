@@ -2,8 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loader } from "./lib/ts-loader.mjs";
 
-const s = loader()("src/lib/admin-sections.ts");
-const ALL = ["resumo", "pedidos", "produtos", "opcionais", "categorias", "qr", "contatos", "avaliacoes", "cupons", "reconquistar", "resultados", "metricas", "origem", "caixa", "mes", "contas", "configuracoes"];
+const load = loader();
+const s = load("src/lib/admin-sections.ts");
+const plans = load("src/lib/plans.ts");
+const ALL = ["resumo", "pedidos", "produtos", "opcionais", "categorias", "qr", "contatos", "avaliacoes", "cupons", "reconquistar", "resultados", "metricas", "origem", "caixa", "mes", "contas", "configuracoes", "plano"];
 
 test("every page belongs to exactly one section", () => {
   for (const page of ALL) {
@@ -31,4 +33,27 @@ test("staff only see overview and orders", () => {
   assert.equal(s.pageAllowed("pedidos", false), true);
   for (const p of ["caixa", "mes", "contas"]) assert.equal(s.pageAllowed(p, false), false, p);
   for (const p of ["cupons", "reconquistar", "origem"]) assert.equal(s.pageAllowed(p, false), false, p);
+});
+
+test("Plano e pagamento is an owner-only tab of Configurações", () => {
+  assert.equal(s.sectionOf("plano"), "configuracoes");
+  assert.deepEqual(s.SECTIONS.find((x) => x.key === "configuracoes").pages, ["configuracoes", "plano"]);
+  assert.equal(s.pageAllowed("plano", false), false);
+  assert.equal(s.pageAllowed("plano", true), true);
+});
+
+test("pages carry their feature: Profissional pages lock on Essencial, the rest never", () => {
+  const locked = ["contatos", "avaliacoes", "cupons", "reconquistar", "resultados", "metricas", "origem", "caixa", "mes", "contas"];
+  for (const page of ALL) {
+    const feature = plans.pageFeature(page);
+    if (locked.includes(page)) {
+      assert.ok(feature, page);
+      assert.equal(plans.allows("essencial", feature), false, page);
+      assert.equal(plans.allows("profissional", feature), true, page);
+      assert.equal(plans.pagePlan(page), "profissional", page);
+    } else {
+      assert.equal(feature, null, page);
+      assert.equal(plans.pagePlan(page), "essencial", page);
+    }
+  }
 });

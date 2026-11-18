@@ -129,6 +129,21 @@ export type RealOrder = {
 export type Workspace = {
   restaurant: RestaurantRow;
   role: "owner" | "operations";
+  // Effective billing state (everyone); plan and the billing summary come only for the owner.
+  billing_state?: string;
+  plan?: "essencial" | "profissional";
+  billing?: {
+    plan: string;
+    cycle: "mensal" | "anual";
+    status: string;
+    founder: boolean;
+    price_cents: number;
+    current_period_end: string | null;
+    overdue_since: string | null;
+    cancel_at: string | null;
+    pending_plan: string | null;
+    pending_cycle: string | null;
+  } | null;
   pix: { pix_key: string; merchant_name: string; merchant_city: string } | null;
   feedback: {
     id: string;

@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Flame,
   ArrowUpRight,
@@ -22,6 +22,8 @@ import {
   Megaphone,
   Compass,
   Wallet,
+  CreditCard,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
 import QRCode from "qrcode";
@@ -64,6 +66,10 @@ import { FinanceMonthPanel } from "./finance-month";
 import { FinanceBills } from "./finance-bills";
 import { PaymentFeesSettings } from "./payment-fees-settings";
 import { ModeToggle } from "./mode-toggle";
+import { PlanLock, PlanLockInline, PAGE_BENEFITS } from "./plan-lock";
+import { BillingSettings } from "./billing-settings";
+import { BillingGate, OverdueBanner, StaffBillingNotice } from "./billing-gate";
+import { allows, pageFeature, stateBlocks } from "@/lib/plans";
 import { AdminOverview } from "./admin-overview";
 import {
   pageAllowed,
@@ -94,6 +100,7 @@ const pages = [
   ["mes", "Resultado do mês", Wallet],
   ["contas", "Contas a pagar", Wallet],
   ["configuracoes", "Configurações", Settings],
+  ["plano", "Plano e pagamento", CreditCard],
   ["qr", "QR das mesas", QrCode],
 ] as const;
 const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
@@ -108,7 +115,8 @@ const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
 export function ConnectedAdmin({ id }: { id: string }) {
   const router = useRouter();
   const [data, setData] = useState<Workspace | null>(null);
-  const [page, setPage] = useState<PageKey>("resumo");
+  const [openPage, setPage] = useState<PageKey>("resumo");
+  const documentRejected = useSearchParams().get("pagamento") === "documento";
   const [lastTab, setLastTab] = useState<Partial<Record<SectionKey, PageKey>>>(
     {},
   );
@@ -208,8 +216,25 @@ export function ConnectedAdmin({ id }: { id: string }) {
     data?.restaurant.timezone,
   );
   const owner = data?.role === "owner";
-  const sections = visibleSections(owner);
+  // Billing not in good standing (pendente, bloqueado, cancelado): the owner only gets Plano e pagamento, staff a notice.
+  const billingState = data?.billing_state ?? "ativo";
+  const blocked = !!data && stateBlocks(billingState);
+  const staffBlocked = blocked && !owner;
+  const page: PageKey = blocked && owner ? "plano" : openPage;
+  const sections = blocked
+    ? owner
+      ? [{ key: "configuracoes" as const, label: "Plano e pagamento", pages: ["plano" as const] }]
+      : []
+    : visibleSections(owner);
   const section = sections.find((s) => s.key === sectionOf(page));
+  // Pages of the Profissional plan show a lock on Essencial (the server enforces it too).
+  const plan = data?.plan ?? "profissional";
+  const isLocked = (p: PageKey) => {
+    const feature = pageFeature(p);
+    return owner && !!feature && !allows(plan, feature);
+  };
+  const lockedPage = isLocked(page);
+  const upgrade = () => go("plano");
   const go = (next: PageKey) => {
     if (!pageAllowed(next, owner)) return;
     setPage(next);
@@ -248,8 +273,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
         </span>
         <nav aria-label="Gestão">
           {sections.map((s) => {
-            const Icon = SECTION_ICONS[s.key];
+            const Icon = blocked ? CreditCard : SECTION_ICONS[s.key];
             const active = sectionOf(page) === s.key;
+            const sectionLocked = s.pages.length > 0 && s.pages.every(isLocked);
             const remembered = lastTab[s.key];
             return (
               <button
@@ -266,6 +292,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
               >
                 <Icon size={19} />
                 {s.label}
+                {sectionLocked && (
+                  <Lock size={14} className="nav-lock" aria-label="Disponível no Profissional" />
+                )}
               </button>
             );
           })}
@@ -293,6 +322,13 @@ export function ConnectedAdmin({ id }: { id: string }) {
         </div>
       </aside>
       <main className="connected-main">
+        {owner && billingState === "atrasado" && (
+          <OverdueBanner
+            restaurantId={id}
+            since={data?.billing?.overdue_since ?? null}
+            onOpenPlan={() => go("plano")}
+          />
+        )}
         <header className="connected-top">
           <span>
             <span
@@ -312,6 +348,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
           </Button>
         </header>
         <div className="connected-content">
+          {!staffBlocked && (
           <div className="page-heading">
             <div>
               <span className="eyebrow">
@@ -325,6 +362,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
               </p>
             </div>
           </div>
+          )}
           {section && section.pages.length > 1 && (
             <div className="section-tabs" role="tablist" aria-label={section.label}>
               {section.pages.map((p) => (
@@ -339,6 +377,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   onKeyDown={onTabKey}
                 >
                   {pages.find((x) => x[0] === p)?.[1]}
+                  {isLocked(p) && (
+                    <Lock size={13} className="tab-lock" aria-label="Disponível no Profissional" />
+                  )}
                 </button>
               ))}
             </div>
@@ -355,8 +396,26 @@ export function ConnectedAdmin({ id }: { id: string }) {
               </button>
             </div>
           )}
-          {data && (
+          {staffBlocked && <StaffBillingNotice />}
+          {data && !staffBlocked && (
             <>
+              {owner && lockedPage && (
+                <PlanLock
+                  title={pages.find((p) => p[0] === page)?.[1] ?? ""}
+                  benefit={PAGE_BENEFITS[page] ?? ""}
+                  onUpgrade={upgrade}
+                />
+              )}
+              {owner && page === "plano" && (
+                <>
+                  {blocked && <BillingGate state={billingState} />}
+                  <BillingSettings
+                    restaurantId={id}
+                    documentRejected={documentRejected}
+                    onChanged={() => void refresh()}
+                  />
+                </>
+              )}
               {page === "resumo" && (
                 <>
                   <AdminOverview
@@ -440,7 +499,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <Products data={data} save={save} busy={busy} />
               )}
               {owner && page === "opcionais" && (
-                <ProductOptionsAdmin data={data} save={save} busy={busy} />
+                <ProductOptionsAdmin data={data} save={save} busy={busy} canOfferInBag={allows(plan, "upsell")} onUpgrade={upgrade} />
               )}
               {owner && page === "categorias" && (
                 <Categories data={data} save={save} busy={busy} />
@@ -448,21 +507,45 @@ export function ConnectedAdmin({ id }: { id: string }) {
               {owner && page === "configuracoes" && (
                 <>
                   <SettingsForm data={data} save={save} busy={busy} />
-                  <MenuThemeSettings data={data} save={save} busy={busy} />
+                  <MenuThemeSettings data={data} save={save} busy={busy} fullTheme={allows(plan, "theme_full")} onUpgrade={upgrade} />
                   <DeliverySettings data={data} save={save} busy={busy} />
                   <PixSettings data={data} save={save} busy={busy} />
-                  <PaymentFeesSettings restaurantId={id} save={save} busy={busy} />
-                  <BagSuggestionsSettings key={(data.restaurant.bag_suggestions ?? []).join(",")} data={data} save={save} busy={busy} />
-                  <CrmSettings data={data} save={save} busy={busy} />
+                  {allows(plan, "finance") ? (
+                    <PaymentFeesSettings restaurantId={id} save={save} busy={busy} />
+                  ) : (
+                    <PlanLockInline
+                      title="Taxas de cartão e Pix"
+                      benefit="Informe as taxas para ver quanto sobra de cada venda no financeiro."
+                      onUpgrade={upgrade}
+                    />
+                  )}
+                  {allows(plan, "upsell") ? (
+                    <BagSuggestionsSettings key={(data.restaurant.bag_suggestions ?? []).join(",")} data={data} save={save} busy={busy} />
+                  ) : (
+                    <PlanLockInline
+                      title="Sugestões na sacola"
+                      benefit="Mostre até 3 produtos na sacola como “Que tal adicionar?” e aumente o ticket médio."
+                      onUpgrade={upgrade}
+                    />
+                  )}
+                  {allows(plan, "crm") ? (
+                    <CrmSettings data={data} save={save} busy={busy} />
+                  ) : (
+                    <PlanLockInline
+                      title="Segmentos de clientes"
+                      benefit="Defina quem é recorrente, VIP ou sumido para chamar cada cliente de volta."
+                      onUpgrade={upgrade}
+                    />
+                  )}
                 </>
               )}
-              {owner && page === "contatos" && (
+              {owner && !lockedPage && page === "contatos" && (
                 <>
                   <CustomersPanel restaurantId={id} save={save} onChanged={() => setCrmStamp((n) => n + 1)} />
                   <CampaignPanel restaurantId={id} staleStamp={crmStamp} />
                 </>
               )}
-              {owner && page === "caixa" && (
+              {owner && !lockedPage && page === "caixa" && (
                 <FinanceCash
                   restaurantId={id}
                   restaurantName={data.restaurant.name}
@@ -471,7 +554,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   busy={busy}
                 />
               )}
-              {owner && page === "mes" && (
+              {owner && !lockedPage && page === "mes" && (
                 <FinanceMonthPanel
                   restaurantId={id}
                   timezone={data.restaurant.timezone}
@@ -479,11 +562,11 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   busy={busy}
                 />
               )}
-              {owner && page === "contas" && (
+              {owner && !lockedPage && page === "contas" && (
                 <FinanceBills restaurantId={id} save={save} busy={busy} />
               )}
-              {owner && page === "metricas" && <Metrics data={data} />}
-              {owner && page === "resultados" && (
+              {owner && !lockedPage && page === "metricas" && <Metrics data={data} />}
+              {owner && !lockedPage && page === "resultados" && (
                 <ResultsReportPanel
                   restaurantId={id}
                   restaurantName={data.restaurant.name}
@@ -491,7 +574,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   logoUrl={data.restaurant.menu_theme?.logo_url}
                 />
               )}
-              {owner && page === "avaliacoes" && (
+              {owner && !lockedPage && page === "avaliacoes" && (
                 <FeedbackAdmin
                   feedback={data.feedback || []}
                   enabled={data.restaurant.feedback_enabled}
@@ -499,7 +582,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   busy={busy}
                 />
               )}
-              {owner && page === "cupons" && (
+              {owner && !lockedPage && page === "cupons" && (
                 <CouponsAdmin
                   restaurantId={id}
                   slug={data.restaurant.slug}
@@ -509,7 +592,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   busy={busy}
                 />
               )}
-              {owner && page === "reconquistar" && (
+              {owner && !lockedPage && page === "reconquistar" && (
                 <WinBackPanel
                   restaurantId={id}
                   restaurantName={data.restaurant.name}
@@ -518,7 +601,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   coupons={data.coupons ?? []}
                 />
               )}
-              {owner && page === "origem" && (
+              {owner && !lockedPage && page === "origem" && (
                 <OriginsPanel
                   restaurantId={id}
                   slug={data.restaurant.slug}

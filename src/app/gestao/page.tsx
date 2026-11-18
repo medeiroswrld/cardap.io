@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isConfigured, serverClient } from "@/lib/supabase/server";
-import { SetupForm } from "@/components/setup-forms";
 export const dynamic = "force-dynamic";
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagamento?: string | string[] }>;
+}) {
   if (!isConfigured()) redirect("/login");
   const client = await serverClient();
   const {
@@ -27,16 +30,12 @@ export default async function Page() {
         </Link>
       </main>
     );
-  if (members?.length) redirect(`/gestao/${members[0].restaurant_id}`);
-  return (
-    <main className="standalone">
-      <span className="eyebrow">Seu primeiro cardápio</span>
-      <h1>Vamos abrir a casa.</h1>
-      <p>
-        Crie o restaurante, cadastre os produtos e configure mesas e horários
-        para começar a receber pedidos.
-      </p>
-      <SetupForm />
-    </main>
-  );
+  // Keep the "?pagamento=documento" notice that the subscription form sends along.
+  const { pagamento } = await searchParams;
+  if (members?.length)
+    redirect(
+      `/gestao/${members[0].restaurant_id}${pagamento === "documento" ? "?pagamento=documento" : ""}`,
+    );
+  // No restaurant yet: accounts are created by the subscription form.
+  redirect("/assinar");
 }

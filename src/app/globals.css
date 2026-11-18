@@ -6323,3 +6323,104 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 .fin-toolbar-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
 .fin-reloading { opacity: 0.6; transition: opacity 0.15s; }
 .fin-toolbar-actions { align-items: center; }
+
+/* Spec O — plan locks, billing tab, billing gate and overdue banner (gestão tokens, light and dark). */
+.connected-sidebar nav button .nav-lock { margin-left: auto; opacity: 0.7; flex: none; }
+.section-tabs button .tab-lock { margin-left: 6px; vertical-align: -2px; opacity: 0.75; }
+.plan-lock {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  max-width: 560px; padding: 32px; margin: 8px 0 22px;
+}
+.plan-lock h2 { font-size: 24px; margin: 0; }
+.plan-lock p { margin: 0 0 8px; max-width: 46ch; }
+.plan-lock-icon {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; flex: none;
+  background: var(--soft); color: var(--brand-text, var(--brand));
+}
+.plan-lock-inline {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.plan-lock-inline > div { flex: 1 1 240px; min-width: 0; }
+.plan-lock-inline h2 { font-size: 17px; margin: 0 0 4px; }
+.plan-lock-inline p { margin: 0; font-size: 13px; }
+.plan-lock-inline .plan-lock-icon { width: 38px; height: 38px; }
+.theme-locked .plan-lock-inline { margin: 0; }
+
+.billing-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 11px 36px; font-size: 13px; font-weight: 500;
+  background: var(--warning-bg); color: var(--warning-text);
+  border-bottom: 1px solid var(--border);
+}
+.billing-banner > span { flex: 1 1 260px; min-width: 0; }
+.billing-banner .button { background: var(--warning-text); color: var(--warning-bg); }
+.billing-gate {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 26px; margin: 0 0 22px; max-width: 640px;
+}
+.billing-gate h2 { font-size: 20px; margin: 0; }
+.billing-gate p { margin: 0 0 6px; }
+.billing-gate-icon {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
+  background: var(--warning-bg); color: var(--warning-text);
+}
+
+.billing-plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.billing-plan-head h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 0; font-size: 26px; }
+.billing-founder {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px;
+  background: var(--warning-bg); color: var(--warning-text); font-size: 12px; font-weight: 600;
+}
+.billing-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 20px 0 0;
+}
+.billing-facts > div { background: var(--soft); border-radius: var(--radius); padding: 14px 16px; }
+.billing-facts dt { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.billing-facts dd { margin: 0; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.billing-note { margin: 16px 0 0; padding: 11px 14px; border-radius: var(--radius); background: var(--soft); color: var(--text); font-size: 14px; }
+.connected-content .billing-note { color: var(--text); }
+.billing-done { margin: 14px 0 0; padding: 11px 14px; border-radius: var(--radius); background: var(--success-bg); color: var(--success-text) !important; font-size: 14px; font-weight: 500; }
+.billing-pay { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.billing-pay h2 { margin: 0 0 4px; }
+.billing-pay p { margin: 0; }
+.billing-pay .form-stack { flex: 1 1 280px; min-width: 0; gap: 12px; }
+.billing-cancel { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.billing-cancel h2 { margin: 0 0 4px; }
+.billing-cancel p { margin: 0; }
+.billing-invoices h2, .billing-change h2 { margin-bottom: 12px; }
+.billing-table-wrap { overflow-x: auto; }
+.billing-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.billing-table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.billing-table td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.billing-table tr:last-child td { border-bottom: 0; }
+.billing-link { color: var(--brand-text, var(--brand)); font: inherit; font-weight: 600; text-decoration: underline; background: none; border: 0; padding: 0; cursor: pointer; }
+.billing-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.billing-choice {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer;
+  border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
+.billing-choice.selected { border-color: var(--brand); background: var(--soft); }
+.billing-choice:focus-within { outline: 3px solid color-mix(in srgb, var(--brand) 40%, transparent); outline-offset: 2px; }
+.billing-choice input { accent-color: var(--brand); flex: none; }
+.billing-choice span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.billing-choice strong { font-size: 14px; font-weight: 600; }
+.billing-choice small { font-size: 12px; color: var(--muted); }
+.billing-confirm { display: flex; flex-direction: column; gap: 16px; }
+.billing-confirm p { margin: 0; line-height: 1.6; }
+.billing-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .billing-banner { padding: 11px 16px; }
+  .plan-lock { padding: 24px 20px; }
+  .billing-plan-head h2 { font-size: 22px; }
+}
+.section-tabs button { display: inline-flex; align-items: center; gap: 6px; }
+.section-tabs button .tab-lock { margin-left: 0; vertical-align: baseline; }
+.plan-lock .eyebrow, .billing-plan-head .eyebrow {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--brand-text, var(--brand));
+}
+.connected-content .billing-table th { font-size: 12px; }
+.connected-content .billing-table td, .connected-content .billing-table .money-cell { font-size: 14px; }
+.connected-content .billing-table td:last-child { text-align: right; }
+.connected-content .billing-table th:last-child { width: 1%; }
+.billing-choice input[type="radio"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; }
+.billing-pay .form-stack input { max-width: 320px; }

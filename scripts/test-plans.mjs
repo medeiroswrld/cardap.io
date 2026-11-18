@@ -8,6 +8,7 @@ const p = load("src/lib/plans.ts");
 const doc = load("src/lib/cpf-cnpj.ts");
 const asaas = load("src/lib/asaas.ts");
 const ev = load("src/lib/billing-events.ts");
+const view = load("src/lib/billing-view.ts");
 
 test("prices by plan, cycle and founder", () => {
   assert.equal(p.priceFor("essencial", "mensal"), 14900);
@@ -353,4 +354,38 @@ test("document and phone masks", () => {
   assert.equal(sales.formatDocument("5299"), "529.9");
   assert.equal(sales.formatPhone("15999990000"), "(15) 99999-0000");
   assert.equal(sales.formatPhone("1533334444"), "(15) 3333-4444");
+});
+
+test("billing view: dates, states, invoices and plan changes", () => {
+  assert.equal(view.fullDate("2026-11-18"), "18/11/2026");
+  assert.equal(view.shortDate("2026-11-18"), "18/11");
+  assert.equal(view.fullDate(null), "");
+  assert.equal(view.stateView("ativo").tone, "success");
+  assert.equal(view.stateView("atrasado").tone, "warning");
+  assert.equal(view.stateView("bloqueado").tone, "danger");
+  assert.equal(view.stateView("cortesia").label, "Cortesia");
+  assert.equal(view.invoiceView("PENDING").action, "pay");
+  assert.equal(view.invoiceView("OVERDUE").action, "pay");
+  assert.equal(view.invoiceView("RECEIVED").action, "receipt");
+  // only hosted Asaas pages are linkable; the oldest unpaid one is the payable invoice
+  const inv = (id, dueDate, status, invoiceUrl) => ({ id, dueDate, valueCents: 100, status, invoiceUrl });
+  assert.equal(view.invoiceLink("http://www.asaas.com/i/1"), null);
+  assert.equal(view.invoiceLink("https://evil.example.com/asaas.com"), null);
+  assert.equal(view.invoiceLink("https://www.asaas.com/i/1"), "https://www.asaas.com/i/1");
+  const payable = view.payableInvoice([
+    inv("a", "2026-12-01", "PENDING", "https://www.asaas.com/i/a"),
+    inv("b", "2026-11-01", "OVERDUE", "https://www.asaas.com/i/b"),
+    inv("c", "2026-10-01", "OVERDUE", "https://evil.example.com/c"),
+    inv("d", "2026-09-01", "RECEIVED", "https://www.asaas.com/i/d"),
+  ]);
+  assert.deepEqual(payable, { id: "b", url: "https://www.asaas.com/i/b" });
+  assert.equal(view.payableInvoice(null), null);
+  const cur = { plan: "essencial", cycle: "mensal" };
+  assert.equal(view.changeKind(cur, { plan: "essencial", cycle: "mensal" }), "same");
+  assert.equal(view.changeKind(cur, { plan: "profissional", cycle: "mensal" }), "upgrade");
+  assert.equal(view.changeKind(cur, { plan: "essencial", cycle: "anual" }), "upgrade");
+  assert.equal(view.changeKind({ plan: "profissional", cycle: "anual" }, { plan: "essencial", cycle: "anual" }), "schedule");
+  assert.equal(view.changeKind({ plan: "profissional", cycle: "anual" }, { plan: "profissional", cycle: "mensal" }), "schedule");
+  assert.equal(view.changeKind(cur, { plan: "profissional", cycle: "anual" }), "upgrade");
+  assert.equal(view.changeKind({ plan: "profissional", cycle: "mensal" }, { plan: "essencial", cycle: "anual" }), "schedule");
 });
