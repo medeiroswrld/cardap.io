@@ -19,11 +19,23 @@ class Query {
   constructor(db, table, fail) {
     Object.assign(this, { db, table, fail, op: "select", filters: [], opts: {}, max: Infinity });
   }
-  select(_cols, opts = {}) { this.opts = opts; return this; }
+  select(_cols, opts = {}) { this.opts = opts; if (this.op === "update") this.returning = true; return this; }
   insert(row) { this.op = "insert"; this.row = row; return this; }
   update(patch) { this.op = "update"; this.patch = patch; return this; }
   eq(c, v) { this.filters.push((r) => r[c] === v); return this; }
   in(c, vs) { this.filters.push((r) => vs.includes(r[c])); return this; }
+  is(c, v) { this.filters.push((r) => (r[c] ?? null) === v); return this; }
+  or(expr) {
+    const tests = expr.split(",").map((part) => {
+      const [c, op, ...rest] = part.split(".");
+      const v = rest.join(".");
+      if (op === "is") return (r) => (r[c] ?? null) === (v === "null" ? null : v);
+      if (op === "lt") return (r) => r[c] != null && r[c] < v;
+      throw new Error("unsupported or(): " + part);
+    });
+    this.filters.push((r) => tests.some((t) => t(r)));
+    return this;
+  }
   not(c, _is, v) { this.filters.push((r) => r[c] !== v); return this; }
   limit(n) { this.max = n; return this; }
   maybeSingle() { this.single = true; return this.then((x) => x); }
@@ -35,13 +47,13 @@ class Query {
     if (this.op === "insert") {
       if (this.table === "billing_events" && rows.some((r) => r.id === this.row.id))
         return { data: null, error: { code: "23505", message: "duplicate key" } };
-      rows.push({ processed_at: null, ...this.row });
+      rows.push({ processed_at: null, processing_started_at: null, ...this.row });
       return { data: null, error: null };
     }
     const match = rows.filter((r) => this.filters.every((f) => f(r)));
     if (this.op === "update") {
       for (const r of match) Object.assign(r, this.patch);
-      return { data: null, error: null };
+      return { data: this.returning ? match.map((r) => ({ ...r })) : null, error: null };
     }
     const picked = match.slice(0, this.max).map((r) => ({ ...r }));
     if (this.opts.head) return { data: null, error: null, count: match.length };
@@ -62,10 +74,18 @@ function fakeAsaas(payments = {}) {
   const calls = [];
   const store = new Map(Object.entries(payments));
   let n = 0;
-  const fail = { getPayment: null, createSubscription: null };
+  const fail = { getPayment: null, createSubscription: null, updateCustomer: null };
+  const subs = [];
   const api = {
     calls,
     store,
+    subs,
+    async listSubscriptions(filter) { calls.push(["listSubscriptions", filter]); return subs.map((x) => ({ ...x })); },
+    async updateCustomer(id, input) {
+      calls.push(["updateCustomer", id, input]);
+      if (fail.updateCustomer) throw fail.updateCustomer;
+      return { id };
+    },
     fail,
     async createCustomer(input) { calls.push(["createCustomer", input]); return { id: "cus_new" }; },
     async createPayment(input) {
@@ -205,6 +225,8 @@ test("webhook: first activation verifies with Asaas, creates the subscription at
   await deliver(t.deps, evt("PAYMENT_RECEIVED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
   assert.equal(names(t.asaas).filter((n) => n === "createSubscription").length, 1);
   assert.equal(t.notified.length, 1);
+  // renewal e-mails/SMS are switched back on exactly once, at first activation
+  assert.deepEqual(t.asaas.calls.filter((c) => c[0] === "updateCustomer"), [["updateCustomer", "cus_1", { notificationDisabled: false }]]);
   // the late RECEIVED was dropped before even asking Asaas again
   assert.equal(names(t.asaas).filter((n) => n === "getPayment").length, 1);
 });
@@ -293,6 +315,7 @@ test("C1 sequence: events of an old, replaced charge neither block nor activate"
   assert.equal(active.row().status, "ativo");
   assert.equal(active.row().overdue_since, null);
   // while overdue on the real subscription charge does
+  active.asaas.store.set("pay_s1", { id: "pay_s1", customer: "cus_1", value: 249, status: "OVERDUE", dueDate: "2026-12-20" });
   await deliver(active.deps, evt("PAYMENT_OVERDUE", { id: "pay_s1", subscription: "sub_1", dueDate: "2026-12-20" }));
   assert.equal(active.row().status, "atrasado");
   assert.equal(active.row().overdue_since, "2026-12-20");
@@ -301,7 +324,8 @@ test("C1 sequence: events of an old, replaced charge neither block nor activate"
 test("I1 sequence: a late payment of an older charge does not clear a newer overdue; duplicate RECEIVED is dropped", async () => {
   const t = setup(baseRow({ status: "ativo", asaas_subscription_id: "sub_1", current_period_end: "2026-12-20" }), {
     pay_s1: { id: "pay_s1", customer: "cus_1", value: 249, status: "RECEIVED", dueDate: "2026-12-20" },
-    pay_s2: { id: "pay_s2", customer: "cus_1", value: 249, status: "CONFIRMED", dueDate: "2027-01-20" },
+    pay_s2: { id: "pay_s2", customer: "cus_1", value: 249, status: "OVERDUE", dueDate: "2027-01-20" },
+    pay_s3: { id: "pay_s3", customer: "cus_1", value: 249, status: "OVERDUE", dueDate: "2027-02-20" },
   });
   await deliver(t.deps, evt("PAYMENT_OVERDUE", { id: "pay_s2", subscription: "sub_1", dueDate: "2027-01-20" }));
   assert.equal(t.row().status, "atrasado");
@@ -311,12 +335,13 @@ test("I1 sequence: a late payment of an older charge does not clear a newer over
   await deliver(t.deps, evt("PAYMENT_RECEIVED", { id: "pay_s1", subscription: "sub_1", customer: "cus_1", dueDate: "2026-12-20" }));
   assert.equal(t.row().status, "atrasado");
   assert.equal(t.row().overdue_since, "2027-01-20");
+  t.asaas.store.get("pay_s2").status = "CONFIRMED";
   // the overdue charge is paid: CONFIRMED clears it, the trailing RECEIVED changes nothing and is not re-verified
   await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_s2", subscription: "sub_1", customer: "cus_1", dueDate: "2027-01-20" }));
   assert.equal(t.row().status, "ativo");
   assert.equal(t.row().overdue_since, null);
-  const before = names(t.asaas).filter((n) => n === "getPayment").length;
   await deliver(t.deps, evt("PAYMENT_OVERDUE", { id: "pay_s3", subscription: "sub_1", dueDate: "2027-02-20" }));
+  const before = names(t.asaas).filter((n) => n === "getPayment").length;
   await deliver(t.deps, evt("PAYMENT_RECEIVED", { id: "pay_s2", subscription: "sub_1", customer: "cus_1", dueDate: "2027-01-20" }));
   assert.equal(t.row().status, "atrasado");
   assert.equal(names(t.asaas).filter((n) => n === "getPayment").length, before);
@@ -358,4 +383,116 @@ test("scheduled downgrade is applied by the matching subscription charge", async
   assert.equal(t.row().founder, false);
   assert.equal(t.row().pending_plan, null);
   assert.equal(t.row().current_period_end, "2027-01-20");
+});
+
+// ---- round 2 ----
+test("OVERDUE is confirmed with Asaas: one that arrives after the charge was paid does not mark atrasado", async () => {
+  const mk = (status) =>
+    setup(baseRow({ status: "ativo", asaas_subscription_id: "sub_1", current_period_end: "2026-12-20" }), {
+      pay_s1: { id: "pay_s1", customer: "cus_1", value: 249, status, dueDate: "2026-12-20" },
+    });
+  const overdue = evt("PAYMENT_OVERDUE", { id: "pay_s1", subscription: "sub_1", dueDate: "2026-12-20" });
+  for (const status of ["CONFIRMED", "RECEIVED", "PENDING"]) {
+    const t = mk(status);
+    assert.equal((await deliver(t.deps, overdue)).status, 200);
+    assert.equal(t.row().status, "ativo", status);
+  }
+  const gone = setup(baseRow({ status: "ativo", asaas_subscription_id: "sub_1" })); // Asaas answers 404
+  await deliver(gone.deps, evt("PAYMENT_OVERDUE", { id: "pay_s1", subscription: "sub_1", dueDate: "2026-12-20" }));
+  assert.equal(gone.row().status, "ativo");
+  const real = mk("OVERDUE");
+  await deliver(real.deps, evt("PAYMENT_OVERDUE", { id: "pay_s1", subscription: "sub_1", dueDate: "2026-12-20" }));
+  assert.equal(real.row().status, "atrasado");
+  const down = mk("OVERDUE");
+  down.asaas.fail.getPayment = new Error("BILLING_UNAVAILABLE");
+  await assert.rejects(deliver(down.deps, evt("PAYMENT_OVERDUE", { id: "pay_s1", subscription: "sub_1", dueDate: "2026-12-20" })), { message: "BILLING_UNAVAILABLE" });
+  assert.equal(down.row().status, "ativo");
+});
+
+test("first activation reuses a live Asaas subscription instead of creating a second one", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  t.asaas.subs.push({ id: "sub_existing", customer: "cus_1", status: "ACTIVE" });
+  await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(names(t.asaas).includes("createSubscription"), false);
+  assert.deepEqual(t.asaas.calls.find((c) => c[0] === "listSubscriptions")[1], { customer: "cus_1", status: "ACTIVE" });
+  assert.equal(t.row().asaas_subscription_id, "sub_existing");
+  assert.equal(t.row().status, "ativo");
+});
+
+test("concurrent duplicate deliveries process the event once", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  const e = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const results = await Promise.allSettled([deliver(t.deps, e), deliver(t.deps, e), deliver(t.deps, e)]);
+  assert.equal(names(t.asaas).filter((n) => n === "createSubscription").length, 1);
+  assert.equal(t.asaas.calls.filter((c) => c[0] === "updateCustomer").length, 1);
+  assert.equal(t.notified.length, 1);
+  assert.ok(results.some((r) => r.status === "fulfilled"));
+  for (const r of results) if (r.status === "rejected") assert.equal(r.reason.message, "BILLING_UNAVAILABLE"); // "in progress": Asaas retries
+  assert.equal(t.row().status, "ativo");
+  assert.equal((await (await deliver(t.deps, e)).json()).duplicate, true);
+});
+
+test("processing lease: a fresh claim blocks, an expired one is taken over", async () => {
+  const e = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  const claimed = (ageMs) => ({ id: e.id, restaurant_id: RID, type: e.event, payload: e, payment_id: "pay_1", processed_at: null, processing_started_at: new Date(Date.now() - ageMs).toISOString() });
+  const fresh = setup(baseRow(), { pay_1: paid });
+  fresh.db.billing_events.push(claimed(10_000));
+  await assert.rejects(deliver(fresh.deps, e), { message: "BILLING_UNAVAILABLE" });
+  assert.equal(fresh.row().status, "pendente");
+  const stale = setup(baseRow(), { pay_1: paid });
+  stale.db.billing_events.push(claimed(5 * 60_000));
+  await deliver(stale.deps, e);
+  assert.equal(stale.row().status, "ativo");
+  assert.ok(stale.db.billing_events[0].processed_at);
+  // a transient failure hands the claim back so the very next delivery can run
+  const fails = setup(baseRow(), { pay_1: paid });
+  fails.asaas.fail.getPayment = new Error("BILLING_UNAVAILABLE");
+  await assert.rejects(deliver(fails.deps, e));
+  assert.equal(fails.db.billing_events[0].processing_started_at, null);
+});
+
+test("provisionCheckout: any first-charge status other than PENDING/OVERDUE blocks a replacement", async () => {
+  for (const status of ["AWAITING_RISK_ANALYSIS", "RECEIVED_IN_CASH", "CONFIRMED", "RECEIVED", "REFUNDED"]) {
+    const asaas = fakeAsaas({ pay_1: { id: "pay_1", customer: "cus_1", value: 546, status, dueDate: "2026-11-20", invoiceUrl: "https://www.asaas.com/i/pay_1" } });
+    await assert.rejects(provisionCheckout(asaas, input(), fakeService(newDb()), TODAY), { message: "STATE_CONFLICT" }, status);
+    assert.equal(names(asaas).includes("createPayment"), false, status);
+    assert.equal(names(asaas).includes("deletePayment"), false, status);
+  }
+});
+
+test("RECEIVED_IN_CASH counts as paid for activation", async () => {
+  const t = setup(baseRow(), { pay_1: { ...paid, status: "RECEIVED_IN_CASH" } });
+  await deliver(t.deps, evt("PAYMENT_RECEIVED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(t.row().status, "ativo");
+});
+
+test("a failing renewal-notice switch is logged and does not undo the activation", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  t.asaas.fail.updateCustomer = new Error("BILLING_UNAVAILABLE");
+  const res = await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(res.status, 200);
+  assert.equal(t.row().status, "ativo");
+  assert.ok(t.logs.some(([e]) => e === "billing.notify_failed"));
+});
+
+test("Asaas rejections and DB constraint errors are non-transient (200); outages stay transient; unactivated paid setup charges are flagged", async () => {
+  const rejected = setup(baseRow(), { pay_1: paid });
+  rejected.asaas.fail.createSubscription = new Error("ASAAS_REJECTED");
+  const e = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  assert.equal((await deliver(rejected.deps, e)).status, 200);
+  assert.deepEqual(rejected.logs.find(([ev]) => ev === "billing.webhook_unactivated"), ["billing.webhook_unactivated", e.id]);
+  assert.ok(rejected.db.billing_events[0].processed_at);
+  const constraint = setup(baseRow(), { pay_1: paid }, (table, op) => (table === "restaurant_billing" && op === "update" ? { code: "23514", message: "check violation" } : null));
+  assert.equal((await deliver(constraint.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }))).status, 200);
+  const outage = setup(baseRow(), { pay_1: paid });
+  outage.asaas.fail.createSubscription = new Error("BILLING_UNAVAILABLE");
+  await assert.rejects(deliver(outage.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" })));
+  // paid at Asaas but for another value/customer: flagged; merely unpaid: not flagged
+  const mismatch = setup(baseRow(), { pay_1: { ...paid, value: 1 } });
+  const e2 = evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" });
+  await deliver(mismatch.deps, e2);
+  assert.deepEqual(mismatch.logs.find(([ev]) => ev === "billing.webhook_unactivated"), ["billing.webhook_unactivated", e2.id]);
+  const unpaid = setup(baseRow(), { pay_1: { ...paid, status: "PENDING" } });
+  await deliver(unpaid.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(unpaid.logs.some(([ev]) => ev === "billing.webhook_unactivated"), false);
 });

@@ -457,9 +457,16 @@ await ok("Asaas ids are unique per restaurant", async () => {
 await ok("billing_events: processed_at and payment_id columns", async () => {
   await root();
   await db.query("insert into billing_events(id,type,payload,payment_id) values('evp1','PAYMENT_CONFIRMED','{}','pay_z')");
-  const { rows } = await db.query("select processed_at, payment_id from billing_events where id='evp1'");
+  const { rows } = await db.query("select processed_at, processing_started_at, payment_id from billing_events where id='evp1'");
   assert.equal(rows[0].processed_at, null);
+  assert.equal(rows[0].processing_started_at, null);
   assert.equal(rows[0].payment_id, "pay_z");
+  // the lease claim is one conditional UPDATE ... RETURNING: only one of two claims wins
+  const claim = "update billing_events set processing_started_at=now() where id='evp1' and processed_at is null and (processing_started_at is null or processing_started_at < now() - interval '2 minutes') returning id";
+  assert.equal((await db.query(claim)).rows.length, 1);
+  assert.equal((await db.query(claim)).rows.length, 0);
+  await db.query("update billing_events set processing_started_at=now()-interval '3 minutes' where id='evp1'");
+  assert.equal((await db.query(claim)).rows.length, 1);
   await db.query("update billing_events set processed_at=now() where id='evp1'");
   await db.query("delete from billing_events where id='evp1'");
 });

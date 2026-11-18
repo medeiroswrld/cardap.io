@@ -53,7 +53,8 @@ export async function provisionCheckout(
       if (!(error instanceof Error && error.message === "NOT_FOUND")) throw error;
     }
     if (existing) {
-      if (existing.status === "CONFIRMED" || existing.status === "RECEIVED") throw new Error("STATE_CONFLICT");
+      // Anything but a plainly open charge (paid, in risk analysis, received in cash...) is not ours to replace.
+      if (existing.status !== "PENDING" && existing.status !== "OVERDUE") throw new Error("STATE_CONFLICT");
       if (
         existing.status === "PENDING" &&
         existing.dueDate >= today &&
@@ -61,7 +62,7 @@ export async function provisionCheckout(
         existing.invoiceUrl
       )
         return existing.invoiceUrl;
-      if (existing.status === "PENDING" || existing.status === "OVERDUE") await asaas.deletePayment(existing.id);
+      await asaas.deletePayment(existing.id);
     }
   }
   const payment = await asaas.createPayment({

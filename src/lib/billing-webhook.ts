@@ -15,7 +15,14 @@ export type WebhookDeps = {
   asaas: () => Asaas;
   token: string | undefined;
   notify?: (restaurantId: string, plan: string) => Promise<void>;
-  log?: (event: "billing.founder_overflow" | "billing.webhook_ignored", reason?: string) => void;
+  // detail: a short reason for `webhook_ignored`, the billing_events id for `webhook_unactivated`
+  log?: (
+    event: "billing.founder_overflow" | "billing.webhook_ignored" | "billing.webhook_unactivated" | "billing.notify_failed",
+    detail?: string,
+  ) => void;
+  // how long a processing claim on an event blocks other deliveries of it
+  leaseSeconds?: number;
+  now?: () => Date;
   today?: () => string;
 };
 
@@ -76,6 +83,9 @@ function isTransient(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const e = error as { message?: unknown; code?: unknown };
   if (e.message === "BILLING_UNAVAILABLE") return true;
+  // Asaas refused the request for good; constraint violations (Postgres class 23) will fail again.
+  if (e.message === "ASAAS_REJECTED") return false;
+  if (typeof e.code === "string" && e.code.startsWith("23")) return false;
   // PostgREST/network errors carry a string `code` (possibly empty); plain Errors do not.
   return typeof e.code === "string";
 }
@@ -83,17 +93,27 @@ function isTransient(error: unknown) {
 const ok = (extra: Record<string, unknown> = {}) =>
   Response.json({ ok: true, ...extra }, { headers: { "Cache-Control": "private, no-store, max-age=0" } });
 
+const PAID = ["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"];
+
 // Verifies the payment with Asaas itself instead of trusting the webhook body.
-async function verifiedPayment(asaas: Asaas, row: BillingRow, payment: WebhookPayment): Promise<AsaasPayment | null> {
+// "paid": status must be a paid one, owned by this customer, for the expected value.
+// "overdue": Asaas must still consider it OVERDUE (events arrive late and unordered).
+async function verifiedPayment(
+  deps: WebhookDeps,
+  row: BillingRow,
+  payment: WebhookPayment,
+  mode: "paid" | "overdue",
+  eventId: string,
+): Promise<AsaasPayment | null> {
   let remote: AsaasPayment;
   try {
-    remote = await asaas.getPayment(String(payment.id));
+    remote = await deps.asaas().getPayment(String(payment.id));
   } catch (error) {
     if (error instanceof Error && error.message === "NOT_FOUND") return null;
     throw error; // transient: Asaas retries
   }
-  if (remote.status !== "CONFIRMED" && remote.status !== "RECEIVED") return null;
-  if (!row.asaas_customer_id || remote.customer !== row.asaas_customer_id) return null;
+  if (mode === "overdue") return remote.status === "OVERDUE" ? remote : null;
+  if (!PAID.includes(remote.status)) return null;
   const cents = Math.round(remote.value * 100);
   const accepted =
     payment.id === row.setup_payment_id
@@ -102,7 +122,10 @@ async function verifiedPayment(asaas: Asaas, row: BillingRow, payment: WebhookPa
           row.price_cents,
           ...(row.pending_plan && row.pending_cycle ? [priceFor(row.pending_plan, row.pending_cycle, false)] : []),
         ];
-  return accepted.includes(cents) ? remote : null;
+  if (row.asaas_customer_id && remote.customer === row.asaas_customer_id && accepted.includes(cents)) return remote;
+  // Asaas has the money but we cannot tie it to this restaurant: a human has to look at it.
+  if (payment.id === row.setup_payment_id && row.status === "pendente") deps.log?.("billing.webhook_unactivated", eventId);
+  return null;
 }
 
 async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
@@ -128,14 +151,21 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     return;
   }
 
-  if (decision.needsVerification && payment) {
-    const remote = await verifiedPayment(deps.asaas(), row, payment);
+  if ((decision.needsVerification || body.event === "PAYMENT_OVERDUE") && payment) {
+    const remote = await verifiedPayment(
+      deps,
+      row,
+      payment,
+      body.event === "PAYMENT_OVERDUE" ? "overdue" : "paid",
+      body.id,
+    );
     if (!remote) {
       deps.log?.("billing.webhook_ignored", "payment-not-verified");
       return;
     }
     // Trust Asaas's own due date over the webhook body.
     payment.dueDate = remote.dueDate ?? payment.dueDate;
+    if (body.event === "PAYMENT_OVERDUE") return applyPatch(deps, row, decision);
     const again = decideWebhook(row, body.event, payment, { subscriptionId: body.subscription?.id, confirmedAlready });
     if (!again) return;
     decision = again;
@@ -147,14 +177,19 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     let nextDueDate = addCycle(due, row.cycle);
     if (nextDueDate < today) nextDueDate = today;
     const label = row.plan === "profissional" ? "Profissional" : "Essencial";
-    const subscription = await deps.asaas().createSubscription({
-      customer: row.asaas_customer_id,
-      valueCents: row.price_cents,
-      nextDueDate,
-      cycle: row.cycle,
-      description: `Fome Play ${label} - assinatura ${row.cycle}`,
-      externalReference: row.restaurant_id,
-    });
+    // A crash between creating the subscription and saving its id must not leave a second one on retry:
+    // reuse the customer's live subscription when Asaas already has it.
+    const live = await deps.asaas().listSubscriptions({ customer: row.asaas_customer_id, status: "ACTIVE" });
+    const subscription =
+      live[0] ??
+      (await deps.asaas().createSubscription({
+        customer: row.asaas_customer_id,
+        valueCents: row.price_cents,
+        nextDueDate,
+        cycle: row.cycle,
+        description: `Fome Play ${label} - assinatura ${row.cycle}`,
+        externalReference: row.restaurant_id,
+      }));
     const saved = await service
       .from("restaurant_billing")
       .update({ asaas_subscription_id: subscription.id })
@@ -162,6 +197,11 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     if (saved.error) throw saved.error;
   }
 
+  await applyPatch(deps, row, decision);
+}
+
+async function applyPatch(deps: WebhookDeps, row: BillingRow, decision: NonNullable<ReturnType<typeof decideWebhook>>) {
+  const { service } = deps;
   if (Object.keys(decision.patch).length > 0) {
     const { error } = await service.from("restaurant_billing").update(decision.patch).eq("restaurant_id", row.restaurant_id);
     if (error) throw error;
@@ -175,6 +215,15 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
     // Rare race on the last slot: the founder keeps the price, we only record the overflow.
     if (row.founder && (count ?? 0) > 10) deps.log?.("billing.founder_overflow");
     await deps.notify?.(row.restaurant_id, String(decision.patch.plan ?? row.plan));
+    // The first charge went out silently (the buyer was sent straight to the invoice page); from now
+    // on Asaas should send renewal invoices. A failure here must not undo the activation.
+    if (row.asaas_customer_id) {
+      try {
+        await deps.asaas().updateCustomer(row.asaas_customer_id, { notificationDisabled: false });
+      } catch {
+        deps.log?.("billing.notify_failed");
+      }
+    }
   }
   if (decision.cancelAsaasSubscription && row.asaas_subscription_id) {
     await deps.asaas().cancelSubscription(row.asaas_subscription_id);
@@ -191,30 +240,63 @@ export async function processAsaasWebhook(request: Request, deps: WebhookDeps): 
   }
   const body = parsed.data;
   const row = await findRow(service, body);
+  const now = (deps.now ?? (() => new Date()))();
   const { error: insertError } = await service.from("billing_events").insert({
     id: body.id,
     restaurant_id: row?.restaurant_id ?? null,
     type: body.event,
     payload: body,
     payment_id: body.payment?.id ?? null,
+    processing_started_at: now.toISOString(),
   });
+  const lease = (deps.leaseSeconds ?? 120) * 1000;
   if (insertError) {
     if (insertError.code !== "23505") throw insertError;
-    // Known event: finished ones are acknowledged, unfinished ones (crash/5xx earlier) run again.
-    const { data: existing, error } = await service
+    // Known event. Finished: acknowledge. Otherwise claim it with one conditional UPDATE (atomic in
+    // Postgres, so concurrent deliveries cannot both win). A claim older than the lease is taken over
+    // (the previous worker crashed); a fresh one means another delivery is working on it right now:
+    // answer an error so Asaas retries instead of dropping the event.
+    const expired = new Date(now.getTime() - lease).toISOString();
+    const claimed = await service
       .from("billing_events")
-      .select("processed_at")
+      .update({ processing_started_at: now.toISOString() })
       .eq("id", body.id)
-      .maybeSingle();
-    if (error) throw error;
-    if (existing?.processed_at) return ok({ duplicate: true });
+      .is("processed_at", null)
+      .or(`processing_started_at.is.null,processing_started_at.lt.${expired}`)
+      .select("id");
+    if (claimed.error) throw claimed.error;
+    if (!claimed.data || claimed.data.length === 0) {
+      const { data: existing, error } = await service
+        .from("billing_events")
+        .select("processed_at")
+        .eq("id", body.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (existing?.processed_at) return ok({ duplicate: true });
+      throw new Error("BILLING_UNAVAILABLE");
+    }
   }
+  const release = () =>
+    service
+      .from("billing_events")
+      .update({ processing_started_at: null })
+      .eq("id", body.id)
+      .then(() => undefined, () => undefined);
   try {
     if (row) await apply(deps, row, body);
     else deps.log?.("billing.webhook_ignored", "unknown-restaurant");
   } catch (error) {
-    if (isTransient(error)) throw error;
+    if (isTransient(error)) {
+      await release(); // let the next delivery in right away
+      throw error;
+    }
     deps.log?.("billing.webhook_ignored", "processing-error");
+    if (
+      row?.status === "pendente" &&
+      (body.event === "PAYMENT_CONFIRMED" || body.event === "PAYMENT_RECEIVED") &&
+      body.payment?.id === row.setup_payment_id
+    )
+      deps.log?.("billing.webhook_unactivated", body.id);
   }
   const { error: doneError } = await service
     .from("billing_events")

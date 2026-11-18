@@ -14,6 +14,7 @@ export const events = [
   "billing.founder_overflow",
   "billing.notify_failed",
   "billing.webhook_ignored",
+  "billing.webhook_unactivated",
   "server.started",
   "logger.identity_disabled",
   "server.fatal",
@@ -94,6 +95,7 @@ export const errorCodes = [
   "BILLING_UNAVAILABLE",
   "FOUNDER_CONFIRM_REQUIRED",
   "WEAK_PASSWORD",
+  "ASAAS_REJECTED",
   "23505",
   "42501",
   "PGRST116",
@@ -102,6 +104,8 @@ export type ErrorCode = (typeof errorCodes)[number];
 export type Fields = {
   operation?: (typeof operations)[number];
   errorCode?: ErrorCode;
+  // Asaas webhook event id (evt_...): an opaque provider id, never personal data.
+  eventId?: string;
   status?: number;
   durationMs?: number;
 };
@@ -353,6 +357,8 @@ export function createSafeLogger(
     const code = field(fields, "errorCode");
     if (member(operations, operation)) output.operation = operation;
     if (member(errorCodes, code)) output.errorCode = code;
+    const eventId = field(fields, "eventId");
+    if (typeof eventId === "string" && /^[A-Za-z0-9_&-]{1,120}$/.test(eventId)) output.eventId = eventId;
     for (const key of ["status", "durationMs"] as const) {
       const value = field(fields, key);
       if (

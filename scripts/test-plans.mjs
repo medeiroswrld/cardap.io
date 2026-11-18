@@ -303,3 +303,19 @@ test("change_plan decision: upgrade, scheduled downgrade, founder price, same pl
   d = ev.decideChangePlan({ ...base, pending_plan: "essencial" }, { plan: "profissional", cycle: "mensal" }, today);
   assert.equal(d.valueCents, 24900);
 });
+test("asaas client: 4xx (except auth/404/throttle) is ASAAS_REJECTED, lists subscriptions, updates customers", async () => {
+  const run = (response) =>
+    asaas.createAsaas({ apiKey: KEY, env: "sandbox", fetchImpl: mockFetch([response]).impl }).getPayment("pay_1");
+  await assert.rejects(run({ status: 400, body: { errors: [{ code: "x" }] } }), { message: "ASAAS_REJECTED" });
+  await assert.rejects(run({ status: 422 }), { message: "ASAAS_REJECTED" });
+  await assert.rejects(run({ status: 404 }), { message: "NOT_FOUND" });
+  for (const status of [401, 403, 408, 429, 500, 503]) await assert.rejects(run({ status }), { message: "BILLING_UNAVAILABLE" }, String(status));
+  const m = mockFetch([{ body: { data: [{ id: "sub_1" }] } }, { body: { id: "cus_1" } }]);
+  const a = asaas.createAsaas({ apiKey: KEY, env: "sandbox", fetchImpl: m.impl });
+  assert.deepEqual((await a.listSubscriptions({ customer: "cus_1", status: "ACTIVE" })).map((x) => x.id), ["sub_1"]);
+  assert.equal(m.calls[0].url, "https://api-sandbox.asaas.com/v3/subscriptions?customer=cus_1&limit=10&status=ACTIVE");
+  await a.updateCustomer("cus_1", { notificationDisabled: false });
+  assert.equal(m.calls[1].init.method, "PUT");
+  assert.equal(m.calls[1].url, "https://api-sandbox.asaas.com/v3/customers/cus_1");
+  assert.deepEqual(JSON.parse(m.calls[1].init.body), { notificationDisabled: false });
+});

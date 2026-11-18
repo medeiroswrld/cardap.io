@@ -70,6 +70,10 @@ export function createAsaas(config: AsaasConfig) {
     if (!response.ok) {
       const codes = Array.isArray(data?.errors) ? data.errors.map((e: { code?: string }) => e?.code) : [];
       if (response.status === 400 && codes.includes("invalid_cpfCnpj")) throw new Error("INVALID_DOCUMENT");
+      // Auth/config problems and throttling heal on retry; any other 4xx means Asaas refuses this
+      // request for good (retrying the same webhook cannot fix it).
+      if (response.status >= 400 && response.status < 500 && ![401, 403, 408, 429].includes(response.status))
+        throw new Error("ASAAS_REJECTED");
       throw new Error("BILLING_UNAVAILABLE");
     }
     if (!data || typeof data !== "object") throw new Error("BILLING_UNAVAILABLE");
@@ -90,6 +94,15 @@ export function createAsaas(config: AsaasConfig) {
         externalReference: input.externalReference,
       });
       return normalizePayment(payment);
+    },
+    updateCustomer(id: string, input: { notificationDisabled: boolean }) {
+      return call<AsaasCustomer>("PUT", `/customers/${encodeURIComponent(id)}`, input);
+    },
+    async listSubscriptions(filter: { customer: string; status?: "ACTIVE" | "INACTIVE" | "EXPIRED" }) {
+      const query = new URLSearchParams({ customer: filter.customer, limit: "10" });
+      if (filter.status) query.set("status", filter.status);
+      const list = await call<{ data: AsaasSubscription[] }>("GET", `/subscriptions?${query}`);
+      return Array.isArray(list.data) ? list.data : [];
     },
     createSubscription(input: { customer: string; valueCents: number; nextDueDate: string; cycle: Cycle; description: string; externalReference: string }) {
       return call<AsaasSubscription>("POST", "/subscriptions", {

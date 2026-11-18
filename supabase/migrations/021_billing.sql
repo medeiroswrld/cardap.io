@@ -34,6 +34,7 @@ create table public.billing_events (
  payload jsonb not null,
  payment_id text,
  received_at timestamptz not null default now(),
+ processing_started_at timestamptz,
  processed_at timestamptz
 );
 create index billing_events_payment on public.billing_events(payment_id, type) where payment_id is not null;
