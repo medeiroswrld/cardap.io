@@ -337,6 +337,71 @@ await ok("events: duplicate id rejected; event survives restaurant delete", asyn
   assert.equal(bl.rows[0].n, 0);
 });
 
+await ok("start_subscription: prices, founder rules, reset, permissions", async () => {
+  await root();
+  await db.query("update restaurant_billing set founder=false");
+  const id = crypto.randomUUID();
+  await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa H','bil-h',true,$2)", [id, SP]);
+  await db.exec("set role service_role");
+  const start = async (p, c, w) => (await db.query("select public.start_subscription($1,$2,$3,$4) r", [id, p, c, w])).rows[0].r;
+  assert.deepEqual(await start("essencial", "mensal", true), { founder: false, price_cents: 14900 });
+  assert.deepEqual(await start("essencial", "anual", false), { founder: false, price_cents: 149000 });
+  assert.deepEqual(await start("profissional", "anual", true), { founder: false, price_cents: 249000 });
+  assert.deepEqual(await start("profissional", "mensal", false), { founder: false, price_cents: 24900 });
+  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900 });
+  // a pending founder retrying keeps its own slot
+  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900 });
+  await root();
+  const row = (await db.query("select plan,cycle,status,founder,price_cents from restaurant_billing where restaurant_id=$1", [id])).rows[0];
+  assert.deepEqual({ ...row }, { plan: "profissional", cycle: "mensal", status: "pendente", founder: true, price_cents: 17900 });
+  assert.equal(await rpc("founder_slots_left"), 9);
+  // fill the remaining 9 slots; the next request is denied the founder price
+  for (let i = 0; i < 9; i++) {
+    const o = crypto.randomUUID();
+    await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa I',$2,true,$3)", [o, "bil-i" + i, SP]);
+    await db.query("update restaurant_billing set founder=true,status='ativo' where restaurant_id=$1", [o]);
+  }
+  assert.equal(await rpc("founder_slots_left"), 0);
+  const late = crypto.randomUUID();
+  await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa J','bil-j',true,$2)", [late, SP]);
+  await db.exec("set role service_role");
+  assert.deepEqual((await db.query("select public.start_subscription($1,'profissional','mensal',true) r", [late])).rows[0].r, { founder: false, price_cents: 24900 });
+  // a restaurant that is already paying cannot be reset
+  await root();
+  await db.query("update restaurant_billing set status='ativo' where restaurant_id=$1", [late]);
+  await db.exec("set role service_role");
+  await rejects(() => db.query("select public.start_subscription($1,'essencial','mensal',false)", [late]), "STATE_CONFLICT");
+  await rejects(() => db.query("select public.start_subscription($1,'agencia','mensal',false)", [late]), "INVALID_INPUT");
+  await rejects(() => db.query("select public.start_subscription(gen_random_uuid(),'essencial','mensal',false)"), "NOT_FOUND");
+  for (const who of [() => login(ownerA), () => anon()]) {
+    await who();
+    await rejects(() => db.query("select public.start_subscription($1,'essencial','mensal',false)", [id]), "permission denied");
+  }
+  await root();
+  await db.query("delete from restaurants where slug like 'bil-i%' or slug in ('bil-h','bil-j')");
+});
+
+await ok("consume_billing_rate_limit: 8 per window, service role only", async () => {
+  await root();
+  await db.exec("set role service_role");
+  const digest = "a".repeat(64);
+  for (let i = 0; i < 8; i++) {
+    const r = (await db.query("select public.consume_billing_rate_limit($1) r", [digest])).rows[0].r;
+    assert.equal(r.allowed, true);
+  }
+  const r = (await db.query("select public.consume_billing_rate_limit($1) r", [digest])).rows[0].r;
+  assert.equal(r.allowed, false);
+  assert.ok(r.retryAfter >= 1 && r.retryAfter <= 600);
+  const other = (await db.query("select public.consume_billing_rate_limit($1) r", ["b".repeat(64)])).rows[0].r;
+  assert.equal(other.allowed, true);
+  await rejects(() => db.query("select public.consume_billing_rate_limit('not-a-hash')"), "INVALID_INPUT");
+  await anon();
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1)", [digest]), "permission denied");
+  await login(ownerA);
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1)", [digest]), "permission denied");
+  await rejects(() => db.query("select * from billing_rate_limits"), "permission denied");
+});
+
 await root();
 console.log(`Billing DB tests passed: ${count}`);
 await db.close();

@@ -1,0 +1,203 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { loader } from "./lib/ts-loader.mjs";
+
+const load = loader();
+const p = load("src/lib/plans.ts");
+const doc = load("src/lib/cpf-cnpj.ts");
+const asaas = load("src/lib/asaas.ts");
+const ev = load("src/lib/billing-events.ts");
+
+test("prices by plan, cycle and founder", () => {
+  assert.equal(p.priceFor("essencial", "mensal"), 14900);
+  assert.equal(p.priceFor("essencial", "anual"), 149000);
+  assert.equal(p.priceFor("profissional", "mensal"), 24900);
+  assert.equal(p.priceFor("profissional", "anual"), 249000);
+  assert.equal(p.priceFor("profissional", "mensal", true), 17900);
+  // founder price only exists for Profissional mensal
+  assert.equal(p.priceFor("profissional", "anual", true), 249000);
+  assert.equal(p.priceFor("essencial", "mensal", true), 14900);
+  assert.equal(p.firstChargeCents("profissional", "mensal", true), 29700 + 17900);
+  assert.equal(p.firstChargeCents("essencial", "anual"), 29700 + 149000);
+});
+test("TypeScript prices match the SQL function", () => {
+  const sql = fs.readFileSync("supabase/migrations/021_billing.sql", "utf8");
+  for (const n of [17900, 14900, 149000, 24900, 249000]) assert.ok(sql.includes(String(n)), String(n));
+});
+test("feature map and page plans", () => {
+  assert.equal(p.allows("essencial", "crm"), false);
+  assert.equal(p.allows("profissional", "crm"), true);
+  assert.equal(p.allows("agencia", "finance"), true);
+  assert.equal(p.pagePlan("produtos"), "essencial");
+  assert.equal(p.pagePlan("resumo"), "essencial");
+  for (const page of ["contatos", "avaliacoes", "cupons", "reconquistar", "resultados", "metricas", "origem", "caixa", "mes", "contas"])
+    assert.equal(p.pagePlan(page), "profissional", page);
+  assert.equal(p.pageFeature("mes"), "finance");
+  assert.equal(p.pageFeature("pedidos"), null);
+});
+test("stateBlocks pauses orders for pendente, bloqueado and cancelado only", () => {
+  for (const s of ["pendente", "bloqueado", "cancelado"]) assert.equal(p.stateBlocks(s), true, s);
+  for (const s of ["ativo", "atrasado", "cortesia"]) assert.equal(p.stateBlocks(s), false, s);
+});
+test("webhook event to status mapping", () => {
+  assert.equal(p.webhookStatus("PAYMENT_CONFIRMED"), "ativo");
+  assert.equal(p.webhookStatus("PAYMENT_RECEIVED"), "ativo");
+  assert.equal(p.webhookStatus("PAYMENT_OVERDUE"), "atrasado");
+  for (const e of ["PAYMENT_REFUNDED", "SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED"])
+    assert.equal(p.webhookStatus(e), "cancelado", e);
+  for (const e of ["PAYMENT_CREATED", "PAYMENT_UPDATED", "PAYMENT_DELETED", "PAYMENT_PARTIALLY_REFUNDED"])
+    assert.equal(p.webhookStatus(e), null, e);
+});
+test("slugFromName", () => {
+  assert.equal(p.slugFromName("Capiburguer & Cia!"), "capiburguer-cia");
+  assert.equal(p.slugFromName("  Pão de Queijo da Vó  "), "pao-de-queijo-da-vo");
+  assert.equal(p.slugFromName("ab"), "restaurante");
+  assert.equal(p.slugFromName("!!!"), "restaurante");
+  assert.equal(p.slugFromName("Demo"), "demo-restaurante");
+  const long = p.slugFromName("a".repeat(30) + " " + "b".repeat(60));
+  assert.ok(long.length <= 50 && /^[a-z0-9-]{3,60}$/.test(long) && !long.endsWith("-"));
+});
+test("ifoodSavings clamps commission and rounds", () => {
+  assert.equal(p.ifoodSavings(1000000, 27), 270000);
+  assert.equal(p.ifoodSavings(1000000, 5), 120000);
+  assert.equal(p.ifoodSavings(1000000, 50), 300000);
+  assert.equal(p.ifoodSavings(-5, 27), 0);
+  assert.equal(p.ifoodSavings(NaN, 27), 0);
+  assert.equal(p.ifoodSavings(333, 27), 90);
+});
+test("date helpers", () => {
+  assert.equal(p.addCycle("2026-01-31", "mensal"), "2026-02-28");
+  assert.equal(p.addCycle("2026-11-18", "mensal"), "2026-12-18");
+  assert.equal(p.addCycle("2026-12-18", "mensal"), "2027-01-18");
+  assert.equal(p.addCycle("2028-02-29", "anual"), "2029-02-28");
+  assert.equal(p.addDays("2026-11-30", 2), "2026-12-02");
+  assert.match(p.todayBrt(new Date("2026-11-18T01:00:00Z")), /^2026-11-17$/);
+});
+test("CPF and CNPJ validation", () => {
+  assert.equal(doc.isValidCpf("529.982.247-25"), true);
+  assert.equal(doc.isValidCpf("52998224725"), true);
+  assert.equal(doc.isValidCpf("529.982.247-24"), false);
+  assert.equal(doc.isValidCpf("111.111.111-11"), false);
+  assert.equal(doc.isValidCpf("123"), false);
+  assert.equal(doc.isValidCnpj("11.222.333/0001-81"), true);
+  assert.equal(doc.isValidCnpj("11.222.333/0001-82"), false);
+  assert.equal(doc.isValidCnpj("00000000000000"), false);
+  assert.equal(doc.isValidDocument("11222333000181"), true);
+  assert.equal(doc.isValidDocument("abc"), false);
+  assert.equal(doc.normalizeDocument("529.982.247-25"), "52998224725");
+});
+
+function mockFetch(responses) {
+  const calls = [];
+  const impl = async (url, init) => {
+    calls.push({ url, init });
+    const r = responses.shift();
+    if (r instanceof Error) throw r;
+    return new Response(JSON.stringify(r.body ?? {}), { status: r.status ?? 200 });
+  };
+  return { impl, calls };
+}
+const KEY = "SENTINEL-asaas-key-123";
+test("asaas client builds requests with reais values, access_token header and sandbox host", async () => {
+  const m = mockFetch([
+    { body: { id: "cus_1" } },
+    { body: { id: "pay_1", invoiceUrl: "https://www.asaas.com/i/1", value: 476, status: "PENDING", dueDate: "2026-11-20" } },
+    { body: { id: "sub_1", customer: "cus_1" } },
+    { body: { id: "sub_1" } },
+    { body: { id: "sub_1", deleted: true } },
+    { body: { data: [{ id: "pay_1", value: 476, status: "PENDING", dueDate: "2026-11-20" }] } },
+  ]);
+  const a = asaas.createAsaas({ apiKey: KEY, env: "sandbox", fetchImpl: m.impl });
+  await a.createCustomer({ name: "Ana", cpfCnpj: "52998224725", email: "a@b.co", externalReference: "rid" });
+  const pay = await a.createPayment({ customer: "cus_1", valueCents: 47600, dueDate: "2026-11-20", description: "x", externalReference: "rid" });
+  assert.equal(pay.invoiceUrl, "https://www.asaas.com/i/1");
+  await a.createSubscription({ customer: "cus_1", valueCents: 17900, nextDueDate: "2026-12-18", cycle: "mensal", description: "x", externalReference: "rid" });
+  await a.updateSubscription("sub_1", { valueCents: 249000, cycle: "anual" });
+  await a.cancelSubscription("sub_1");
+  const list = await a.listPayments({ customer: "cus_1" });
+  assert.equal(list[0].invoiceUrl, null);
+  const [c, pm, sb, up, del, ls] = m.calls;
+  assert.equal(c.url, "https://api-sandbox.asaas.com/v3/customers");
+  assert.equal(c.init.headers.access_token, KEY);
+  const body = (call) => JSON.parse(call.init.body);
+  assert.deepEqual(
+    { ...body(pm) },
+    { customer: "cus_1", billingType: "UNDEFINED", value: 476, dueDate: "2026-11-20", description: "x", externalReference: "rid" },
+  );
+  assert.equal(body(sb).value, 179);
+  assert.equal(body(sb).cycle, "MONTHLY");
+  assert.equal(body(sb).billingType, "UNDEFINED");
+  assert.equal(up.init.method, "PUT");
+  assert.equal(body(up).value, 2490);
+  assert.equal(body(up).cycle, "YEARLY");
+  assert.equal(del.init.method, "DELETE");
+  assert.equal(ls.url, "https://api-sandbox.asaas.com/v3/payments?limit=20&customer=cus_1");
+  assert.equal(asaas.toReais(29700 + 14900), 446);
+});
+test("asaas client maps failures to stable codes without leaking secrets", async () => {
+  const run = (response) =>
+    asaas
+      .createAsaas({ apiKey: KEY, env: "production", fetchImpl: mockFetch([response]).impl })
+      .createCustomer({ name: "A", cpfCnpj: "00000000000", email: "a@b.co", externalReference: "r" });
+  await assert.rejects(run({ status: 500 }), { message: "BILLING_UNAVAILABLE" });
+  await assert.rejects(run(new Error("socket " + KEY)), { message: "BILLING_UNAVAILABLE" });
+  await assert.rejects(run({ status: 401, body: { errors: [] } }), { message: "BILLING_UNAVAILABLE" });
+  await assert.rejects(run({ status: 400, body: { errors: [{ code: "invalid_cpfCnpj" }] } }), { message: "INVALID_DOCUMENT" });
+  const m = mockFetch([{ body: { id: "cus_1" } }]);
+  await asaas.createAsaas({ apiKey: KEY, env: "production", fetchImpl: m.impl }).createCustomer({ name: "A", cpfCnpj: "1", email: "a@b.co", externalReference: "r" });
+  assert.ok(m.calls[0].url.startsWith("https://api.asaas.com/v3/"));
+});
+test("asaas config comes from env and is null when incomplete", () => {
+  assert.equal(asaas.asaasConfigFromEnv({}), null);
+  assert.equal(asaas.asaasConfigFromEnv({ ASAAS_API_KEY: "k", ASAAS_ENV: "staging" }), null);
+  assert.deepEqual({ ...asaas.asaasConfigFromEnv({ ASAAS_API_KEY: "k", ASAAS_ENV: "sandbox" }) }, { apiKey: "k", env: "sandbox" });
+});
+
+const row = (over = {}) => ({
+  restaurant_id: "r", plan: "profissional", cycle: "mensal", status: "pendente", founder: false, price_cents: 24900,
+  asaas_customer_id: "cus", asaas_subscription_id: "sub", setup_payment_id: "pay", current_period_end: null,
+  overdue_since: null, cancel_at: null, pending_plan: null, pending_cycle: null, ...over,
+});
+test("webhook decisions: first activation, renewals, overdue, refund", () => {
+  let d = ev.decideWebhook(row(), "PAYMENT_CONFIRMED", { dueDate: "2026-11-20" });
+  assert.equal(d.firstActivation, true);
+  assert.deepEqual({ ...d.patch }, { status: "ativo", overdue_since: null, current_period_end: "2026-12-20" });
+  d = ev.decideWebhook(row({ status: "ativo", current_period_end: "2026-12-20" }), "PAYMENT_RECEIVED", { dueDate: "2026-11-20" });
+  assert.equal(d.firstActivation, false);
+  assert.equal(d.patch.current_period_end, "2026-12-20"); // never moves backwards
+  d = ev.decideWebhook(row({ status: "atrasado", overdue_since: "2026-12-01", cycle: "anual" }), "PAYMENT_RECEIVED", { subscription: "sub", dueDate: "2026-12-20" });
+  assert.deepEqual({ ...d.patch }, { status: "ativo", overdue_since: null, current_period_end: "2027-12-20" });
+  // overdue
+  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_OVERDUE", { dueDate: "2026-12-20" });
+  assert.deepEqual({ ...d.patch }, { status: "atrasado", overdue_since: "2026-12-20" });
+  d = ev.decideWebhook(row({ status: "atrasado", overdue_since: "2026-12-20" }), "PAYMENT_OVERDUE", { dueDate: "2027-01-20" });
+  assert.equal(d.patch.overdue_since, "2026-12-20");
+  assert.equal(ev.decideWebhook(row({ status: "pendente" }), "PAYMENT_OVERDUE", { dueDate: "2026-11-20" }), null);
+  // refund cancels the plan and the Asaas subscription
+  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_REFUNDED", {});
+  assert.deepEqual({ ...d.patch }, { status: "cancelado" });
+  assert.equal(d.cancelAsaasSubscription, true);
+  d = ev.decideWebhook(row({ status: "ativo" }), "SUBSCRIPTION_DELETED", null);
+  assert.equal(d.cancelAsaasSubscription, false);
+  // unknown events and protected states
+  assert.equal(ev.decideWebhook(row(), "PAYMENT_CREATED", {}), null);
+  assert.equal(ev.decideWebhook(row({ status: "cortesia" }), "PAYMENT_REFUNDED", {}), null);
+  assert.equal(ev.decideWebhook(row({ status: "cancelado" }), "PAYMENT_RECEIVED", { dueDate: "2026-11-20" }), null);
+});
+test("our own cancel keeps the paid period when Asaas echoes SUBSCRIPTION_DELETED", () => {
+  const cancelling = row({ status: "ativo", cancel_at: "2026-12-20" });
+  assert.equal(ev.decideWebhook(cancelling, "SUBSCRIPTION_DELETED", null), null);
+  assert.equal(ev.decideWebhook(cancelling, "SUBSCRIPTION_INACTIVATED", null), null);
+});
+test("scheduled downgrade applies on the next confirmed subscription charge only", () => {
+  const pending = row({ status: "ativo", pending_plan: "essencial", pending_cycle: "mensal", price_cents: 17900, founder: false });
+  // first charge (no subscription id) does not apply it
+  let d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { dueDate: "2026-11-20" });
+  assert.equal(d.patch.plan, undefined);
+  d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { subscription: "sub", dueDate: "2026-12-20" });
+  assert.deepEqual(
+    { ...d.patch },
+    { status: "ativo", overdue_since: null, plan: "essencial", cycle: "mensal", price_cents: 14900, pending_plan: null, pending_cycle: null, current_period_end: "2027-01-20" },
+  );
+});

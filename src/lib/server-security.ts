@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { errorCode, errorStatus } from "./observability/core";
 import { logFailure } from "./observability/logger";
 import { RateLimitError } from "./rate-limit-identity";
+import { apiErrorMessages } from "./client-api";
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export function checkOrigin(request: Request) {
@@ -23,6 +24,8 @@ export function apiError(error: unknown) {
       error:
         message === "RATE_LIMITED"
           ? "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe."
+          : ["PLAN_REQUIRED", "EMAIL_IN_USE", "INVALID_DOCUMENT", "BILLING_UNAVAILABLE", "FOUNDER_CONFIRM_REQUIRED"].includes(message)
+            ? apiErrorMessages[message]
           : message === "CUSTOMER_HAS_OPEN_ORDERS"
             ? "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir os dados."
           : message === "VIDEO_STORAGE_UNAVAILABLE"

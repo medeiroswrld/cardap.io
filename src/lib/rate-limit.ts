@@ -44,3 +44,24 @@ export async function enforcePublicLimit(
   }
   if (!data.allowed) throw new RateLimitError(data.retryAfter);
 }
+// Public billing endpoints have no restaurant yet: dedicated per-client bucket.
+export async function enforceBillingLimit(request: Request) {
+  const digest = rateLimitHash(
+    process.env.RATE_LIMIT_HASH_KEY,
+    "billing",
+    "subscribe",
+    rateLimitAddress(request.headers, process.env.VERCEL === "1"),
+  );
+  const { data, error } = await serviceClient().rpc("consume_billing_rate_limit", { p_subject: digest });
+  if (
+    error ||
+    typeof data?.allowed !== "boolean" ||
+    !Number.isInteger(data?.retryAfter) ||
+    data.retryAfter < 1 ||
+    data.retryAfter > 600
+  ) {
+    logger.error("dependency.failed", { errorCode: "RATE_LIMIT_UNAVAILABLE" });
+    throw new Error("RATE_LIMIT_UNAVAILABLE");
+  }
+  if (!data.allowed) throw new RateLimitError(data.retryAfter);
+}

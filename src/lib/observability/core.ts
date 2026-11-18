@@ -11,6 +11,8 @@ export const events = [
   "auth.callback_rejected",
   "auth.cookie_write_failed",
   "server.error",
+  "billing.founder_overflow",
+  "billing.notify_failed",
   "server.started",
   "logger.identity_disabled",
   "server.fatal",
@@ -24,6 +26,8 @@ export const operations = [
   "supabase.orders",
   "supabase.feedback",
   "supabase.onboarding",
+  "supabase.billing",
+  "asaas.api",
   "supabase.media",
   "supabase.storage",
   "cloudflare.upload",
@@ -83,6 +87,11 @@ export const errorCodes = [
   "COUPON_USED",
   "LIMIT_REACHED",
   "DUE_DATE_REQUIRED",
+  "PLAN_REQUIRED",
+  "EMAIL_IN_USE",
+  "INVALID_DOCUMENT",
+  "BILLING_UNAVAILABLE",
+  "FOUNDER_CONFIRM_REQUIRED",
   "23505",
   "42501",
   "PGRST116",
@@ -107,6 +116,9 @@ const routes = new Set([
   "/api/auth",
   "/api/password",
   "/api/onboarding",
+  "/api/billing/subscribe",
+  "/api/billing/asaas",
+  "/api/billing/founders",
   "/api/catalog/[slug]",
   "/auth/confirm",
   ...[
@@ -135,6 +147,7 @@ const routes = new Set([
     "finance/month",
     "finance/bills",
     "finance/fees",
+    "billing",
   ].map((part) => `/api/restaurants/[id]/${part}`),
 ]);
 export function safeAction(method: string, route: string) {
@@ -209,7 +222,7 @@ export function errorStatus(code: ErrorCode) {
   if (code === "STATE_CONFLICT") return 409;
   if (["UNAUTHORIZED", "GUEST_SESSION_EXPIRED"].includes(code)) return 401;
   if (
-    ["FORBIDDEN", "ORIGIN_REJECTED", "FEEDBACK_DISABLED", "42501"].includes(
+    ["FORBIDDEN", "ORIGIN_REJECTED", "FEEDBACK_DISABLED", "PLAN_REQUIRED", "42501"].includes(
       code,
     )
   )
@@ -225,6 +238,8 @@ export function errorStatus(code: ErrorCode) {
       "COUPON_DUPLICATE",
       "COUPON_USED",
       "LIMIT_REACHED",
+      "EMAIL_IN_USE",
+      "FOUNDER_CONFIRM_REQUIRED",
     ].includes(code)
   )
     return 409;
@@ -247,6 +262,7 @@ export function errorStatus(code: ErrorCode) {
       "COUPON_MIN_ORDER",
       "COUPON_EXCEEDS_TOTAL",
       "DUE_DATE_REQUIRED",
+      "INVALID_DOCUMENT",
       "INVALID_PAYMENT",
       "INVALID_CHANGE",
       "AUTH_REJECTED",
@@ -263,6 +279,7 @@ export function errorStatus(code: ErrorCode) {
       "STREAM_STATUS_FAILED",
       "VIDEO_STORAGE_UNAVAILABLE",
       "AUTH_UNAVAILABLE",
+      "BILLING_UNAVAILABLE",
     ].includes(code)
   )
     return 503;

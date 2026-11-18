@@ -351,7 +351,7 @@ test("every exported API method uses the wrapper with an allowlisted static rout
       }
     }
   }
-  assert.equal(count, 34);
+  assert.equal(count, 39);
 });
 
 test("rate-limit identity ignores untrusted forwarding and never stores raw identifiers", () => {
@@ -448,4 +448,23 @@ test("finance routes are allowlisted and DUE_DATE_REQUIRED maps to 400", () => {
   for (const route of ["finance/cash", "finance/month", "finance/bills", "finance/fees"])
     assert.equal(core.safeAction("GET", `/api/restaurants/[id]/${route}`), `GET /api/restaurants/[id]/${route}`);
   assert.equal(core.errorStatus(core.errorCode(new Error("DUE_DATE_REQUIRED"))), 400);
+});
+
+test("billing routes are allowlisted and billing errors map to statuses and messages", async () => {
+  for (const [method, route] of [
+    ["POST", "/api/billing/subscribe"],
+    ["POST", "/api/billing/asaas"],
+    ["GET", "/api/billing/founders"],
+    ["GET", "/api/restaurants/[id]/billing"],
+    ["POST", "/api/restaurants/[id]/billing"],
+  ])
+    assert.equal(core.safeAction(method, route), `${method} ${route}`);
+  const expected = { PLAN_REQUIRED: 403, EMAIL_IN_USE: 409, INVALID_DOCUMENT: 400, BILLING_UNAVAILABLE: 503, FOUNDER_CONFIRM_REQUIRED: 409 };
+  const security = loader({ "./observability/logger": { logFailure: () => {} } })("src/lib/server-security.ts");
+  for (const [code, status] of Object.entries(expected)) {
+    assert.equal(core.errorStatus(core.errorCode(new Error(code))), status, code);
+    const response = security.apiError(new Error(code));
+    assert.equal(response.status, status);
+    assert.notEqual((await response.json()).error, "Ocorreu uma falha interna. Tente novamente em instantes.");
+  }
 });

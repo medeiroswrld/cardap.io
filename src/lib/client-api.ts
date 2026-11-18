@@ -38,6 +38,12 @@ export const apiErrorMessages: Record<string, string> = {
   COUPON_USED: "Este cupom já foi usado em pedidos. Você pode pausá-lo.",
   DUE_DATE_REQUIRED: "Informe o vencimento da conta.",
   LIMIT_REACHED: "Limite de 20 origens atingido.",
+  PLAN_REQUIRED: "Este recurso faz parte do plano Profissional.",
+  EMAIL_IN_USE: "Este e-mail já tem conta. Entre para continuar.",
+  INVALID_DOCUMENT: "CPF ou CNPJ inválido.",
+  BILLING_UNAVAILABLE: "Assinaturas indisponíveis no momento. Fale com a gente.",
+  FOUNDER_CONFIRM_REQUIRED:
+    "Você perde o preço de fundador ao trocar de plano ou ciclo. Confirme para continuar.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
 };
