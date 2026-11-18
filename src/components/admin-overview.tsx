@@ -5,6 +5,7 @@ import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
 import { fulfillmentLabel, statusLabel, statusTone } from "@/lib/order-flow";
 import { monthOptions, type ResultsReport } from "@/lib/results-report";
+import type { Bills } from "@/lib/finance";
 import { matchesQuery, recentOrders } from "@/lib/overview";
 import type { Workspace } from "@/lib/connected-types";
 import { Button } from "./ui/button";
@@ -13,11 +14,14 @@ export function AdminOverview({
   data,
   owner,
   onOpenOrders,
+  onOpenBills,
 }: {
   data: Workspace;
   owner: boolean;
   onOpenOrders: () => void;
+  onOpenBills?: () => void;
 }) {
+  const [dueThisWeek, setDueThisWeek] = useState(0);
   const [query, setQuery] = useState("");
   const restaurantId = data.restaurant.id;
   const [results, setResults] = useState<{
@@ -40,6 +44,18 @@ export function AdminOverview({
       cancelled = true;
     };
   }, [owner, restaurantId, data.restaurant.timezone]);
+  useEffect(() => {
+    if (!owner) return;
+    let cancelled = false;
+    requestJson<Bills>(`/api/restaurants/${restaurantId}/finance/bills`)
+      .then((b) => {
+        if (!cancelled) setDueThisWeek(Number(b.due_this_week) || 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, restaurantId]);
   const status = results && results.key === restaurantId ? results.status : "loading";
 
   const open = useMemo(
@@ -70,6 +86,18 @@ export function AdminOverview({
   return (
     <div className="overview">
       <div className="overview-main">
+        {owner && dueThisWeek > 0 && (
+          <div className="notice fin-notice" role="status">
+            <span>
+              {dueThisWeek === 1 ? "1 conta vence esta semana" : `${dueThisWeek} contas vencem esta semana`}
+            </span>
+            {onOpenBills && (
+              <Button size="sm" variant="outline" onClick={onOpenBills}>
+                Ver contas
+              </Button>
+            )}
+          </div>
+        )}
         <label className="overview-search">
           <Search size={17} />
           <input

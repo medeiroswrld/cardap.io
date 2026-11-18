@@ -6277,3 +6277,44 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
   .win-back-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 12px; }
   .win-back-table td[data-label="Cliente"]::before { content: none; }
 }
+
+/* Financeiro */
+.fin-section { display: grid; gap: 18px; }
+.fin-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.fin-card { display: grid; gap: 4px; padding: 18px 20px; align-content: start; }
+.fin-card span { color: var(--muted); font-size: 13px; }
+.fin-card strong { font-size: 1.7rem; font-weight: 800; line-height: 1.15; }
+.fin-card small { color: var(--muted); font-size: 12px; }
+.fin-positive { color: var(--success-text); }
+.fin-negative { color: var(--danger-text); }
+.fin-summary { margin: 10px 0 0; display: grid; }
+.fin-summary > div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.fin-summary dt, .fin-summary dd { margin: 0; }
+.fin-summary dd { font-variant-numeric: tabular-nums; }
+.fin-strong { font-weight: 700; }
+.fin-total { font-size: 1.15rem !important; }
+.fin-total dd { color: var(--brand-text); }
+.fin-list, .fin-bills, .fin-bars { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.fin-list li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.fin-inline-form { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; margin-top: 14px; }
+.fin-bars li { display: grid; grid-template-columns: minmax(120px, 190px) 1fr auto; align-items: center; gap: 12px; font-size: 14px; }
+.fin-bar { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.fin-bar i { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
+.fin-table td, .fin-table th { white-space: nowrap; }
+.fin-table td:nth-child(2) { white-space: normal; min-width: 140px; }
+.fin-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.fin-bills li { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+.fin-bill-main { display: grid; gap: 2px; min-width: 0; }
+.fin-bill-main small { color: var(--muted); }
+.fin-bill-amount { font-variant-numeric: tabular-nums; }
+.fin-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .fin-inline-form { grid-template-columns: 1fr; }
+  .fin-bars li { grid-template-columns: 1fr auto; }
+  .fin-bars .fin-bar { grid-column: 1 / -1; order: 3; }
+  .fin-bills li { grid-template-columns: 1fr auto; }
+  .fin-bills li .button { grid-column: 1 / -1; }
+  .fin-list li { grid-template-columns: 1fr auto; }
+  .fin-list li .button { grid-column: 1 / -1; }
+}
+.fin-toolbar-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }

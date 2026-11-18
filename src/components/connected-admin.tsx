@@ -59,6 +59,10 @@ import { ResultsReportPanel } from "./results-report";
 import { CouponsAdmin } from "./coupons-admin";
 import { WinBackPanel } from "./win-back-panel";
 import { OriginsPanel } from "./origins-panel";
+import { FinanceCash } from "./finance-cash";
+import { FinanceMonthPanel } from "./finance-month";
+import { FinanceBills } from "./finance-bills";
+import { PaymentFeesSettings } from "./payment-fees-settings";
 import { ModeToggle } from "./mode-toggle";
 import { AdminOverview } from "./admin-overview";
 import {
@@ -359,6 +363,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                     data={data}
                     owner={owner}
                     onOpenOrders={() => go("pedidos")}
+                    onOpenBills={() => go("contas")}
                   />
                   {owner &&
                     (!data.products.length ||
@@ -446,6 +451,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   <MenuThemeSettings data={data} save={save} busy={busy} />
                   <DeliverySettings data={data} save={save} busy={busy} />
                   <PixSettings data={data} save={save} busy={busy} />
+                  <PaymentFeesSettings restaurantId={id} save={save} busy={busy} />
                   <BagSuggestionsSettings key={(data.restaurant.bag_suggestions ?? []).join(",")} data={data} save={save} busy={busy} />
                   <CrmSettings data={data} save={save} busy={busy} />
                 </>
@@ -455,6 +461,26 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   <CustomersPanel restaurantId={id} save={save} onChanged={() => setCrmStamp((n) => n + 1)} />
                   <CampaignPanel restaurantId={id} staleStamp={crmStamp} />
                 </>
+              )}
+              {owner && page === "caixa" && (
+                <FinanceCash
+                  restaurantId={id}
+                  restaurantName={data.restaurant.name}
+                  timezone={data.restaurant.timezone}
+                  save={save}
+                  busy={busy}
+                />
+              )}
+              {owner && page === "mes" && (
+                <FinanceMonthPanel
+                  restaurantId={id}
+                  timezone={data.restaurant.timezone}
+                  save={save}
+                  busy={busy}
+                />
+              )}
+              {owner && page === "contas" && (
+                <FinanceBills restaurantId={id} save={save} busy={busy} />
               )}
               {owner && page === "metricas" && <Metrics data={data} />}
               {owner && page === "resultados" && (
