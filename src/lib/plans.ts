@@ -160,14 +160,17 @@ export const CATALOG_ACTIONS: Record<string, Feature | null> = {
 // derives it from the background and sends it with every save.
 export const BASIC_THEME_KEYS = ["logo_url", "cover_url", "brand", "mode"] as const;
 
-// Essencial theme save: keeps the basic keys, silently drops other keys that merely repeat what is
-// stored (a downgraded owner's editor resends them), and reports `denied` when a non-basic key would
+// Essencial theme save: keeps the basic keys, preserves the stored non-basic keys (a downgraded owner's editor
+// resends them), and reports `denied` when a non-basic key would
 // actually change (that is the Profissional identity).
 export function essencialTheme(
   theme: Record<string, string>,
   stored: Record<string, unknown> | null | undefined,
 ): { theme: Record<string, string>; denied: boolean } {
+  // The stored Profissional keys survive (they come back on an upgrade); the payload only moves the basic ones.
   const kept: Record<string, string> = {};
+  for (const [key, value] of Object.entries(stored ?? {}))
+    if (typeof value === "string" && !(BASIC_THEME_KEYS as readonly string[]).includes(key)) kept[key] = value;
   let denied = false;
   for (const [key, value] of Object.entries(theme)) {
     if ((BASIC_THEME_KEYS as readonly string[]).includes(key)) kept[key] = value;

@@ -93,7 +93,7 @@ const editorPayload = (over = {}) => ({
   logo_url: "https://x.supabase.co/storage/v1/object/public/restaurant-media/r/a.png", ...over,
 });
 
-test("menu_theme on Essencial: basic keys and mode are kept, repeated stored keys are dropped silently", () => {
+test("menu_theme on Essencial: basic keys and mode come from the payload, stored non-basic keys are preserved", () => {
   assert.equal(p.catalogActionFeature({ action: "menu_theme" }), null); // decided by essencialTheme in the route
   // fresh restaurant: logo + brand + the derived mode (what the editor sends after picking only those)
   const fresh = p.essencialTheme({ brand: "#112233", logo_url: "u", cover_url: "c", mode: "dark" }, {});
@@ -103,7 +103,10 @@ test("menu_theme on Essencial: basic keys and mode are kept, repeated stored key
   const stored = editorPayload({ heading_font: "forte", radius: "reto", preset: "noite" });
   const resent = p.essencialTheme({ ...stored, brand: "#00aa00", logo_url: "new" }, stored);
   assert.equal(resent.denied, false);
-  assert.deepEqual(resent.theme, { brand: "#00aa00", logo_url: "new", mode: "light" });
+  // stored non-basic keys survive untouched, basic ones come from the payload
+  assert.deepEqual(resent.theme, { ...stored, brand: "#00aa00", logo_url: "new", mode: "light" });
+  // no stored theme: only the basic keys
+  assert.deepEqual(p.essencialTheme({ brand: "#112233", mode: "dark" }, null).theme, { brand: "#112233", mode: "dark" });
 });
 
 test("menu_theme on Essencial: a non-basic key that differs from the stored one is PLAN_REQUIRED territory", () => {
