@@ -14,9 +14,14 @@ create table public.restaurant_billing (
  cancel_at date,
  pending_plan text check (pending_plan in ('essencial','profissional')),
  pending_cycle text check (pending_cycle in ('mensal','anual')),
+ pending_since date,
+ founder_claimed_at timestamptz,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now()
 );
+-- One restaurant per Asaas customer / subscription (webhook lookups rely on it).
+create unique index restaurant_billing_customer_uq on public.restaurant_billing(asaas_customer_id) where asaas_customer_id is not null;
+create unique index restaurant_billing_subscription_uq on public.restaurant_billing(asaas_subscription_id) where asaas_subscription_id is not null;
 alter table public.restaurant_billing enable row level security;
 revoke all on public.restaurant_billing from anon, authenticated;
 grant select on public.restaurant_billing to authenticated;
@@ -27,8 +32,11 @@ create table public.billing_events (
  restaurant_id uuid references public.restaurants(id) on delete set null,
  type text not null,
  payload jsonb not null,
- received_at timestamptz not null default now()
+ payment_id text,
+ received_at timestamptz not null default now(),
+ processed_at timestamptz
 );
+create index billing_events_payment on public.billing_events(payment_id, type) where payment_id is not null;
 alter table public.billing_events enable row level security;
 revoke all on public.billing_events from anon, authenticated;
 
@@ -93,38 +101,53 @@ revoke all on public.product_options, public.product_option_links from anon, aut
 grant select on public.product_options, public.product_option_links to anon, authenticated;
 
 -- Atomic checkout start. Serialises founder-slot claims, prices the plan and resets the row to
--- pendente (created_at = now() starts the 48h founder window at checkout). Service role only.
--- Prices (cents) mirror src/lib/plans.ts.
+-- pendente. A row that is already founder-pending keeps its original created_at (48h window) and its
+-- slot; a NEW founder claim is capped globally (3 per hour) so scripted signups cannot drain the 10
+-- slots; over the cap the signup proceeds as non-founder. Reusing a cancelado row forgets the old
+-- Asaas ids. Service role only. Prices (cents) mirror src/lib/plans.ts.
 create function public.start_subscription(p_restaurant uuid, p_plan text, p_cycle text, p_want_founder boolean)
 returns jsonb language plpgsql security definer set search_path=public as $$
-declare cur restaurant_billing%rowtype; is_founder boolean; price integer; slots integer;
+declare cur restaurant_billing%rowtype; had boolean; holds boolean; eligible boolean; is_founder boolean;
+  claimed boolean := false; price integer; recent integer;
 begin
  if p_plan not in ('essencial','profissional') or p_cycle not in ('mensal','anual') then raise exception 'INVALID_INPUT'; end if;
  if not exists(select 1 from restaurants where id=p_restaurant) then raise exception 'NOT_FOUND'; end if;
  perform pg_advisory_xact_lock(hashtext('founder_slots'));
  select * into cur from restaurant_billing where restaurant_id=p_restaurant;
- if found and cur.status in ('ativo','atrasado','cortesia') then raise exception 'STATE_CONFLICT'; end if;
- slots := founder_slots_left();
- -- a still-pending founder row already holds its own slot
- if found and cur.founder and cur.status='pendente' and cur.created_at > now() - interval '48 hours' then slots := slots + 1; end if;
- is_founder := coalesce(p_want_founder,false) and p_plan='profissional' and p_cycle='mensal' and slots > 0;
+ had := found;
+ if had and cur.status in ('ativo','atrasado','cortesia') then raise exception 'STATE_CONFLICT'; end if;
+ holds := had and cur.founder and cur.status='pendente' and cur.created_at > now() - interval '48 hours';
+ eligible := coalesce(p_want_founder,false) and p_plan='profissional' and p_cycle='mensal';
+ if not eligible then is_founder := false;
+ elsif holds then is_founder := true;
+ else
+  select count(*) into recent from restaurant_billing where founder_claimed_at > now() - interval '1 hour';
+  is_founder := founder_slots_left() > 0 and recent < 3;
+  claimed := is_founder;
+ end if;
  price := case when is_founder then 17900
    when p_plan='essencial' and p_cycle='mensal' then 14900
    when p_plan='essencial' then 149000
    when p_cycle='mensal' then 24900
    else 249000 end;
- insert into restaurant_billing(restaurant_id,plan,cycle,status,founder,price_cents,created_at)
- values(p_restaurant,p_plan,p_cycle,'pendente',is_founder,price,now())
+ insert into restaurant_billing(restaurant_id,plan,cycle,status,founder,price_cents,created_at,founder_claimed_at)
+ values(p_restaurant,p_plan,p_cycle,'pendente',is_founder,price,now(),case when claimed then now() end)
  on conflict (restaurant_id) do update set plan=excluded.plan, cycle=excluded.cycle, status='pendente',
-   founder=excluded.founder, price_cents=excluded.price_cents, created_at=now(), cancel_at=null,
-   overdue_since=null, pending_plan=null, pending_cycle=null;
+   founder=excluded.founder, price_cents=excluded.price_cents,
+   created_at=case when holds then restaurant_billing.created_at else now() end,
+   founder_claimed_at=case when claimed then now() else restaurant_billing.founder_claimed_at end,
+   cancel_at=null, overdue_since=null, pending_plan=null, pending_cycle=null, pending_since=null,
+   asaas_customer_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_customer_id end,
+   asaas_subscription_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_subscription_id end,
+   setup_payment_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.setup_payment_id end,
+   current_period_end=case when restaurant_billing.status='cancelado' then null else restaurant_billing.current_period_end end;
  return jsonb_build_object('founder',is_founder,'price_cents',price);
 end $$;
 revoke all on function public.start_subscription(uuid,text,text,boolean) from public, anon, authenticated;
 grant execute on function public.start_subscription(uuid,text,text,boolean) to service_role;
 
--- Per-client limit for the public subscribe route (no restaurant exists yet, so it cannot use
--- public_rate_limits). Subject is an HMAC digest; no raw IP is stored.
+-- Per-client limit for billing routes (subscribe has no restaurant yet, so it cannot use
+-- public_rate_limits); the caller chooses max hits and window length. Subject is an HMAC digest; no raw IP is stored.
 create table public.billing_rate_limits (
  subject_hash text not null check (subject_hash ~ '^[a-f0-9]{64}$'),
  window_start timestamptz not null,
@@ -135,12 +158,13 @@ create table public.billing_rate_limits (
 create index billing_rate_limits_expiry on public.billing_rate_limits(expires_at);
 alter table public.billing_rate_limits enable row level security;
 revoke all on public.billing_rate_limits from anon, authenticated;
-create function public.consume_billing_rate_limit(p_subject text) returns jsonb
+create function public.consume_billing_rate_limit(p_subject text, p_max integer, p_period integer) returns jsonb
 language plpgsql security definer set search_path=public as $$
-declare max_hits integer := 8; period_seconds integer := 600; now_ timestamptz := clock_timestamp();
+declare max_hits integer := p_max; period_seconds integer := p_period; now_ timestamptz := clock_timestamp();
   starts timestamptz; ends timestamptz; used integer;
 begin
- if p_subject is null or p_subject !~ '^[a-f0-9]{64}$' then raise exception 'INVALID_INPUT'; end if;
+ if p_subject is null or p_subject !~ '^[a-f0-9]{64}$' or p_max is null or p_max not between 1 and 1000
+  or p_period is null or p_period not between 60 and 86400 then raise exception 'INVALID_INPUT'; end if;
  starts := to_timestamp(floor(extract(epoch from now_)/period_seconds)*period_seconds);
  ends := starts + make_interval(secs => period_seconds);
  insert into billing_rate_limits(subject_hash,window_start,hits,expires_at) values(p_subject,starts,1,ends)
@@ -150,5 +174,5 @@ begin
   select subject_hash,window_start from billing_rate_limits where expires_at < now_ - interval '1 hour' order by expires_at limit 100);
  return jsonb_build_object('allowed',used<=max_hits,'retryAfter',greatest(1,ceil(extract(epoch from ends-now_))::integer));
 end $$;
-revoke all on function public.consume_billing_rate_limit(text) from public, anon, authenticated;
-grant execute on function public.consume_billing_rate_limit(text) to service_role;
+revoke all on function public.consume_billing_rate_limit(text,integer,integer) from public, anon, authenticated;
+grant execute on function public.consume_billing_rate_limit(text,integer,integer) to service_role;

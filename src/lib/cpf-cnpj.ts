@@ -25,3 +25,10 @@ export function isValidCnpj(value: string) {
 export function isValidDocument(value: string) {
   return isValidCpf(value) || isValidCnpj(value);
 }
+
+// Brazilian number without the country code: DDD + 8/9 digits. A leading 55 is the country code
+// only when there are too many digits for a national number (DDD 55 exists).
+export function normalizePhone(value: string) {
+  const digits = value.replace(/[^0-9]/g, "");
+  return (digits.length === 12 || digits.length === 13) && digits.startsWith("55") ? digits.slice(2) : digits;
+}

@@ -44,6 +44,7 @@ export const apiErrorMessages: Record<string, string> = {
   BILLING_UNAVAILABLE: "Assinaturas indisponíveis no momento. Fale com a gente.",
   FOUNDER_CONFIRM_REQUIRED:
     "Você perde o preço de fundador ao trocar de plano ou ciclo. Confirme para continuar.",
+  WEAK_PASSWORD: "Essa senha é fraca ou muito comum. Use pelo menos 8 caracteres, misturando letras e números.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
 };

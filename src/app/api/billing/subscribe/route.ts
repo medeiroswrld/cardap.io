@@ -5,7 +5,7 @@ import { invalidateCatalogSlug } from "@/lib/catalog-cache";
 import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 import { enforceBillingLimit } from "@/lib/rate-limit";
 import { asaasConfigFromEnv, asaasFromEnv } from "@/lib/asaas";
-import { isValidDocument, normalizeDocument } from "@/lib/cpf-cnpj";
+import { isValidDocument, normalizeDocument, normalizePhone } from "@/lib/cpf-cnpj";
 import { slugFromName } from "@/lib/plans";
 import { provisionCheckout } from "@/lib/billing-server";
 
@@ -18,8 +18,8 @@ const schema = z.object({
   phone: z
     .string()
     .max(30)
-    .transform((v) => v.replace(/\D/g, ""))
-    .pipe(z.string().min(10).max(13)),
+    .transform(normalizePhone)
+    .pipe(z.string().regex(/^[0-9]{10,11}$/)),
   document: z
     .string()
     .max(30)
@@ -36,8 +36,9 @@ async function createOwnerAccount(email: string, password: string, name: string)
     user_metadata: { name },
   });
   if (error) {
-    if (error.code === "email_exists" || error.status === 422) throw new Error("EMAIL_IN_USE");
-    if (!error.status || error.status >= 500) throw new Error("AUTH_UNAVAILABLE");
+    if (error.code === "email_exists" || error.code === "user_already_exists") throw new Error("EMAIL_IN_USE");
+    if (error.code === "weak_password") throw new Error("WEAK_PASSWORD");
+    if (!error.status || error.status >= 500 || error.status === 429) throw new Error("AUTH_UNAVAILABLE");
     throw new Error("INVALID_INPUT");
   }
   return data.user.id;
@@ -75,20 +76,32 @@ async function handlePOST(request: Request) {
     if (!asaasConfigFromEnv()) throw new Error("BILLING_UNAVAILABLE");
     const userId = await createOwnerAccount(input.email, input.password, input.ownerName);
     setLogUser(userId);
-    const supabase = await serverClient();
-    const signedIn = await supabase.auth.signInWithPassword({
-      email: input.email,
-      password: input.password,
-    });
-    if (signedIn.error) throw new Error("AUTH_UNAVAILABLE");
-    const restaurantId = await onboardWithUniqueSlug(supabase, input.restaurantName);
+    let restaurantId: string;
+    try {
+      const supabase = await serverClient();
+      const signedIn = await supabase.auth.signInWithPassword({
+        email: input.email,
+        password: input.password,
+      });
+      if (signedIn.error) throw new Error("AUTH_UNAVAILABLE");
+      restaurantId = await onboardWithUniqueSlug(supabase, input.restaurantName);
+    } catch (error) {
+      // No restaurant yet: do not leave an orphan login behind.
+      const removed = await serviceClient().auth.admin.deleteUser(userId);
+      if (removed.error) logFailure(removed.error, "supabase.auth");
+      throw error;
+    }
     const { data: started, error: startError } = await serviceClient().rpc("start_subscription", {
       p_restaurant: restaurantId,
       p_plan: input.plan,
       p_cycle: input.cycle,
       p_want_founder: input.plan === "profissional" && input.cycle === "mensal",
     });
-    if (startError) throw startError;
+    if (startError) {
+      // The restaurant exists (pendente): gestao offers "Tentar gerar o pagamento de novo".
+      logFailure(startError, "supabase.billing");
+      return Response.json({ redirect: "/gestao" }, { headers: noStore });
+    }
     try {
       const invoiceUrl = await provisionCheckout(asaasFromEnv(), {
         restaurantId,
@@ -102,11 +115,18 @@ async function handlePOST(request: Request) {
           mobilePhone: input.phone,
         },
       });
-      return Response.json({ redirect: invoiceUrl }, { headers: noStore });
+      // founder/priceCents: the real price the buyer gets (the founder price may be gone).
+      return Response.json(
+        { redirect: invoiceUrl, founder: Boolean(started?.founder), priceCents: Number(started?.price_cents) },
+        { headers: noStore },
+      );
     } catch (error) {
-      // The account exists as pendente: gestao offers "Tentar gerar o pagamento de novo".
       logFailure(error, "asaas.api");
-      return Response.json({ redirect: "/gestao" }, { headers: noStore });
+      const documentRejected = error instanceof Error && error.message === "INVALID_DOCUMENT";
+      return Response.json(
+        { redirect: documentRejected ? "/gestao?pagamento=documento" : "/gestao" },
+        { headers: noStore },
+      );
     }
   } catch (error) {
     return apiError(error);

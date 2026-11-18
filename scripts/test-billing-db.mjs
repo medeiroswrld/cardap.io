@@ -381,24 +381,110 @@ await ok("start_subscription: prices, founder rules, reset, permissions", async 
   await db.query("delete from restaurants where slug like 'bil-i%' or slug in ('bil-h','bil-j')");
 });
 
-await ok("consume_billing_rate_limit: 8 per window, service role only", async () => {
+await ok("start_subscription: founder window is kept on repeat calls, claims are capped, cancelado reuse clears Asaas ids", async () => {
+  await root();
+  await db.query("update restaurant_billing set founder=false, founder_claimed_at=null, status='cortesia' where status in ('pendente','cancelado','ativo','atrasado')");
+  const ids = [];
+  for (let i = 0; i < 5; i++) {
+    const id = crypto.randomUUID();
+    ids.push(id);
+    await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa K',$2,true,$3)", [id, "bil-k" + i, SP]);
+  }
+  await db.exec("set role service_role");
+  const start = async (id, p, c, w) => (await db.query("select public.start_subscription($1,$2,$3,$4) r", [id, p, c, w])).rows[0].r;
+  const founder = (id) => start(id, "profissional", "mensal", true);
+  // a founder-pending row retrying keeps its original 48h window
+  assert.equal((await founder(ids[0])).founder, true);
+  await root();
+  await db.query("update restaurant_billing set created_at=now()-interval '47 hours' where restaurant_id=$1", [ids[0]]);
+  await db.exec("set role service_role");
+  assert.equal((await founder(ids[0])).founder, true);
+  await root();
+  let age = (await db.query("select extract(epoch from now()-created_at)/3600 h from restaurant_billing where restaurant_id=$1", [ids[0]])).rows[0].h;
+  assert.ok(Number(age) > 46, "created_at must not be refreshed, got " + age);
+  // after 48h the slot is gone: a new claim starts a fresh window
+  await db.query("update restaurant_billing set created_at=now()-interval '49 hours' where restaurant_id=$1", [ids[0]]);
+  await db.exec("set role service_role");
+  assert.equal((await founder(ids[0])).founder, true);
+  await root();
+  age = (await db.query("select extract(epoch from now()-created_at)/3600 h from restaurant_billing where restaurant_id=$1", [ids[0]])).rows[0].h;
+  assert.ok(Number(age) < 1);
+  // global cap: 3 NEW founder claims per hour; the 4th signup proceeds at the normal price
+  await db.exec("set role service_role");
+  assert.equal((await founder(ids[1])).founder, true);
+  assert.equal((await founder(ids[2])).founder, true);
+  assert.deepEqual(await founder(ids[3]), { founder: false, price_cents: 24900 });
+  // retrying an existing claim does not count as a new one
+  assert.equal((await founder(ids[1])).founder, true);
+  // claims older than an hour stop counting
+  await root();
+  await db.query("update restaurant_billing set founder_claimed_at=now()-interval '2 hours' where restaurant_id=$1", [ids[2]]);
+  await db.exec("set role service_role");
+  assert.deepEqual(await founder(ids[3]), { founder: true, price_cents: 17900 });
+  // a cancelado row that signs up again forgets old Asaas ids and the scheduled cancellation
+  await root();
+  await db.query(
+    "update restaurant_billing set status='cancelado', asaas_customer_id='cus_old', asaas_subscription_id='sub_old', setup_payment_id='pay_old', current_period_end='2026-01-01', cancel_at='2026-01-01', overdue_since='2025-12-01', pending_plan='essencial', pending_cycle='mensal', pending_since='2025-12-01' where restaurant_id=$1",
+    [ids[4]],
+  );
+  await db.exec("set role service_role");
+  await start(ids[4], "essencial", "mensal", false);
+  await root();
+  const row = (await db.query("select * from restaurant_billing where restaurant_id=$1", [ids[4]])).rows[0];
+  assert.equal(row.status, "pendente");
+  for (const col of ["asaas_customer_id", "asaas_subscription_id", "setup_payment_id", "current_period_end", "cancel_at", "overdue_since", "pending_plan", "pending_cycle", "pending_since"])
+    assert.equal(row[col], null, col);
+  // a pendente row (retry) keeps the ids it already has
+  await db.query("update restaurant_billing set asaas_customer_id='cus_keep', setup_payment_id='pay_keep' where restaurant_id=$1", [ids[4]]);
+  await db.exec("set role service_role");
+  await start(ids[4], "essencial", "anual", false);
+  await root();
+  const kept = (await db.query("select asaas_customer_id, setup_payment_id from restaurant_billing where restaurant_id=$1", [ids[4]])).rows[0];
+  assert.deepEqual({ ...kept }, { asaas_customer_id: "cus_keep", setup_payment_id: "pay_keep" });
+  await db.query("delete from restaurants where slug like 'bil-k%'");
+});
+
+await ok("Asaas ids are unique per restaurant", async () => {
+  await root();
+  await db.query("update restaurant_billing set asaas_customer_id='cus_u', asaas_subscription_id='sub_u' where restaurant_id=$1", [r1]);
+  await rejects(() => db.query("update restaurant_billing set asaas_customer_id='cus_u' where restaurant_id=$1", [r2]), "duplicate key");
+  await rejects(() => db.query("update restaurant_billing set asaas_subscription_id='sub_u' where restaurant_id=$1", [r2]), "duplicate key");
+  await db.query("update restaurant_billing set asaas_customer_id=null, asaas_subscription_id=null where restaurant_id in ($1,$2)", [r1, r2]);
+  // nulls never collide
+  await db.query("update restaurant_billing set asaas_customer_id=null where restaurant_id=$1", [r2]);
+});
+
+await ok("billing_events: processed_at and payment_id columns", async () => {
+  await root();
+  await db.query("insert into billing_events(id,type,payload,payment_id) values('evp1','PAYMENT_CONFIRMED','{}','pay_z')");
+  const { rows } = await db.query("select processed_at, payment_id from billing_events where id='evp1'");
+  assert.equal(rows[0].processed_at, null);
+  assert.equal(rows[0].payment_id, "pay_z");
+  await db.query("update billing_events set processed_at=now() where id='evp1'");
+  await db.query("delete from billing_events where id='evp1'");
+});
+
+await ok("consume_billing_rate_limit: caller-chosen limit per window, service role only", async () => {
   await root();
   await db.exec("set role service_role");
   const digest = "a".repeat(64);
-  for (let i = 0; i < 8; i++) {
-    const r = (await db.query("select public.consume_billing_rate_limit($1) r", [digest])).rows[0].r;
-    assert.equal(r.allowed, true);
-  }
-  const r = (await db.query("select public.consume_billing_rate_limit($1) r", [digest])).rows[0].r;
+  const hit = async (subject, max = 5, period = 3600) =>
+    (await db.query("select public.consume_billing_rate_limit($1,$2,$3) r", [subject, max, period])).rows[0].r;
+  for (let i = 0; i < 5; i++) assert.equal((await hit(digest)).allowed, true);
+  const r = await hit(digest);
   assert.equal(r.allowed, false);
-  assert.ok(r.retryAfter >= 1 && r.retryAfter <= 600);
-  const other = (await db.query("select public.consume_billing_rate_limit($1) r", ["b".repeat(64)])).rows[0].r;
-  assert.equal(other.allowed, true);
-  await rejects(() => db.query("select public.consume_billing_rate_limit('not-a-hash')"), "INVALID_INPUT");
+  assert.ok(r.retryAfter >= 1 && r.retryAfter <= 3600);
+  assert.equal((await hit("b".repeat(64))).allowed, true);
+  // another limit/window works independently
+  for (let i = 0; i < 2; i++) assert.equal((await hit("c".repeat(64), 2, 600)).allowed, true);
+  assert.equal((await hit("c".repeat(64), 2, 600)).allowed, false);
+  await rejects(() => db.query("select public.consume_billing_rate_limit('not-a-hash',5,3600)"), "INVALID_INPUT");
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1,0,3600)", [digest]), "INVALID_INPUT");
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1,5,5)", [digest]), "INVALID_INPUT");
   await anon();
-  await rejects(() => db.query("select public.consume_billing_rate_limit($1)", [digest]), "permission denied");
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1,5,3600)", [digest]), "permission denied");
   await login(ownerA);
-  await rejects(() => db.query("select public.consume_billing_rate_limit($1)", [digest]), "permission denied");
+  await rejects(() => db.query("select public.consume_billing_rate_limit($1,5,3600)", [digest]), "permission denied");
   await rejects(() => db.query("select * from billing_rate_limits"), "permission denied");
 });
 

@@ -5,12 +5,11 @@ import { apiError, checkOrigin, noStore } from "@/lib/server-security";
 import { asaasConfigFromEnv, asaasFromEnv } from "@/lib/asaas";
 import { isValidDocument, normalizeDocument } from "@/lib/cpf-cnpj";
 import { provisionCheckout } from "@/lib/billing-server";
-import { isSellablePlan, priceFor, todayBrt, type Cycle, type SellablePlan } from "@/lib/plans";
-import type { BillingRow } from "@/lib/billing-events";
+import { isSellablePlan, todayBrt } from "@/lib/plans";
+import { decideChangePlan, type BillingRow } from "@/lib/billing-events";
+import { enforceRetryPaymentLimit } from "@/lib/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
-const rank = { essencial: 0, profissional: 1 } as const;
-const cycleRank = { mensal: 0, anual: 1 } as const;
 
 async function loadRow(supabase: Awaited<ReturnType<typeof requireMember>>["supabase"], id: string) {
   const { data, error } = await supabase
@@ -106,6 +105,7 @@ async function handlePOST(request: Request, { params }: Params) {
     if (body.action === "retry_payment") {
       if (row.status !== "pendente" || !isSellablePlan(row.plan)) throw new Error("STATE_CONFLICT");
       if (!asaasConfigFromEnv()) throw new Error("BILLING_UNAVAILABLE");
+      await enforceRetryPaymentLimit(id);
       // Re-claim the founder slot atomically (it may have expired after 48h) and refresh the price.
       const { data: started, error } = await service.rpc("start_subscription", {
         p_restaurant: id,
@@ -129,11 +129,12 @@ async function handlePOST(request: Request, { params }: Params) {
         plan: row.plan,
         cycle: row.cycle,
         founder: Boolean(started?.founder),
-        existingCustomerId: row.asaas_customer_id,
-        existingSubscriptionId: row.asaas_subscription_id,
         customer,
       });
-      return Response.json({ redirect }, { headers: noStore });
+      return Response.json(
+        { redirect, founder: Boolean(started?.founder), priceCents: Number(started?.price_cents) },
+        { headers: noStore },
+      );
     }
 
     // change_plan and cancel need a live, paid subscription that is not already ending.
@@ -148,41 +149,38 @@ async function handlePOST(request: Request, { params }: Params) {
 
     if (body.action === "cancel") {
       if (row.cancel_at) return Response.json({ ok: true, cancelAt: row.cancel_at }, { headers: noStore });
-      await asaas.cancelSubscription(row.asaas_subscription_id);
       const cancelAt = row.current_period_end ?? todayBrt();
-      await update({ cancel_at: cancelAt, pending_plan: null, pending_cycle: null });
+      // cancel_at first: if the SUBSCRIPTION_DELETED echo arrives before we return, the webhook already
+      // sees it and keeps the paid period. Roll it back when Asaas refuses.
+      await update({ cancel_at: cancelAt, pending_plan: null, pending_cycle: null, pending_since: null });
+      try {
+        await asaas.cancelSubscription(row.asaas_subscription_id);
+      } catch (error) {
+        try {
+          await update({
+            cancel_at: null,
+            pending_plan: row.pending_plan,
+            pending_cycle: row.pending_cycle,
+            pending_since: row.pending_since,
+          });
+        } catch (rollbackError) {
+          logFailure(rollbackError, "supabase.billing");
+        }
+        throw error;
+      }
       return Response.json({ ok: true, cancelAt }, { headers: noStore });
     }
 
     if (row.cancel_at) throw new Error("STATE_CONFLICT");
-    const current = { plan: row.plan as SellablePlan, cycle: row.cycle as Cycle };
-    const same = body.plan === current.plan && body.cycle === current.cycle;
-    if (same && !row.pending_plan) throw new Error("INVALID_INPUT");
-    if (same) {
-      // Choosing the current plan again cancels a scheduled downgrade.
-      await asaas.updateSubscription(row.asaas_subscription_id, { valueCents: row.price_cents, cycle: current.cycle });
-      await update({ pending_plan: null, pending_cycle: null });
-      return Response.json({ ok: true, applied: "now" }, { headers: noStore });
-    }
-    if (row.founder && !body.confirmFounderLoss) throw new Error("FOUNDER_CONFIRM_REQUIRED");
-    const newPrice = priceFor(body.plan, body.cycle, false);
-    // Upgrade: neither dimension goes down. Everything else (incl. mixed) waits for the next charge.
-    const upgrade =
-      rank[body.plan] >= rank[current.plan] && cycleRank[body.cycle] >= cycleRank[current.cycle];
-    await asaas.updateSubscription(row.asaas_subscription_id, { valueCents: newPrice, cycle: body.cycle });
-    if (upgrade) {
-      await update({
-        plan: body.plan,
-        cycle: body.cycle,
-        price_cents: newPrice,
-        founder: false,
-        pending_plan: null,
-        pending_cycle: null,
-      });
-    } else {
-      await update({ pending_plan: body.plan, pending_cycle: body.cycle, founder: false });
-    }
-    return Response.json({ ok: true, applied: upgrade ? "now" : "next_charge" }, { headers: noStore });
+    const decision = decideChangePlan(row, body, todayBrt());
+    if (decision.kind === "invalid") throw new Error("INVALID_INPUT");
+    if (decision.kind === "founder_confirm") throw new Error("FOUNDER_CONFIRM_REQUIRED");
+    await asaas.updateSubscription(row.asaas_subscription_id, { valueCents: decision.valueCents, cycle: decision.cycle });
+    await update(decision.patch);
+    return Response.json(
+      { ok: true, applied: decision.kind === "schedule" ? "next_charge" : "now" },
+      { headers: noStore },
+    );
   } catch (error) {
     return apiError(error);
   }

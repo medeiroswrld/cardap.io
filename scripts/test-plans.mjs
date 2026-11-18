@@ -107,6 +107,11 @@ test("asaas client builds requests with reais values, access_token header and sa
     { body: { id: "sub_1" } },
     { body: { id: "sub_1", deleted: true } },
     { body: { data: [{ id: "pay_1", value: 476, status: "PENDING", dueDate: "2026-11-20" }] } },
+    { body: { id: "pay_1", customer: "cus_1", value: 476, status: "CONFIRMED", dueDate: "2026-11-20", invoiceUrl: "https://evil.example/i" } },
+    { body: { deleted: true, id: "pay_1" } },
+    { status: 404 },
+    { status: 404 },
+    { status: 404 },
   ]);
   const a = asaas.createAsaas({ apiKey: KEY, env: "sandbox", fetchImpl: m.impl });
   await a.createCustomer({ name: "Ana", cpfCnpj: "52998224725", email: "a@b.co", externalReference: "rid" });
@@ -117,9 +122,21 @@ test("asaas client builds requests with reais values, access_token header and sa
   await a.cancelSubscription("sub_1");
   const list = await a.listPayments({ customer: "cus_1" });
   assert.equal(list[0].invoiceUrl, null);
-  const [c, pm, sb, up, del, ls] = m.calls;
+  const got = await a.getPayment("pay_1");
+  assert.equal(got.invoiceUrl, null); // not an asaas.com host
+  assert.equal(got.status, "CONFIRMED");
+  await a.deletePayment("pay_1");
+  assert.deepEqual({ ...(await a.deletePayment("pay_gone")) }, { deleted: true, id: "pay_gone" }); // 404 ignored
+  assert.deepEqual({ ...(await a.cancelSubscription("sub_gone")) }, { deleted: true, id: "sub_gone" });
+  await assert.rejects(a.getPayment("pay_missing"), { message: "NOT_FOUND" });
+  const [c, pm, sb, up, del, ls, gp, dp] = m.calls;
+  assert.equal(gp.url, "https://api-sandbox.asaas.com/v3/payments/pay_1");
+  assert.equal(gp.init.method, "GET");
+  assert.equal(dp.init.method, "DELETE");
+  assert.equal(dp.url, "https://api-sandbox.asaas.com/v3/payments/pay_1");
   assert.equal(c.url, "https://api-sandbox.asaas.com/v3/customers");
   assert.equal(c.init.headers.access_token, KEY);
+  assert.equal(JSON.parse(c.init.body).notificationDisabled, true);
   const body = (call) => JSON.parse(call.init.body);
   assert.deepEqual(
     { ...body(pm) },
@@ -157,25 +174,25 @@ test("asaas config comes from env and is null when incomplete", () => {
 const row = (over = {}) => ({
   restaurant_id: "r", plan: "profissional", cycle: "mensal", status: "pendente", founder: false, price_cents: 24900,
   asaas_customer_id: "cus", asaas_subscription_id: "sub", setup_payment_id: "pay", current_period_end: null,
-  overdue_since: null, cancel_at: null, pending_plan: null, pending_cycle: null, ...over,
+  overdue_since: null, cancel_at: null, pending_plan: null, pending_cycle: null, pending_since: null, ...over,
 });
 test("webhook decisions: first activation, renewals, overdue, refund", () => {
-  let d = ev.decideWebhook(row(), "PAYMENT_CONFIRMED", { dueDate: "2026-11-20" });
+  let d = ev.decideWebhook(row(), "PAYMENT_CONFIRMED", { id: "pay", dueDate: "2026-11-20" });
   assert.equal(d.firstActivation, true);
   assert.deepEqual({ ...d.patch }, { status: "ativo", overdue_since: null, current_period_end: "2026-12-20" });
-  d = ev.decideWebhook(row({ status: "ativo", current_period_end: "2026-12-20" }), "PAYMENT_RECEIVED", { dueDate: "2026-11-20" });
+  d = ev.decideWebhook(row({ status: "ativo", current_period_end: "2026-12-20" }), "PAYMENT_RECEIVED", { id: "pay", dueDate: "2026-11-20" });
   assert.equal(d.firstActivation, false);
   assert.equal(d.patch.current_period_end, "2026-12-20"); // never moves backwards
   d = ev.decideWebhook(row({ status: "atrasado", overdue_since: "2026-12-01", cycle: "anual" }), "PAYMENT_RECEIVED", { subscription: "sub", dueDate: "2026-12-20" });
   assert.deepEqual({ ...d.patch }, { status: "ativo", overdue_since: null, current_period_end: "2027-12-20" });
   // overdue
-  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_OVERDUE", { dueDate: "2026-12-20" });
+  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_OVERDUE", { subscription: "sub", dueDate: "2026-12-20" });
   assert.deepEqual({ ...d.patch }, { status: "atrasado", overdue_since: "2026-12-20" });
-  d = ev.decideWebhook(row({ status: "atrasado", overdue_since: "2026-12-20" }), "PAYMENT_OVERDUE", { dueDate: "2027-01-20" });
+  d = ev.decideWebhook(row({ status: "atrasado", overdue_since: "2026-12-20" }), "PAYMENT_OVERDUE", { subscription: "sub", dueDate: "2027-01-20" });
   assert.equal(d.patch.overdue_since, "2026-12-20");
   assert.equal(ev.decideWebhook(row({ status: "pendente" }), "PAYMENT_OVERDUE", { dueDate: "2026-11-20" }), null);
   // refund cancels the plan and the Asaas subscription
-  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_REFUNDED", {});
+  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_REFUNDED", { id: "pay" });
   assert.deepEqual({ ...d.patch }, { status: "cancelado" });
   assert.equal(d.cancelAsaasSubscription, true);
   d = ev.decideWebhook(row({ status: "ativo" }), "SUBSCRIPTION_DELETED", null);
@@ -183,7 +200,7 @@ test("webhook decisions: first activation, renewals, overdue, refund", () => {
   // unknown events and protected states
   assert.equal(ev.decideWebhook(row(), "PAYMENT_CREATED", {}), null);
   assert.equal(ev.decideWebhook(row({ status: "cortesia" }), "PAYMENT_REFUNDED", {}), null);
-  assert.equal(ev.decideWebhook(row({ status: "cancelado" }), "PAYMENT_RECEIVED", { dueDate: "2026-11-20" }), null);
+  assert.equal(ev.decideWebhook(row({ status: "cancelado" }), "PAYMENT_RECEIVED", { id: "pay", dueDate: "2026-11-20" }), null);
 });
 test("our own cancel keeps the paid period when Asaas echoes SUBSCRIPTION_DELETED", () => {
   const cancelling = row({ status: "ativo", cancel_at: "2026-12-20" });
@@ -193,11 +210,96 @@ test("our own cancel keeps the paid period when Asaas echoes SUBSCRIPTION_DELETE
 test("scheduled downgrade applies on the next confirmed subscription charge only", () => {
   const pending = row({ status: "ativo", pending_plan: "essencial", pending_cycle: "mensal", price_cents: 17900, founder: false });
   // first charge (no subscription id) does not apply it
-  let d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { dueDate: "2026-11-20" });
+  let d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { id: "pay", dueDate: "2026-11-20" });
   assert.equal(d.patch.plan, undefined);
   d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { subscription: "sub", dueDate: "2026-12-20" });
   assert.deepEqual(
     { ...d.patch },
-    { status: "ativo", overdue_since: null, plan: "essencial", cycle: "mensal", price_cents: 14900, pending_plan: null, pending_cycle: null, current_period_end: "2027-01-20" },
+    { status: "ativo", overdue_since: null, plan: "essencial", cycle: "mensal", price_cents: 14900, founder: false, pending_plan: null, pending_cycle: null, pending_since: null, current_period_end: "2027-01-20" },
   );
+});
+test("invoice urls are accepted only on https asaas.com hosts", () => {
+  for (const ok of ["https://www.asaas.com/i/1", "https://sandbox.asaas.com/i/1", "https://asaas.com/x"])
+    assert.equal(asaas.safeInvoiceUrl(ok) !== null, true, ok);
+  for (const bad of ["http://www.asaas.com/i/1", "https://asaas.com.evil.io/i", "https://evilasaas.com/i", "javascript:alert(1)", "//asaas.com", "", null, 5])
+    assert.equal(asaas.safeInvoiceUrl(bad), null, String(bad));
+});
+test("phone normalisation strips a country code only when digits exceed a national number", () => {
+  assert.equal(doc.normalizePhone("+55 (11) 91234-5678"), "11912345678");
+  assert.equal(doc.normalizePhone("5511912345678"), "11912345678");
+  assert.equal(doc.normalizePhone("551134567890"), "1134567890");
+  assert.equal(doc.normalizePhone("(55) 91234-5678"), "55912345678"); // DDD 55, 11 digits: untouched
+  assert.equal(doc.normalizePhone("11 3456-7890"), "1134567890");
+});
+test("webhook: payments that are not the current setup/subscription charge are ignored", () => {
+  const r = row({ status: "ativo", setup_payment_id: "pay_new" });
+  assert.equal(ev.decideWebhook(r, "PAYMENT_OVERDUE", { id: "pay_old", dueDate: "2026-11-20" }), null);
+  assert.equal(ev.decideWebhook(r, "PAYMENT_CONFIRMED", { id: "pay_old", dueDate: "2026-11-20" }), null);
+  assert.equal(ev.decideWebhook(r, "PAYMENT_REFUNDED", { id: "pay_old" }), null);
+  assert.equal(ev.decideWebhook(r, "PAYMENT_REFUNDED", { id: "x", subscription: "other" }), null);
+  assert.equal(ev.decideWebhook(r, "PAYMENT_REFUNDED", { id: "pay_new" }).patch.status, "cancelado");
+  assert.equal(ev.decideWebhook(r, "SUBSCRIPTION_DELETED", null, { subscriptionId: "other" }), null);
+});
+test("webhook: first activation asks for subscription creation only while none exists", () => {
+  const pending = row({ asaas_subscription_id: null });
+  let d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { id: "pay", dueDate: "2026-11-20" });
+  assert.equal(d.createSubscription, true);
+  assert.equal(d.needsVerification, true);
+  d = ev.decideWebhook(row(), "PAYMENT_CONFIRMED", { id: "pay", dueDate: "2026-11-20" });
+  assert.equal(d.createSubscription, false);
+});
+test("webhook: late RECEIVED after CONFIRMED is ignored; a payment older than the overdue one keeps atrasado", () => {
+  const late = row({ status: "atrasado", overdue_since: "2026-12-20" });
+  assert.equal(ev.decideWebhook(late, "PAYMENT_RECEIVED", { subscription: "sub", dueDate: "2026-12-20" }, { confirmedAlready: true }), null);
+  // an older charge (due before overdue_since) gets paid: still atrasado
+  let d = ev.decideWebhook(late, "PAYMENT_RECEIVED", { subscription: "sub", dueDate: "2026-11-20" });
+  assert.equal(d.patch.status, undefined);
+  assert.equal(d.patch.overdue_since, undefined);
+  // the overdue charge itself (or newer) clears it
+  d = ev.decideWebhook(late, "PAYMENT_RECEIVED", { subscription: "sub", dueDate: "2026-12-20" });
+  assert.equal(d.patch.status, "ativo");
+  assert.equal(d.patch.overdue_since, null);
+});
+test("webhook: a scheduled downgrade only applies to charges due on/after pending_since", () => {
+  const pending = row({ status: "ativo", pending_plan: "essencial", pending_cycle: "mensal", pending_since: "2026-12-10", founder: true, price_cents: 17900 });
+  let d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { subscription: "sub", dueDate: "2026-12-05" });
+  assert.equal(d.patch.plan, undefined);
+  d = ev.decideWebhook(pending, "PAYMENT_CONFIRMED", { subscription: "sub", dueDate: "2026-12-10" });
+  assert.equal(d.patch.plan, "essencial");
+  assert.equal(d.patch.founder, false);
+  assert.equal(d.patch.pending_since, null);
+});
+test("change_plan decision: upgrade, scheduled downgrade, founder price, same plan", () => {
+  const base = { plan: "profissional", cycle: "mensal", founder: false, pending_plan: null };
+  const today = "2026-11-18";
+  assert.equal(ev.decideChangePlan(base, { plan: "profissional", cycle: "mensal" }, today).kind, "invalid");
+  // upgrade applies now with the full price
+  let d = ev.decideChangePlan({ ...base, plan: "essencial" }, { plan: "profissional", cycle: "mensal" }, today);
+  assert.equal(d.kind, "upgrade");
+  assert.equal(d.valueCents, 24900);
+  assert.deepEqual({ ...d.patch }, { plan: "profissional", cycle: "mensal", price_cents: 24900, founder: false, pending_plan: null, pending_cycle: null, pending_since: null });
+  // mixed (plan down, cycle up) and plain downgrade are scheduled
+  d = ev.decideChangePlan(base, { plan: "essencial", cycle: "anual" }, today);
+  assert.equal(d.kind, "schedule");
+  assert.deepEqual({ ...d.patch }, { pending_plan: "essencial", pending_cycle: "anual", pending_since: today });
+  assert.equal(ev.decideChangePlan({ ...base, cycle: "anual" }, { plan: "profissional", cycle: "mensal" }, today).kind, "schedule");
+  // founder: confirmation needed, and a scheduled change keeps founder and price until it applies
+  const founder = { ...base, founder: true };
+  assert.equal(ev.decideChangePlan(founder, { plan: "essencial", cycle: "mensal" }, today).kind, "founder_confirm");
+  d = ev.decideChangePlan(founder, { plan: "essencial", cycle: "mensal", confirmFounderLoss: true }, today);
+  assert.equal(d.kind, "schedule");
+  assert.equal("founder" in d.patch, false);
+  assert.equal("price_cents" in d.patch, false);
+  d = ev.decideChangePlan(founder, { plan: "profissional", cycle: "anual", confirmFounderLoss: true }, today);
+  assert.equal(d.kind, "upgrade");
+  assert.equal(d.patch.founder, false);
+  assert.equal(d.patch.price_cents, 249000);
+  // choosing the current plan again keeps the founder price consistent with Asaas
+  d = ev.decideChangePlan({ ...founder, pending_plan: "essencial" }, { plan: "profissional", cycle: "mensal" }, today);
+  assert.equal(d.kind, "keep");
+  assert.equal(d.valueCents, 17900);
+  assert.equal(d.patch.price_cents, 17900);
+  assert.equal("founder" in d.patch, false);
+  d = ev.decideChangePlan({ ...base, pending_plan: "essencial" }, { plan: "profissional", cycle: "mensal" }, today);
+  assert.equal(d.valueCents, 24900);
 });
