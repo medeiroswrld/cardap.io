@@ -5,7 +5,7 @@ export const FAQ_ITEMS = [
   { q: "Preciso de máquina ou app?", a: "Não. Funciona no navegador, no celular ou computador que você já tem." },
   { q: "Como recebo os pedidos?", a: "No painel, com aviso na tela. Dá para imprimir cada pedido." },
   { q: "Posso cancelar?", a: "Sim, quando quiser, pelo painel. O acesso segue até o fim do período pago." },
-  { q: "O que é a implantação?", a: "Um pagamento único para deixar seu cardápio configurado e no ar." },
+  { q: "O que é a implantação?", a: "Um pagamento único para deixar seu cardápio configurado e no ar. A implantação não é reembolsável." },
   { q: "Funciona com meu iFood?", a: "Você continua no iFood e leva o cliente a pedir direto no seu link, sem comissão. Não há integração com o iFood." },
 ];
 

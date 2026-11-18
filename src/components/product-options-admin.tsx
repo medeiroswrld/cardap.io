@@ -73,7 +73,10 @@ export function ProductOptionsAdmin({
             disabled={busy || !canOfferInBag || data.options.every((o) => o.offer_in_bag)}
             onClick={() => void save({ action: "options_in_bag_all", offer: true }).catch((err) => setError((err as Error).message))}
           >
-            {!canOfferInBag && <Lock size={14} aria-hidden="true" />} Oferecer todos na sacola
+            <span className="inline-icon-text">
+              {!canOfferInBag && <Lock size={14} role="img" aria-label="Disponível no Profissional" />}
+              Oferecer todos na sacola
+            </span>
           </Button>
           <Button
             variant="ghost"
@@ -226,7 +229,7 @@ export function ProductOptionsAdmin({
               />
               Oferecer na sacola
               {!canOfferInBag && !data.options.find((o) => o.id === edit.id)?.offer_in_bag && (
-                <Lock size={13} aria-label="Disponível no Profissional" />
+                <Lock size={13} role="img" aria-label="Disponível no Profissional" />
               )}
             </label>
             <p className="field-help">

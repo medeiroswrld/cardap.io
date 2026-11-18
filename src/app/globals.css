@@ -6424,3 +6424,4 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 .connected-content .billing-table th:last-child { width: 1%; }
 .billing-choice input[type="radio"] { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; }
 .billing-pay .form-stack input { max-width: 320px; }
+.inline-icon-text { display: inline-flex; align-items: center; gap: 6px; }

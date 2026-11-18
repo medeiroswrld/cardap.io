@@ -11,6 +11,13 @@ export function agencyWhatsappUrl(number: string | undefined | null) {
   return `https://wa.me/${digits}?text=${encodeURIComponent("Oi! Quero saber do plano Agência do Fome Play.")}`;
 }
 
+// WhatsApp link for a cancelled owner asking to reactivate; null when the number is not configured.
+export function reactivateWhatsappUrl(number: string | undefined | null) {
+  const digits = (number ?? "").replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent("Oi! Quero reativar minha assinatura do Fome Play.")}`;
+}
+
 // Where the browser may be sent after the subscription call: a same-origin path or an https Asaas page.
 export function safeRedirect(value: unknown): string | null {
   if (typeof value !== "string" || !value) return null;

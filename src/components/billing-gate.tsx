@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { payableInvoice, shortDate, type BillingInfo } from "@/lib/billing-view";
-import { agencyWhatsappUrl } from "@/lib/sales";
+import { reactivateWhatsappUrl } from "@/lib/sales";
 
 // Staff of a restaurant whose billing is blocked: only the message, no data.
 export function StaffBillingNotice() {
@@ -28,14 +28,14 @@ const OWNER_LEAD: Record<string, { title: string; text: string }> = {
   },
   cancelado: {
     title: "Sua assinatura foi cancelada.",
-    text: "Para voltar a usar o Fome Play, fale com a gente. Seu cardápio continua no ar.",
+    text: "Para voltar a usar o Fome Play, é só reativar. Seu cardápio continua no ar.",
   },
 };
 
 // Owner of a blocked restaurant: a lead message above the Plano e pagamento tab.
 export function BillingGate({ state }: { state: string }) {
   const lead = OWNER_LEAD[state] ?? OWNER_LEAD.pendente;
-  const whatsapp = state === "cancelado" ? agencyWhatsappUrl(process.env.NEXT_PUBLIC_SALES_WHATSAPP) : null;
+  const whatsapp = state === "cancelado" ? reactivateWhatsappUrl(process.env.NEXT_PUBLIC_SALES_WHATSAPP) : null;
   return (
     <section className="admin-panel billing-gate" role="status">
       <span className="billing-gate-icon" aria-hidden="true">
@@ -43,11 +43,16 @@ export function BillingGate({ state }: { state: string }) {
       </span>
       <h2>{lead.title}</h2>
       <p>{lead.text}</p>
-      {whatsapp && (
-        <a className="button button-outline" href={whatsapp} target="_blank" rel="noopener noreferrer">
-          Falar com a gente
-        </a>
-      )}
+      {state === "cancelado" &&
+        (whatsapp ? (
+          <a className="button button-outline" href={whatsapp} target="_blank" rel="noopener noreferrer">
+            Falar com a gente
+          </a>
+        ) : (
+          <p>
+            Para reativar, assine de novo em <a className="billing-link" href="/assinar">fomeplay.com.br/assinar</a>.
+          </p>
+        ))}
     </section>
   );
 }

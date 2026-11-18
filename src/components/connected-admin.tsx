@@ -293,7 +293,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <Icon size={19} />
                 {s.label}
                 {sectionLocked && (
-                  <Lock size={14} className="nav-lock" aria-label="Disponível no Profissional" />
+                  <Lock size={14} className="nav-lock" role="img" aria-label="Disponível no Profissional" />
                 )}
               </button>
             );
@@ -332,9 +332,9 @@ export function ConnectedAdmin({ id }: { id: string }) {
         <header className="connected-top">
           <span>
             <span
-              className={`open-dot ${data?.restaurant.accepting_orders ? "" : "paused"}`}
+              className={`open-dot ${data?.restaurant.accepting_orders && !blocked ? "" : "paused"}`}
             />
-            {data?.restaurant.accepting_orders
+            {data?.restaurant.accepting_orders && !blocked
               ? "Pedidos habilitados nos horários configurados"
               : "Pedidos pausados"}
           </span>
@@ -378,7 +378,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 >
                   {pages.find((x) => x[0] === p)?.[1]}
                   {isLocked(p) && (
-                    <Lock size={13} className="tab-lock" aria-label="Disponível no Profissional" />
+                    <Lock size={13} className="tab-lock" role="img" aria-label="Disponível no Profissional" />
                   )}
                 </button>
               ))}
@@ -423,6 +423,8 @@ export function ConnectedAdmin({ id }: { id: string }) {
                     owner={owner}
                     onOpenOrders={() => go("pedidos")}
                     onOpenBills={() => go("contas")}
+                    plan={plan}
+                    onUpgrade={upgrade}
                   />
                   {owner &&
                     (!data.products.length ||

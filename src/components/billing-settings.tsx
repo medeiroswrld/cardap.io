@@ -86,6 +86,7 @@ export function BillingSettings({
   const chosen = target ?? current;
   const kind = changeKind(current, chosen);
   const manage = ["ativo", "atrasado"].includes(info.status) && info.hasSubscription && !info.cancelAt && !courtesy;
+  const accessUntil = info.cancelAt ?? (info.status === "cancelado" ? info.currentPeriodEnd : null);
   const payable = payableInvoice(info.invoices);
   const periodEnd = shortDate(info.currentPeriodEnd);
 
@@ -172,10 +173,17 @@ export function BillingSettings({
                 {money(info.priceCents)}/{cycleUnit(info.cycle)}
               </dd>
             </div>
-            <div>
-              <dt>{info.cancelAt ? "Acesso até" : "Próxima cobrança"}</dt>
-              <dd>{fullDate(info.cancelAt ?? info.currentPeriodEnd) || "—"}</dd>
-            </div>
+            {accessUntil ? (
+              <div>
+                <dt>Acesso até</dt>
+                <dd>{fullDate(accessUntil)}</dd>
+              </div>
+            ) : info.status !== "cancelado" ? (
+              <div>
+                <dt>Próxima cobrança</dt>
+                <dd>{fullDate(info.currentPeriodEnd) || "—"}</dd>
+              </div>
+            ) : null}
           </dl>
         )}
         {info.pendingPlan && info.pendingCycle && !info.cancelAt && (
@@ -294,7 +302,7 @@ export function BillingSettings({
                         {planLabel(option.plan)} · {cycleLabel(option.cycle).toLowerCase()}
                       </strong>
                       <small>
-                        {money(targetPrice(option))}/{cycleUnit(option.cycle)}
+                        {money(isCurrent ? info.priceCents : targetPrice(option))}/{cycleUnit(option.cycle)}
                         {isCurrent ? " · atual" : isPending ? " · agendado" : ""}
                       </small>
                     </span>
@@ -401,7 +409,7 @@ export function BillingSettings({
 
 // "Pagar agora" for an account that never paid: asks the server to (re)create the checkout and goes to the Asaas page.
 function PayNow({ url, documentRejected, generated }: { url: string; documentRejected: boolean; generated: boolean }) {
-  const [document, setDocument] = useState("");
+  const [doc, setDoc] = useState("");
   const [askDocument, setAskDocument] = useState(documentRejected);
   const [failed, setFailed] = useState(false);
   const [working, setWorking] = useState(false);
@@ -412,7 +420,7 @@ function PayNow({ url, documentRejected, generated }: { url: string; documentRej
     try {
       const result = await requestJson<{ redirect?: string }>(url, {
         action: "retry_payment",
-        ...(askDocument && document.trim() ? { document: document.trim() } : {}),
+        ...(askDocument && doc.trim() ? { document: doc.trim() } : {}),
       });
       const next = safeRedirect(result.redirect);
       if (!next) throw new Error("Não foi possível abrir o pagamento. Tente de novo.");
@@ -444,8 +452,8 @@ function PayNow({ url, documentRejected, generated }: { url: string; documentRej
             <input
               inputMode="numeric"
               autoComplete="off"
-              value={document}
-              onChange={(e) => setDocument(formatDocument(e.target.value))}
+              value={doc}
+              onChange={(e) => setDoc(formatDocument(e.target.value))}
             />
           </label>
         )}
@@ -455,7 +463,7 @@ function PayNow({ url, documentRejected, generated }: { url: string; documentRej
           </p>
         )}
       </div>
-      <Button onClick={() => void pay()} disabled={working || (askDocument && !document.trim())}>
+      <Button onClick={() => void pay()} disabled={working || (askDocument && !doc.trim())}>
         {working ? "Abrindo…" : failed || !generated ? "Tentar gerar o pagamento de novo" : "Pagar agora"}
       </Button>
     </section>

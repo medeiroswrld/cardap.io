@@ -9,18 +9,26 @@ import type { Bills } from "@/lib/finance";
 import { matchesQuery, recentOrders } from "@/lib/overview";
 import type { Workspace } from "@/lib/connected-types";
 import { Button } from "./ui/button";
+import { PlanLockInline } from "./plan-lock";
+import { allows, type Plan } from "@/lib/plans";
 
 export function AdminOverview({
   data,
   owner,
   onOpenOrders,
   onOpenBills,
+  plan = "profissional",
+  onUpgrade,
 }: {
   data: Workspace;
   owner: boolean;
   onOpenOrders: () => void;
   onOpenBills?: () => void;
+  plan?: Plan;
+  onUpgrade?: () => void;
 }) {
+  const canResults = allows(plan, "results");
+  const canFinance = allows(plan, "finance");
   const [dueState, setDueState] = useState<{ key: string; count: number } | null>(null);
   const [query, setQuery] = useState("");
   const restaurantId = data.restaurant.id;
@@ -30,7 +38,7 @@ export function AdminOverview({
     dishes: ResultsReport["top_quantity"];
   } | null>(null);
   useEffect(() => {
-    if (!owner) return;
+    if (!owner || !canResults) return;
     let cancelled = false;
     const month = monthOptions(new Date(), data.restaurant.timezone)[0].value;
     requestJson<ResultsReport>(`/api/restaurants/${restaurantId}/results?month=${month}`)
@@ -43,9 +51,9 @@ export function AdminOverview({
     return () => {
       cancelled = true;
     };
-  }, [owner, restaurantId, data.restaurant.timezone]);
+  }, [owner, canResults, restaurantId, data.restaurant.timezone]);
   useEffect(() => {
-    if (!owner) return;
+    if (!owner || !canFinance) return;
     let cancelled = false;
     requestJson<Bills>(`/api/restaurants/${restaurantId}/finance/bills`)
       .then((b) => {
@@ -55,7 +63,7 @@ export function AdminOverview({
     return () => {
       cancelled = true;
     };
-  }, [owner, restaurantId]);
+  }, [owner, canFinance, restaurantId]);
   const dueThisWeek = dueState && dueState.key === restaurantId ? dueState.count : 0;
   const status = results && results.key === restaurantId ? results.status : "loading";
 
@@ -87,7 +95,7 @@ export function AdminOverview({
   return (
     <div className="overview">
       <div className="overview-main">
-        {owner && dueThisWeek > 0 && (
+        {owner && canFinance && dueThisWeek > 0 && (
           <div className="notice fin-notice" role="status">
             <span>
               {dueThisWeek === 1 ? "1 conta vence esta semana" : `${dueThisWeek} contas vencem esta semana`}
@@ -115,7 +123,14 @@ export function AdminOverview({
           <div className="admin-panel connected-stat"><span>Total entregue</span><strong>{money(delivered.reduce((s, o) => s + o.total_cents, 0))}</strong></div>
         </div>
         <p className="field-help">Resumo dos últimos {data.orders.length} pedidos carregados (limite: 200).</p>
-        {owner && (
+        {owner && !canResults && (
+          <PlanLockInline
+            title="Pratos mais pedidos"
+            benefit="Veja quais pratos mais vendem no mês."
+            onUpgrade={() => onUpgrade?.()}
+          />
+        )}
+        {owner && canResults && (
           <section>
             <h2 className="overview-title">Pratos mais pedidos</h2>
             <p className="field-help">Neste mês, só pedidos entregues.</p>
