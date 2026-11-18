@@ -61,8 +61,15 @@ export function priceFor(plan: SellablePlan, cycle: Cycle, founder = false) {
   if (founder && plan === "profissional" && cycle === "mensal") return FOUNDER_PRICE_CENTS;
   return PLAN_PRICES[plan][cycle];
 }
-export function firstChargeCents(plan: SellablePlan, cycle: Cycle, founder = false) {
-  return SETUP_FEE_CENTS + priceFor(plan, cycle, founder);
+// First charge = implantação + first period. A reactivation (cancelled restaurant coming back) skips
+// the implantação: the setup was already paid.
+export function firstChargeCents(
+  plan: SellablePlan,
+  cycle: Cycle,
+  founder = false,
+  options: { reactivation?: boolean } = {},
+) {
+  return (options.reactivation ? 0 : SETUP_FEE_CENTS) + priceFor(plan, cycle, founder);
 }
 // Orders are paused (menu stays online) while billing is not in good standing.
 export function stateBlocks(state: string) {
@@ -77,6 +84,7 @@ export function webhookStatus(event: string): BillingStatus | null {
     case "PAYMENT_OVERDUE":
       return "atrasado";
     case "PAYMENT_REFUNDED":
+    case "PAYMENT_PARTIALLY_REFUNDED":
     case "SUBSCRIPTION_DELETED":
     case "SUBSCRIPTION_INACTIVATED":
       return "cancelado";

@@ -16,6 +16,8 @@ create table public.restaurant_billing (
  pending_cycle text check (pending_cycle in ('mensal','anual')),
  pending_since date,
  founder_claimed_at timestamptz,
+ -- came back after a cancellation: its first charge skips the implantação (set by start_subscription)
+ reactivated boolean not null default false,
  -- lease: the webhook delivery that is creating the Asaas subscription (see billing-webhook.ts)
  subscription_claimed_at timestamptz,
  created_at timestamptz not null default now(),
@@ -108,20 +110,26 @@ grant select on public.product_options, public.product_option_links to anon, aut
 -- Atomic checkout start. Serialises founder-slot claims, prices the plan and resets the row to
 -- pendente. A row that is already founder-pending keeps its original created_at (48h window) and its
 -- slot; a NEW founder claim is capped globally (3 per hour) so scripted signups cannot drain the 10
--- slots; over the cap the signup proceeds as non-founder. Reusing a cancelado row forgets the old
--- Asaas ids. Service role only. Prices (cents) mirror src/lib/plans.ts.
+-- slots; over the cap the signup proceeds as non-founder. A row whose EFFECTIVE state is cancelado
+-- (refunded/deleted, or cancel_at reached while the stored status is still ativo) may start again:
+-- it is a reactivation (reactivated = true, returned as `reactivation` so the first charge skips the
+-- implantação). It forgets the old subscription, charge, period and scheduled changes but keeps the
+-- Asaas customer. Service role only. Prices (cents) mirror src/lib/plans.ts.
 create function public.start_subscription(p_restaurant uuid, p_plan text, p_cycle text, p_want_founder boolean)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare cur restaurant_billing%rowtype; had boolean; holds boolean; eligible boolean; is_founder boolean;
-  claimed boolean := false; price integer; recent integer;
+  claimed boolean := false; price integer; recent integer; st text; reset boolean; reactivated_ boolean;
 begin
  if p_plan not in ('essencial','profissional') or p_cycle not in ('mensal','anual') then raise exception 'INVALID_INPUT'; end if;
  if not exists(select 1 from restaurants where id=p_restaurant) then raise exception 'NOT_FOUND'; end if;
  perform pg_advisory_xact_lock(hashtext('founder_slots'));
  select * into cur from restaurant_billing where restaurant_id=p_restaurant;
  had := found;
- if had and cur.status in ('ativo','atrasado','cortesia') then raise exception 'STATE_CONFLICT'; end if;
- holds := had and cur.founder and cur.status='pendente' and cur.created_at > now() - interval '48 hours';
+ st := restaurant_billing_state(p_restaurant);
+ reset := had and st = 'cancelado';
+ if had and not reset and cur.status in ('ativo','atrasado','cortesia') then raise exception 'STATE_CONFLICT'; end if;
+ reactivated_ := reset or (had and cur.reactivated);
+ holds := had and not reset and cur.founder and cur.status='pendente' and cur.created_at > now() - interval '48 hours';
  eligible := coalesce(p_want_founder,false) and p_plan='profissional' and p_cycle='mensal';
  if not eligible then is_founder := false;
  elsif holds then is_founder := true;
@@ -135,18 +143,17 @@ begin
    when p_plan='essencial' then 149000
    when p_cycle='mensal' then 24900
    else 249000 end;
- insert into restaurant_billing(restaurant_id,plan,cycle,status,founder,price_cents,created_at,founder_claimed_at)
- values(p_restaurant,p_plan,p_cycle,'pendente',is_founder,price,now(),case when claimed then now() end)
+ insert into restaurant_billing(restaurant_id,plan,cycle,status,founder,price_cents,created_at,founder_claimed_at,reactivated)
+ values(p_restaurant,p_plan,p_cycle,'pendente',is_founder,price,now(),case when claimed then now() end,false)
  on conflict (restaurant_id) do update set plan=excluded.plan, cycle=excluded.cycle, status='pendente',
-   founder=excluded.founder, price_cents=excluded.price_cents,
+   founder=excluded.founder, price_cents=excluded.price_cents, reactivated=reactivated_,
    created_at=case when holds then restaurant_billing.created_at else now() end,
    founder_claimed_at=case when claimed then now() else restaurant_billing.founder_claimed_at end,
    cancel_at=null, overdue_since=null, pending_plan=null, pending_cycle=null, pending_since=null, subscription_claimed_at=null,
-   asaas_customer_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_customer_id end,
-   asaas_subscription_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.asaas_subscription_id end,
-   setup_payment_id=case when restaurant_billing.status='cancelado' then null else restaurant_billing.setup_payment_id end,
-   current_period_end=case when restaurant_billing.status='cancelado' then null else restaurant_billing.current_period_end end;
- return jsonb_build_object('founder',is_founder,'price_cents',price);
+   asaas_subscription_id=case when reset then null else restaurant_billing.asaas_subscription_id end,
+   setup_payment_id=case when reset then null else restaurant_billing.setup_payment_id end,
+   current_period_end=case when reset then null else restaurant_billing.current_period_end end;
+ return jsonb_build_object('founder',is_founder,'price_cents',price,'reactivation',reactivated_);
 end $$;
 revoke all on function public.start_subscription(uuid,text,text,boolean) from public, anon, authenticated;
 grant execute on function public.start_subscription(uuid,text,text,boolean) to service_role;

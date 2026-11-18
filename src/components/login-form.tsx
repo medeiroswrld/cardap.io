@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 import { ModeToggle } from "./mode-toggle";
 export function LoginForm({ configured }: { configured: boolean }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "recover" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "recover">("login");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   return (
@@ -62,12 +62,7 @@ export function LoginForm({ configured }: { configured: boolean }) {
               if (mode === "login") {
                 router.push("/gestao");
                 router.refresh();
-              } else
-                setMessage(
-                  mode === "signup"
-                    ? "Confira seu e-mail para confirmar a conta."
-                    : data.message,
-                );
+              } else setMessage(data.message);
             } catch (e) {
               setMessage((e as Error).message);
             } finally {
@@ -78,18 +73,12 @@ export function LoginForm({ configured }: { configured: boolean }) {
           <LockKeyhole size={27} />
           <div>
             <h2>
-              {mode === "login"
-                ? "Entrar na gestão"
-                : mode === "signup"
-                  ? "O próximo capítulo da sua casa."
-                  : "Vamos recuperar seu acesso."}
+              {mode === "login" ? "Entrar na gestão" : "Vamos recuperar seu acesso."}
             </h2>
             <p>
               {mode === "login"
                 ? "Entre para cuidar do seu restaurante."
-                : mode === "signup"
-                  ? "Crie a conta do responsável pelo restaurante."
-                  : "Informe o e-mail da sua conta."}
+                : "Informe o e-mail da sua conta."}
             </p>
           </div>
           {!configured && (
@@ -117,9 +106,7 @@ export function LoginForm({ configured }: { configured: boolean }) {
                 required
                 minLength={8}
                 maxLength={128}
-                autoComplete={
-                  mode === "signup" ? "new-password" : "current-password"
-                }
+                autoComplete="current-password"
                 placeholder="Pelo menos 8 caracteres"
               />
             </label>
@@ -146,23 +133,25 @@ export function LoginForm({ configured }: { configured: boolean }) {
               ? "Aguarde…"
               : mode === "login"
                 ? "Entrar no restaurante"
-                : mode === "signup"
-                  ? "Criar conta"
-                  : "Enviar instruções"}
+                : "Enviar instruções"}
             <ArrowRight size={16} />
           </Button>
-          <button
-            className="text-link"
-            type="button"
-            onClick={() => {
-              setMode(mode === "login" ? "signup" : "login");
-              setMessage("");
-            }}
-          >
-            {mode === "login"
-              ? "Ainda não tem conta? Cadastre seu restaurante"
-              : "Já tem uma conta? Voltar para entrar"}
-          </button>
+          {mode === "login" ? (
+            <Link className="text-link" href="/assinar">
+              Ainda não tem conta? Cadastre seu restaurante
+            </Link>
+          ) : (
+            <button
+              className="text-link"
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setMessage("");
+              }}
+            >
+              Já tem uma conta? Voltar para entrar
+            </button>
+          )}
           <div className="login-demo">
             <p>Quer conhecer primeiro?</p>
             <Link className="button button-outline full-width" href="/r/demo">

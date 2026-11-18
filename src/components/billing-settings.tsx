@@ -86,7 +86,9 @@ export function BillingSettings({
   const chosen = target ?? current;
   const kind = changeKind(current, chosen);
   const manage = ["ativo", "atrasado"].includes(info.status) && info.hasSubscription && !info.cancelAt && !courtesy;
-  const accessUntil = info.cancelAt ?? (info.status === "cancelado" ? info.currentPeriodEnd : null);
+  // A refunded/cancelled plan has no future access: only an ending (still active) subscription shows the date.
+  const ended = info.state === "cancelado";
+  const accessUntil = ended ? null : info.cancelAt;
   const payable = payableInvoice(info.invoices);
   const periodEnd = shortDate(info.currentPeriodEnd);
 
@@ -178,7 +180,7 @@ export function BillingSettings({
                 <dt>Acesso até</dt>
                 <dd>{fullDate(accessUntil)}</dd>
               </div>
-            ) : info.status !== "cancelado" ? (
+            ) : !ended ? (
               <div>
                 <dt>Próxima cobrança</dt>
                 <dd>{fullDate(info.currentPeriodEnd) || "—"}</dd>
@@ -192,7 +194,7 @@ export function BillingSettings({
             {periodEnd ? ` em ${periodEnd}` : " na próxima cobrança"}.
           </p>
         )}
-        {info.cancelAt && (
+        {info.cancelAt && !ended && (
           <p className="billing-note" role="status">
             Assinatura cancelada. Acesso até {shortDate(info.cancelAt)}.
           </p>

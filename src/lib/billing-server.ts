@@ -80,6 +80,8 @@ export async function provisionCheckout(
     plan: SellablePlan;
     cycle: Cycle;
     founder: boolean;
+    // a cancelled restaurant coming back: the first charge is the plan price only (no implantação)
+    reactivation?: boolean;
     customer?: CustomerInput;
   },
   service: Db = serviceClient(),
@@ -99,7 +101,7 @@ export async function provisionCheckout(
     customerId = (await asaas.createCustomer({ ...input.customer, externalReference: input.restaurantId })).id;
     await save(service, input.restaurantId, { asaas_customer_id: customerId });
   }
-  const valueCents = firstChargeCents(input.plan, input.cycle, input.founder);
+  const valueCents = firstChargeCents(input.plan, input.cycle, input.founder, { reactivation: input.reactivation });
   if (row.setup_payment_id) {
     let existing: Awaited<ReturnType<Asaas["getPayment"]>> | null = null;
     try {
@@ -126,7 +128,9 @@ export async function provisionCheckout(
     customer: customerId,
     valueCents,
     dueDate: addDays(today, 2),
-    description: `Fome Play ${label} - implantação + ${input.cycle === "anual" ? "1º ano" : "1º mês"}`,
+    description: input.reactivation
+      ? `Fome Play ${label} - reativação ${input.cycle === "anual" ? "(ano)" : "(mês)"}`
+      : `Fome Play ${label} - implantação + ${input.cycle === "anual" ? "1º ano" : "1º mês"}`,
     externalReference: input.restaurantId,
   });
   await save(service, input.restaurantId, { setup_payment_id: payment.id });

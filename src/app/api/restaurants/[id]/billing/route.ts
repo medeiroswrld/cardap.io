@@ -7,7 +7,7 @@ import { isValidDocument, normalizeDocument } from "@/lib/cpf-cnpj";
 import { billingState, provisionCheckout } from "@/lib/billing-server";
 import { isSellablePlan, todayBrt } from "@/lib/plans";
 import { decideChangePlan, type BillingRow } from "@/lib/billing-events";
-import { enforceRetryPaymentLimit } from "@/lib/rate-limit";
+import { enforceReactivateLimit, enforceRetryPaymentLimit } from "@/lib/rate-limit";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -83,6 +83,12 @@ const action = z.discriminatedUnion("action", [
   }),
   z.object({ action: z.literal("cancel") }),
   z.object({
+    action: z.literal("reactivate"),
+    plan: z.enum(["essencial", "profissional"]),
+    cycle: z.enum(["mensal", "anual"]),
+    document: z.string().max(30).refine(isValidDocument, "INVALID_DOCUMENT").optional(),
+  }),
+  z.object({
     action: z.literal("retry_payment"),
     document: z.string().max(30).refine(isValidDocument, "INVALID_DOCUMENT").optional(),
   }),
@@ -100,6 +106,42 @@ async function handlePOST(request: Request, { params }: Params) {
       const { error } = await service.from("restaurant_billing").update(patch).eq("restaurant_id", id);
       if (error) throw error;
     };
+
+    if (body.action === "reactivate") {
+      // Only a restaurant whose EFFECTIVE state is cancelado (refund, deleted subscription, or the paid
+      // period ended) may come back; start_subscription re-checks it atomically.
+      if ((await billingState(id)) !== "cancelado") throw new Error("STATE_CONFLICT");
+      if (!asaasConfigFromEnv()) throw new Error("BILLING_UNAVAILABLE");
+      await enforceReactivateLimit(id);
+      // Never claims a founder slot: the founder offer is for new customers.
+      const { data: started, error } = await service.rpc("start_subscription", {
+        p_restaurant: id,
+        p_plan: body.plan,
+        p_cycle: body.cycle,
+        p_want_founder: false,
+      });
+      if (error) throw error;
+      let customer;
+      if (!row.asaas_customer_id) {
+        if (!body.document || !user.email) throw new Error("INVALID_DOCUMENT");
+        const { data: restaurant } = await supabase.from("restaurants").select("name").eq("id", id).maybeSingle();
+        customer = {
+          name: restaurant?.name ?? user.email,
+          cpfCnpj: normalizeDocument(body.document),
+          email: user.email,
+        };
+      }
+      // First charge = plan price only: the implantação was paid on the first subscription.
+      const redirect = await provisionCheckout(asaasFromEnv(), {
+        restaurantId: id,
+        plan: body.plan,
+        cycle: body.cycle,
+        founder: false,
+        reactivation: true,
+        customer,
+      });
+      return Response.json({ redirect, priceCents: Number(started?.price_cents) }, { headers: noStore });
+    }
 
     if (body.action === "retry_payment") {
       if (row.status !== "pendente" || !isSellablePlan(row.plan)) throw new Error("STATE_CONFLICT");
@@ -128,6 +170,7 @@ async function handlePOST(request: Request, { params }: Params) {
         plan: row.plan,
         cycle: row.cycle,
         founder: Boolean(started?.founder),
+        reactivation: Boolean(started?.reactivation),
         customer,
       });
       return Response.json(
@@ -145,6 +188,12 @@ async function handlePOST(request: Request, { params }: Params) {
       throw new Error("STATE_CONFLICT");
     if (!asaasConfigFromEnv()) throw new Error("BILLING_UNAVAILABLE");
     const asaas = asaasFromEnv();
+    // Plan changes wait until the open charge is paid (the Asaas subscription value would change mid-dispute).
+    if (body.action === "change_plan" && row.status === "atrasado")
+      return Response.json(
+        { error: "Regularize o pagamento antes de trocar de plano." },
+        { status: 409, headers: noStore },
+      );
 
     if (body.action === "cancel") {
       if (row.cancel_at) return Response.json({ ok: true, cancelAt: row.cancel_at }, { headers: noStore });

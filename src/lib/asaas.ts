@@ -9,6 +9,8 @@ export type AsaasPayment = {
   customer?: string;
   subscription?: string | null;
   value: number;
+  // billed value before interest/fine/discount
+  originalValue?: number | null;
   status: string;
   dueDate: string;
   invoiceUrl: string | null;

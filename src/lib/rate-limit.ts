@@ -75,3 +75,7 @@ export function enforceBillingLimit(request: Request) {
 export function enforceRetryPaymentLimit(restaurantId: string) {
   return consumeBillingLimit("retry_payment", restaurantId);
 }
+// Owner "reactivate the subscription": 5 per hour per restaurant.
+export function enforceReactivateLimit(restaurantId: string) {
+  return consumeBillingLimit("reactivate", restaurantId);
+}

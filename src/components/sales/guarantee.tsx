@@ -8,7 +8,7 @@ export function Guarantee() {
           <ShieldCheck size={44} strokeWidth={1.6} />
           <div>
             <h2>30 dias de garantia</h2>
-            <p>Não gostou em 30 dias? Devolvemos a mensalidade.</p>
+            <p>Não gostou em 30 dias? Devolvemos o valor do plano.</p>
           </div>
         </div>
       </div>

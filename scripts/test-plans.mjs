@@ -21,6 +21,10 @@ test("prices by plan, cycle and founder", () => {
   assert.equal(p.priceFor("essencial", "mensal", true), 14900);
   assert.equal(p.firstChargeCents("profissional", "mensal", true), 29700 + 17900);
   assert.equal(p.firstChargeCents("essencial", "anual"), 29700 + 149000);
+  // reactivation: plan price only, no implantação
+  assert.equal(p.firstChargeCents("essencial", "mensal", false, { reactivation: true }), 14900);
+  assert.equal(p.firstChargeCents("profissional", "anual", false, { reactivation: true }), 249000);
+  assert.equal(p.firstChargeCents("profissional", "mensal", false, { reactivation: false }), 29700 + 24900);
 });
 test("TypeScript prices match the SQL function", () => {
   const sql = fs.readFileSync("supabase/migrations/021_billing.sql", "utf8");
@@ -45,9 +49,9 @@ test("webhook event to status mapping", () => {
   assert.equal(p.webhookStatus("PAYMENT_CONFIRMED"), "ativo");
   assert.equal(p.webhookStatus("PAYMENT_RECEIVED"), "ativo");
   assert.equal(p.webhookStatus("PAYMENT_OVERDUE"), "atrasado");
-  for (const e of ["PAYMENT_REFUNDED", "SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED"])
+  for (const e of ["PAYMENT_REFUNDED", "PAYMENT_PARTIALLY_REFUNDED", "SUBSCRIPTION_DELETED", "SUBSCRIPTION_INACTIVATED"])
     assert.equal(p.webhookStatus(e), "cancelado", e);
-  for (const e of ["PAYMENT_CREATED", "PAYMENT_UPDATED", "PAYMENT_DELETED", "PAYMENT_PARTIALLY_REFUNDED"])
+  for (const e of ["PAYMENT_CREATED", "PAYMENT_UPDATED", "PAYMENT_DELETED", "PAYMENT_CHARGEBACK_REQUESTED"])
     assert.equal(p.webhookStatus(e), null, e);
 });
 test("slugFromName", () => {
@@ -194,7 +198,10 @@ test("webhook decisions: first activation, renewals, overdue, refund", () => {
   assert.equal(ev.decideWebhook(row({ status: "pendente" }), "PAYMENT_OVERDUE", { dueDate: "2026-11-20" }), null);
   // refund cancels the plan and the Asaas subscription
   d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_REFUNDED", { id: "pay" });
-  assert.deepEqual({ ...d.patch }, { status: "cancelado" });
+  assert.deepEqual({ ...d.patch }, { status: "cancelado", cancel_at: null });
+  assert.equal(d.cancelAsaasSubscription, true);
+  d = ev.decideWebhook(row({ status: "ativo" }), "PAYMENT_PARTIALLY_REFUNDED", { id: "pay" });
+  assert.deepEqual({ ...d.patch }, { status: "cancelado", cancel_at: null });
   assert.equal(d.cancelAsaasSubscription, true);
   d = ev.decideWebhook(row({ status: "ativo" }), "SUBSCRIPTION_DELETED", null);
   assert.equal(d.cancelAsaasSubscription, false);

@@ -586,3 +586,67 @@ test("lease release is conditional: another claimant's lease is not cleared", as
   await assert.rejects(deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" })));
   assert.equal(t.row().subscription_claimed_at, "2099-01-01T00:00:00.000Z");
 });
+
+// ---- final review ----
+test("partial refund of the current charge cancels the plan like a full refund; foreign charges do not", async () => {
+  const active = () => setup(baseRow({ status: "ativo", asaas_subscription_id: "sub_1", setup_payment_id: "pay_1", cancel_at: "2099-01-01", current_period_end: "2099-01-01" }));
+  const other = active();
+  await deliver(other.deps, evt("PAYMENT_PARTIALLY_REFUNDED", { id: "pay_old", customer: "cus_1" }));
+  assert.equal(other.row().status, "ativo");
+  assert.equal(names(other.asaas).includes("cancelSubscription"), false);
+  const current = active();
+  await deliver(current.deps, evt("PAYMENT_PARTIALLY_REFUNDED", { id: "pay_1", customer: "cus_1" }));
+  assert.equal(current.row().status, "cancelado");
+  assert.equal(current.row().cancel_at, null, "no future access date after a refund");
+  assert.deepEqual(current.asaas.calls.find((c) => c[0] === "cancelSubscription"), ["cancelSubscription", "sub_1"]);
+  const sub = active();
+  await deliver(sub.deps, evt("PAYMENT_PARTIALLY_REFUNDED", { id: "pay_s1", subscription: "sub_1" }));
+  assert.equal(sub.row().status, "cancelado");
+});
+
+test("webhook payloads are stored with the parsed fields only (no card data or tokens)", async () => {
+  const t = setup(baseRow(), { pay_1: paid });
+  await deliver(
+    t.deps,
+    evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20", creditCard: { creditCardToken: "tok_secret", creditCardNumber: "1234" }, value: 546 }, { extra: "x" }),
+  );
+  const stored = JSON.stringify(t.db.billing_events[0].payload);
+  assert.equal(stored.includes("tok_secret"), false);
+  assert.equal(stored.includes("creditCard"), false);
+  assert.equal(stored.includes('"extra"'), false);
+  assert.equal(t.db.billing_events[0].payload.payment.id, "pay_1");
+});
+
+test("events with no status mapping are logged by type", async () => {
+  for (const type of ["PAYMENT_CHARGEBACK_REQUESTED", "PAYMENT_DELETED"]) {
+    const t = setup(baseRow({ status: "ativo", asaas_subscription_id: "sub_1" }));
+    await deliver(t.deps, evt(type, { id: "pay_1", customer: "cus_1" }));
+    assert.ok(t.logs.some(([e, r]) => e === "billing.webhook_ignored" && r === type), type);
+    assert.equal(t.row().status, "ativo");
+  }
+});
+
+test("verification compares what we billed (originalValue), not what was paid with interest", async () => {
+  const t = setup(baseRow(), { pay_1: { ...paid, value: 553.2, originalValue: 546 } });
+  await deliver(t.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(t.row().status, "ativo");
+});
+
+test("reactivation: first charge is the plan price only (no implantação) and its payment activates the plan", async () => {
+  const bare = baseRow({ setup_payment_id: null, reactivated: true });
+  const db = newDb(bare);
+  const asaas = fakeAsaas();
+  const url = await provisionCheckout(asaas, input({ reactivation: true }), fakeService(db), TODAY);
+  assert.equal(url, "https://www.asaas.com/i/pay_new1");
+  assert.equal(asaas.calls.find((c) => c[0] === "createPayment")[1].valueCents, 24900);
+  assert.equal(names(asaas).includes("createCustomer"), false, "the kept customer is reused");
+  assert.equal(db.restaurant_billing[0].setup_payment_id, "pay_new1");
+  // the webhook accepts exactly the plan price for a reactivated row, and not the old setup + price total
+  const ok = setup(baseRow({ reactivated: true, setup_payment_id: "pay_r" }), { pay_r: { ...paid, id: "pay_r", value: 249 } });
+  await deliver(ok.deps, evt("PAYMENT_CONFIRMED", { id: "pay_r", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(ok.row().status, "ativo");
+  assert.equal(ok.asaas.calls.find((c) => c[0] === "createSubscription")[1].nextDueDate, "2026-12-20");
+  const wrong = setup(baseRow({ reactivated: true, setup_payment_id: "pay_r" }), { pay_r: { ...paid, id: "pay_r", value: 546 } });
+  await deliver(wrong.deps, evt("PAYMENT_CONFIRMED", { id: "pay_r", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.equal(wrong.row().status, "pendente");
+});

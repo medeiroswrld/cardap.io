@@ -70,7 +70,7 @@ Curta e visual (preferência do usuário: pouco texto, headline curta, no máxim
 - Restaurantes existentes: insert de `cortesia` + `profissional`.
 
 ## Variáveis de ambiente (o dono cadastra na Vercel)
-`ASAAS_API_KEY`, `ASAAS_ENV` (`sandbox` | `production`), `ASAAS_WEBHOOK_TOKEN`, `BILLING_NOTIFY_EMAIL`, `NEXT_PUBLIC_SALES_WHATSAPP`. Nunca no código nem no chat.
+`ASAAS_API_KEY`, `ASAAS_ENV` (`sandbox` | `production`), `ASAAS_WEBHOOK_TOKEN`, `BILLING_NOTIFY_EMAIL`, `RESEND_API_KEY`, `BILLING_FROM_EMAIL` (opcional), `NEXT_PUBLIC_SALES_WHATSAPP`. Nunca no código nem no chat.
 
 ## Fora de escopo
 Cobrança proporcional em upgrade, cupom de desconto na assinatura, notas fiscais da assinatura, plano Agência pelo site, programa de afiliados.

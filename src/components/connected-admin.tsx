@@ -396,7 +396,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
               </button>
             </div>
           )}
-          {staffBlocked && <StaffBillingNotice />}
+          {staffBlocked && <StaffBillingNotice state={billingState} />}
           {data && !staffBlocked && (
             <>
               {owner && lockedPage && (
@@ -408,7 +408,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
               )}
               {owner && page === "plano" && (
                 <>
-                  {blocked && <BillingGate state={billingState} />}
+                  {blocked && <BillingGate state={billingState} restaurantId={id} />}
                   <BillingSettings
                     restaurantId={id}
                     documentRejected={documentRejected}

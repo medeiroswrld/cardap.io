@@ -18,6 +18,8 @@ export type BillingRow = {
   pending_plan: SellablePlan | null;
   pending_cycle: Cycle | null;
   pending_since: string | null;
+  // came back after a cancellation: the first charge skips the implantação
+  reactivated?: boolean;
 };
 export type WebhookPayment = { id?: string; subscription?: string | null; dueDate?: string | null };
 export type WebhookContext = {
@@ -105,12 +107,14 @@ export function decideWebhook(
   }
   // cancelado
   if (row.status === "cortesia") return null;
+  // A refund (full or partial) of the current charge ends the plan: the guarantee returns the plan amount.
+  const isRefund = event === "PAYMENT_REFUNDED" || event === "PAYMENT_PARTIALLY_REFUNDED";
   // Our own cancel already scheduled cancel_at; the Asaas deletion echo must not cut the paid period.
   if ((event === "SUBSCRIPTION_DELETED" || event === "SUBSCRIPTION_INACTIVATED") && row.cancel_at) return null;
   return {
     ...none,
-    patch: { status: "cancelado" },
-    cancelAsaasSubscription: event === "PAYMENT_REFUNDED" && Boolean(row.asaas_subscription_id),
+    patch: isRefund ? { status: "cancelado", cancel_at: null } : { status: "cancelado" },
+    cancelAsaasSubscription: isRefund && Boolean(row.asaas_subscription_id),
   };
 }
 

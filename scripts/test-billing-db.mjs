@@ -346,13 +346,13 @@ await ok("start_subscription: prices, founder rules, reset, permissions", async 
   await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa H','bil-h',true,$2)", [id, SP]);
   await db.exec("set role service_role");
   const start = async (p, c, w) => (await db.query("select public.start_subscription($1,$2,$3,$4) r", [id, p, c, w])).rows[0].r;
-  assert.deepEqual(await start("essencial", "mensal", true), { founder: false, price_cents: 14900 });
-  assert.deepEqual(await start("essencial", "anual", false), { founder: false, price_cents: 149000 });
-  assert.deepEqual(await start("profissional", "anual", true), { founder: false, price_cents: 249000 });
-  assert.deepEqual(await start("profissional", "mensal", false), { founder: false, price_cents: 24900 });
-  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900 });
+  assert.deepEqual(await start("essencial", "mensal", true), { founder: false, price_cents: 14900, reactivation: false });
+  assert.deepEqual(await start("essencial", "anual", false), { founder: false, price_cents: 149000, reactivation: false });
+  assert.deepEqual(await start("profissional", "anual", true), { founder: false, price_cents: 249000, reactivation: false });
+  assert.deepEqual(await start("profissional", "mensal", false), { founder: false, price_cents: 24900, reactivation: false });
+  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900, reactivation: false });
   // a pending founder retrying keeps its own slot
-  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900 });
+  assert.deepEqual(await start("profissional", "mensal", true), { founder: true, price_cents: 17900, reactivation: false });
   await root();
   const row = (await db.query("select plan,cycle,status,founder,price_cents from restaurant_billing where restaurant_id=$1", [id])).rows[0];
   assert.deepEqual({ ...row }, { plan: "profissional", cycle: "mensal", status: "pendente", founder: true, price_cents: 17900 });
@@ -367,7 +367,7 @@ await ok("start_subscription: prices, founder rules, reset, permissions", async 
   const late = crypto.randomUUID();
   await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa J','bil-j',true,$2)", [late, SP]);
   await db.exec("set role service_role");
-  assert.deepEqual((await db.query("select public.start_subscription($1,'profissional','mensal',true) r", [late])).rows[0].r, { founder: false, price_cents: 24900 });
+  assert.deepEqual((await db.query("select public.start_subscription($1,'profissional','mensal',true) r", [late])).rows[0].r, { founder: false, price_cents: 24900, reactivation: false });
   // a restaurant that is already paying cannot be reset
   await root();
   await db.query("update restaurant_billing set status='ativo' where restaurant_id=$1", [late]);
@@ -383,7 +383,7 @@ await ok("start_subscription: prices, founder rules, reset, permissions", async 
   await db.query("delete from restaurants where slug like 'bil-i%' or slug in ('bil-h','bil-j')");
 });
 
-await ok("start_subscription: founder window is kept on repeat calls, claims are capped, cancelado reuse clears Asaas ids", async () => {
+await ok("start_subscription: founder window is kept on repeat calls, claims are capped, reactivation resets the row but keeps the customer", async () => {
   await root();
   await db.query("update restaurant_billing set founder=false, founder_claimed_at=null, status='cortesia' where status in ('pendente','cancelado','ativo','atrasado')");
   const ids = [];
@@ -415,14 +415,14 @@ await ok("start_subscription: founder window is kept on repeat calls, claims are
   await db.exec("set role service_role");
   assert.equal((await founder(ids[1])).founder, true);
   assert.equal((await founder(ids[2])).founder, true);
-  assert.deepEqual(await founder(ids[3]), { founder: false, price_cents: 24900 });
+  assert.deepEqual(await founder(ids[3]), { founder: false, price_cents: 24900, reactivation: false });
   // retrying an existing claim does not count as a new one
   assert.equal((await founder(ids[1])).founder, true);
   // claims older than an hour stop counting
   await root();
   await db.query("update restaurant_billing set founder_claimed_at=now()-interval '2 hours' where restaurant_id=$1", [ids[2]]);
   await db.exec("set role service_role");
-  assert.deepEqual(await founder(ids[3]), { founder: true, price_cents: 17900 });
+  assert.deepEqual(await founder(ids[3]), { founder: true, price_cents: 17900, reactivation: false });
   // a cancelado row that signs up again forgets old Asaas ids and the scheduled cancellation
   await root();
   await db.query(
@@ -434,7 +434,9 @@ await ok("start_subscription: founder window is kept on repeat calls, claims are
   await root();
   const row = (await db.query("select * from restaurant_billing where restaurant_id=$1", [ids[4]])).rows[0];
   assert.equal(row.status, "pendente");
-  for (const col of ["asaas_customer_id", "asaas_subscription_id", "setup_payment_id", "current_period_end", "cancel_at", "overdue_since", "pending_plan", "pending_cycle", "pending_since"])
+  assert.equal(row.asaas_customer_id, "cus_old", "the Asaas customer is kept");
+  assert.equal(row.reactivated, true);
+  for (const col of ["asaas_subscription_id", "setup_payment_id", "current_period_end", "cancel_at", "overdue_since", "pending_plan", "pending_cycle", "pending_since"])
     assert.equal(row[col], null, col);
   // a pendente row (retry) keeps the ids it already has
   await db.query("update restaurant_billing set asaas_customer_id='cus_keep', setup_payment_id='pay_keep' where restaurant_id=$1", [ids[4]]);
@@ -443,6 +445,31 @@ await ok("start_subscription: founder window is kept on repeat calls, claims are
   await root();
   const kept = (await db.query("select asaas_customer_id, setup_payment_id from restaurant_billing where restaurant_id=$1", [ids[4]])).rows[0];
   assert.deepEqual({ ...kept }, { asaas_customer_id: "cus_keep", setup_payment_id: "pay_keep" });
+  // the pending retry of a reactivation is still a reactivation
+  await db.exec("set role service_role");
+  assert.equal((await start(ids[4], "essencial", "anual", false)).reactivation, true);
+  // an ativo row whose cancel_at has passed is effectively cancelado: it may reactivate (and the old ids go)
+  await root();
+  await db.query(
+    "update restaurant_billing set status='ativo', reactivated=false, cancel_at=(now() at time zone $2)::date - 1, asaas_subscription_id='sub_end', setup_payment_id='pay_end', current_period_end='2026-11-01' where restaurant_id=$1",
+    [ids[4], SP],
+  );
+  assert.equal(await rpc("restaurant_billing_state", ids[4]), "cancelado");
+  await db.exec("set role service_role");
+  assert.deepEqual(await start(ids[4], "profissional", "mensal", false), { founder: false, price_cents: 24900, reactivation: true });
+  await root();
+  const again = (await db.query("select status,asaas_subscription_id,setup_payment_id,current_period_end,cancel_at,reactivated,asaas_customer_id from restaurant_billing where restaurant_id=$1", [ids[4]])).rows[0];
+  assert.deepEqual({ ...again }, { status: "pendente", asaas_subscription_id: null, setup_payment_id: null, current_period_end: null, cancel_at: null, reactivated: true, asaas_customer_id: "cus_keep" });
+  // ativo with the end still in the future is NOT cancelado: no restart
+  await db.query("update restaurant_billing set status='ativo', cancel_at=(now() at time zone $2)::date + 5 where restaurant_id=$1", [ids[4], SP]);
+  await db.exec("set role service_role");
+  await rejects(() => db.query("select public.start_subscription($1,'essencial','mensal',false)", [ids[4]]), "STATE_CONFLICT");
+  // a plain pendente row is not a reactivation
+  await root();
+  await db.query("update restaurant_billing set status='pendente', cancel_at=null, reactivated=false where restaurant_id=$1", [ids[4]]);
+  await db.exec("set role service_role");
+  assert.equal((await start(ids[4], "essencial", "mensal", false)).reactivation, false);
+  await root();
   await db.query("delete from restaurants where slug like 'bil-k%'");
 });
 

@@ -15,7 +15,14 @@ async function handlePOST(request: Request) {
       notify: notifyNewSubscriber,
       invalidate: (restaurantId) => invalidateCatalog(serviceClient(), restaurantId),
       log: (event, detail) =>
-        logger.warn(event, event === "billing.webhook_unactivated" || event === "billing.notify_failed" ? { eventId: detail } : undefined),
+        logger.warn(
+          event,
+          event === "billing.webhook_unactivated" || event === "billing.notify_failed"
+            ? { eventId: detail }
+            : event === "billing.webhook_ignored"
+              ? { webhookEvent: detail } // reasons (lowercase) are dropped by the sanitizer; event types pass
+              : undefined,
+        ),
     });
   } catch (error) {
     return apiError(error);

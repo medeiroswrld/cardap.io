@@ -107,6 +107,8 @@ export type Fields = {
   errorCode?: ErrorCode;
   // Asaas webhook event id (evt_...): an opaque provider id, never personal data.
   eventId?: string;
+  // Asaas webhook event type (PAYMENT_DELETED...): a fixed provider vocabulary.
+  webhookEvent?: string;
   status?: number;
   durationMs?: number;
 };
@@ -361,6 +363,8 @@ export function createSafeLogger(
     if (member(errorCodes, code)) output.errorCode = code;
     const eventId = field(fields, "eventId");
     if (typeof eventId === "string" && /^[A-Za-z0-9_&-]{1,120}$/.test(eventId)) output.eventId = eventId;
+    const webhookEvent = field(fields, "webhookEvent");
+    if (typeof webhookEvent === "string" && /^[A-Z_]{1,60}$/.test(webhookEvent)) output.webhookEvent = webhookEvent;
     for (const key of ["status", "durationMs"] as const) {
       const value = field(fields, key);
       if (

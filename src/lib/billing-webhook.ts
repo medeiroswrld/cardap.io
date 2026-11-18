@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Asaas, AsaasPayment } from "./asaas";
 import { decideWebhook, type BillingRow, type WebhookPayment } from "./billing-events";
-import { addCycle, priceFor, SETUP_FEE_CENTS, todayBrt } from "./plans";
+import { addCycle, priceFor, SETUP_FEE_CENTS, todayBrt, webhookStatus } from "./plans";
 
 // Asaas webhook processing, with its collaborators injected so it can be tested without a network
 // or a database. Asaas delivers at least once and unordered, and pauses the queue after 15
@@ -29,6 +29,8 @@ export type WebhookDeps = {
 };
 
 const uuid = z.uuid();
+// Only these fields are parsed (zod strips the rest) and only they are stored in billing_events: the raw
+// payload may carry card data or tokens.
 const payload = z.object({
   id: z.string().min(1).max(200),
   event: z.string().min(1).max(100),
@@ -40,7 +42,6 @@ const payload = z.object({
       externalReference: z.string().nullish(),
       dueDate: z.string().nullish(),
     })
-    .loose()
     .optional(),
   subscription: z
     .object({
@@ -48,7 +49,6 @@ const payload = z.object({
       customer: z.string().optional(),
       externalReference: z.string().nullish(),
     })
-    .loose()
     .optional(),
 });
 type Body = z.infer<typeof payload>;
@@ -125,10 +125,11 @@ async function verifiedPayment(
   }
   if (mode === "overdue") return remote.status === "OVERDUE" ? remote : null;
   if (!PAID.includes(remote.status)) return null;
-  const cents = Math.round(remote.value * 100);
+  // `value` includes interest/fine/discount once the charge is paid; `originalValue` is what we billed.
+  const cents = Math.round((remote.originalValue ?? remote.value) * 100);
   const accepted =
     payment.id === row.setup_payment_id
-      ? [SETUP_FEE_CENTS + row.price_cents]
+      ? [(row.reactivated ? 0 : SETUP_FEE_CENTS) + row.price_cents]
       : [
           row.price_cents,
           ...(row.pending_plan && row.pending_cycle ? [priceFor(row.pending_plan, row.pending_cycle, false)] : []),
@@ -158,7 +159,8 @@ async function apply(deps: WebhookDeps, row: BillingRow, body: Body) {
   }
   let decision = decideWebhook(row, body.event, payment, { subscriptionId: body.subscription?.id, confirmedAlready });
   if (!decision) {
-    deps.log?.("billing.webhook_ignored", "no-decision");
+    // events with no status mapping (PAYMENT_DELETED, PAYMENT_CHARGEBACK_REQUESTED...) are logged by type
+    deps.log?.("billing.webhook_ignored", webhookStatus(body.event) === null ? body.event : "no-decision");
     return;
   }
 
