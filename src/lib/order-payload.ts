@@ -22,10 +22,24 @@ const common = {
   phone: z.string().regex(/^\d{10,11}$/),
   marketing_consent: z.boolean(),
   items: z.array(item).min(1).max(50),
+  // Coupon and origin are validated again by place_guest_order; the client is never trusted.
+  coupon_code: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9]{3,20}$/)
+    .nullable()
+    .optional(),
+  expected_discount_cents: z.number().int().min(0).max(10000000).nullable().optional(),
+  origin: z
+    .string()
+    .regex(/^[a-z0-9-]{2,30}$/)
+    .nullable()
+    .optional(),
 };
 const payment = z.enum(["dinheiro", "cartao", "pix"]);
 const change = z.number().int().min(1).max(10000000).nullable().optional();
-export const orderPayload = z.union([
+export const orderPayload = z
+  .union([
   z
     .object({ ...common, fulfillment: z.literal("mesa").default("mesa"), table_id: z.uuid() })
     .strict(),
@@ -56,5 +70,8 @@ export const orderPayload = z.union([
         .strict(),
     })
     .strict(),
-]);
+  ])
+  .refine((v) => !v.coupon_code || typeof v.expected_discount_cents === "number", {
+    message: "expected_discount_cents is required with a coupon",
+  });
 export type OrderPayload = z.infer<typeof orderPayload>;

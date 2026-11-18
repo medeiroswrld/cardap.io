@@ -26,6 +26,13 @@ export const apiErrorMessages: Record<string, string> = {
   INVALID_CHANGE: "O troco precisa ser para um valor igual ou maior que o total, e só vale para dinheiro.",
   CUSTOMER_HAS_OPEN_ORDERS:
     "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir os dados.",
+  COUPON_INVALID: "Cupom não encontrado.",
+  COUPON_EXPIRED: "Este cupom expirou.",
+  COUPON_MIN_ORDER: "Este cupom vale só para pedidos a partir do valor mínimo definido pelo restaurante.",
+  COUPON_EXCEEDS_TOTAL: "O desconto não pode ser maior que o pedido. Adicione mais itens.",
+  COUPON_DUPLICATE: "Já existe um cupom com esse código.",
+  COUPON_USED: "Este cupom já foi usado em pedidos. Você pode pausá-lo.",
+  LIMIT_REACHED: "Limite de 20 origens atingido.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
 };

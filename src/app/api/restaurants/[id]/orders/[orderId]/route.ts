@@ -27,7 +27,7 @@ async function handleGET(_request: Request, { params }: Context) {
     const { data, error } = await client
       .from("orders")
       .select(
-        "id,number,table_id,status,fulfillment,delivery_fee_cents,payment_method,change_for_cents,total_cents,created_at,estimate_minutes,cancellation_reason,dining_tables(number),order_addresses(zone_name,street,number,complement,reference),order_items(*),order_status_events(status,created_at)",
+        "id,number,table_id,status,fulfillment,delivery_fee_cents,payment_method,change_for_cents,coupon_code,discount_cents,total_cents,created_at,estimate_minutes,cancellation_reason,dining_tables(number),order_addresses(zone_name,street,number,complement,reference),order_items(*),order_status_events(status,created_at)",
       )
       .eq("restaurant_id", id)
       .eq("guest_session_id", session.id)

@@ -125,6 +125,27 @@ const schema = z.discriminatedUnion("action", [
     theme: z.record(z.string(), z.string().max(400)).refine((t) => Object.keys(t).length <= 12),
   }),
   crmSettingsBody,
+  z.object({
+    action: z.literal("save_coupon"),
+    id: z.uuid().nullable().optional(),
+    code: z
+      .string()
+      .trim()
+      .transform((v) => v.toUpperCase())
+      .pipe(z.string().regex(/^[A-Z0-9]{3,20}$/)),
+    kind: z.enum(["percent", "fixed"]),
+    value: z.number().int().min(1).max(50000),
+    min_order_cents: z.number().int().min(0).max(100000),
+    valid_until: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullable()
+      .optional(),
+    active: z.boolean(),
+  }),
+  z.object({ action: z.literal("delete_coupon"), id: z.uuid() }),
+  z.object({ action: z.literal("save_origin"), name: z.string().trim().min(2).max(40) }),
+  z.object({ action: z.literal("delete_origin"), id: z.uuid() }),
 ]);
 async function handlePOST(
   request: Request,
@@ -310,6 +331,47 @@ async function handlePOST(
           { status: errorStatus(code), headers: noStore },
         );
       }
+    } else if (
+      body.action === "save_coupon" ||
+      body.action === "delete_coupon" ||
+      body.action === "save_origin" ||
+      body.action === "delete_origin"
+    ) {
+      // Owner-only RPCs; domain errors (COUPON_*, LIMIT_REACHED) are returned as codes.
+      let result: { data: unknown; error: { message?: string; code?: string } | null };
+      if (body.action === "save_coupon") {
+        if (body.kind === "percent" && body.value > 90) throw new Error("INVALID_INPUT");
+        result = await supabase.rpc("save_coupon", {
+          p_restaurant: id,
+          p_id: body.id ?? null,
+          p_coupon: {
+            code: body.code,
+            kind: body.kind,
+            value: body.value,
+            min_order_cents: body.min_order_cents,
+            valid_until: body.valid_until ?? "",
+            active: body.active,
+          },
+        });
+      } else if (body.action === "delete_coupon")
+        result = await supabase.rpc("delete_coupon", { p_restaurant: id, p_id: body.id });
+      else if (body.action === "save_origin")
+        result = await supabase.rpc("save_origin", { p_restaurant: id, p_name: body.name });
+      else result = await supabase.rpc("delete_origin", { p_restaurant: id, p_id: body.id });
+      if (result.error) {
+        const code = errorCode(result.error);
+        if (errorStatus(code) >= 500) throw result.error;
+        logFailure(result.error, "supabase.catalog");
+        return Response.json({ error: code }, { status: errorStatus(code), headers: noStore });
+      }
+      return Response.json(
+        body.action === "save_coupon"
+          ? { ok: true, id: result.data }
+          : body.action === "save_origin"
+            ? { ok: true, origin: result.data }
+            : { ok: true },
+        { headers: noStore },
+      );
     } else if (body.action === "crm_settings") {
       const { action: _, ...settings } = body;
       void _;

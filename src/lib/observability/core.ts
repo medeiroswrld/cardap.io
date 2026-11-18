@@ -75,6 +75,13 @@ export const errorCodes = [
   "INVALID_VIDEO",
   "CUSTOMER_HAS_OPEN_ORDERS",
   "COOKIE_WRITE_FAILED",
+  "COUPON_INVALID",
+  "COUPON_EXPIRED",
+  "COUPON_MIN_ORDER",
+  "COUPON_EXCEEDS_TOTAL",
+  "COUPON_DUPLICATE",
+  "COUPON_USED",
+  "LIMIT_REACHED",
   "23505",
   "42501",
   "PGRST116",
@@ -119,6 +126,10 @@ const routes = new Set([
     "crm/[contactId]",
     "crm/campaign",
     "results",
+    "coupon",
+    "coupon-stats",
+    "lapsed-customers",
+    "origin-report",
   ].map((part) => `/api/restaurants/[id]/${part}`),
 ]);
 export function safeAction(method: string, route: string) {
@@ -206,6 +217,9 @@ export function errorStatus(code: ErrorCode) {
       "OPTIONS_CHANGED",
       "IDEMPOTENCY_CONFLICT",
       "CUSTOMER_HAS_OPEN_ORDERS",
+      "COUPON_DUPLICATE",
+      "COUPON_USED",
+      "LIMIT_REACHED",
     ].includes(code)
   )
     return 409;
@@ -223,6 +237,10 @@ export function errorStatus(code: ErrorCode) {
       "INVALID_ZONE",
       "INVALID_ADDRESS",
       "BELOW_MINIMUM",
+      "COUPON_INVALID",
+      "COUPON_EXPIRED",
+      "COUPON_MIN_ORDER",
+      "COUPON_EXCEEDS_TOTAL",
       "INVALID_PAYMENT",
       "INVALID_CHANGE",
       "AUTH_REJECTED",

@@ -134,8 +134,10 @@ async function handleGET(
     let photoMetrics: unknown[] = [];
     let feedback: unknown[] = [];
     let pix: unknown = null;
+    let coupons: unknown[] = [];
+    let origins: unknown[] = [];
     if (role === "owner") {
-      const [m, photos, reviews, pixRow] = await Promise.all([
+      const [m, photos, reviews, pixRow, couponRows, originRows] = await Promise.all([
         supabase
           .from("video_view_sessions")
           .select(
@@ -165,9 +167,21 @@ async function handleGET(
           .select("pix_key,merchant_name,merchant_city")
           .eq("restaurant_id", id)
           .maybeSingle(),
+        supabase
+          .from("coupons")
+          .select("*")
+          .eq("restaurant_id", id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("order_origins")
+          .select("*")
+          .eq("restaurant_id", id)
+          .order("created_at"),
       ]);
-      if (m.error || photos.error || reviews.error)
+      if (m.error || photos.error || reviews.error || couponRows.error || originRows.error)
         throw new Error("DATABASE_ERROR");
+      coupons = couponRows.data;
+      origins = originRows.data;
       // Pix is optional: a failed read must not break the owner's admin.
       if (pixRow.error)
         logger.warn("dependency.failed", {
@@ -195,6 +209,8 @@ async function handleGET(
         photoMetrics,
         feedback,
         pix,
+        coupons,
+        origins,
       },
       { headers: noStore },
     );

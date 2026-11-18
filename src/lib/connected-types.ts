@@ -100,6 +100,9 @@ export type RealOrder = {
   delivery_fee_cents: number;
   payment_method: PaymentMethod | null;
   change_for_cents: number | null;
+  coupon_code?: string | null;
+  discount_cents?: number;
+  origin?: string | null;
   order_addresses: OrderAddress | null;
   first_order?: boolean;
   created_at: string;
@@ -144,6 +147,9 @@ export type Workspace = {
   tables: TableRow[];
   zones: DeliveryZone[];
   orders: RealOrder[];
+  // Owner only; empty for operations staff.
+  coupons: import("./coupons").CouponRow[];
+  origins: import("./origins").OriginRow[];
   photoMetrics: {
     product_id: string;
     photo_url: string;

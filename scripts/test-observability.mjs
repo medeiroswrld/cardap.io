@@ -351,7 +351,7 @@ test("every exported API method uses the wrapper with an allowlisted static rout
       }
     }
   }
-  assert.equal(count, 26);
+  assert.equal(count, 30);
 });
 
 test("rate-limit identity ignores untrusted forwarding and never stores raw identifiers", () => {
@@ -433,4 +433,13 @@ test("CRM routes are logged by template and open-orders conflict maps to 409", (
   for (const route of ["crm", "crm/[contactId]", "crm/campaign"]) {
     assert.notEqual(core.safeAction("GET", `/api/restaurants/[id]/${route}`), "server");
   }
+});
+
+test("coupon and origin routes are allowlisted and their errors map to statuses", () => {
+  for (const route of ["coupon", "coupon-stats", "lapsed-customers", "origin-report"])
+    assert.equal(core.safeAction("GET", `/api/restaurants/[id]/${route}`), `GET /api/restaurants/[id]/${route}`);
+  for (const code of ["COUPON_INVALID", "COUPON_EXPIRED", "COUPON_MIN_ORDER", "COUPON_EXCEEDS_TOTAL"])
+    assert.equal(core.errorStatus(core.errorCode(new Error(code))), 400);
+  for (const code of ["COUPON_DUPLICATE", "COUPON_USED", "LIMIT_REACHED"])
+    assert.equal(core.errorStatus(core.errorCode(new Error(code))), 409);
 });
