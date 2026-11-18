@@ -14,7 +14,7 @@ export type WebhookDeps = {
   // null/throwing when the integration is not configured
   asaas: () => Asaas;
   token: string | undefined;
-  notify?: (restaurantId: string, plan: string) => Promise<void>;
+  notify?: (restaurantId: string, plan: string, reactivation?: boolean) => Promise<void>;
   // drops the cached public menu (its plan decides which upsell offers show)
   invalidate?: (restaurantId: string) => Promise<void>;
   // detail: a short reason for `webhook_ignored`, the billing_events id for `webhook_unactivated` and `notify_failed`
@@ -258,7 +258,7 @@ async function applyPatch(
       .in("status", ["ativo", "atrasado"]);
     // Rare race on the last slot: the founder keeps the price, we only record the overflow.
     if (row.founder && (count ?? 0) > 10) deps.log?.("billing.founder_overflow");
-    await deps.notify?.(row.restaurant_id, String(decision.patch.plan ?? row.plan));
+    await deps.notify?.(row.restaurant_id, String(decision.patch.plan ?? row.plan), Boolean(row.reactivated));
     // The first charge went out silently (the buyer was sent straight to the invoice page); from now
     // on Asaas should send renewal invoices. A failure here must not undo the activation.
     if (row.asaas_customer_id) {

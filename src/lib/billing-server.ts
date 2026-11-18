@@ -139,7 +139,7 @@ export async function provisionCheckout(
 }
 
 // Best-effort e-mail to the Fome Play owner on the first activation (Resend REST API).
-export async function notifyNewSubscriber(restaurantId: string, plan: string) {
+export async function notifyNewSubscriber(restaurantId: string, plan: string, reactivation = false) {
   const to = process.env.BILLING_NOTIFY_EMAIL;
   const key = process.env.RESEND_API_KEY;
   if (!to || !key) return;
@@ -151,8 +151,12 @@ export async function notifyNewSubscriber(restaurantId: string, plan: string) {
       body: JSON.stringify({
         from: process.env.BILLING_FROM_EMAIL || "Fome Play <onboarding@resend.dev>",
         to: [to],
-        subject: `Novo assinante: ${data?.name ?? "restaurante"} (${plan})`,
-        text: `Novo assinante: ${data?.name ?? "restaurante"} (${plan}) — fazer implantação.`,
+        subject: reactivation
+          ? `Reativação: ${data?.name ?? "restaurante"} (${plan})`
+          : `Novo assinante: ${data?.name ?? "restaurante"} (${plan})`,
+        text: reactivation
+          ? `Reativação: ${data?.name ?? "restaurante"} (${plan}) — sem implantação.`
+          : `Novo assinante: ${data?.name ?? "restaurante"} (${plan}) — fazer implantação.`,
       }),
       signal: AbortSignal.timeout(10000),
     });

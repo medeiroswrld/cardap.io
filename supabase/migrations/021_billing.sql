@@ -128,7 +128,8 @@ begin
  st := restaurant_billing_state(p_restaurant);
  reset := had and st = 'cancelado';
  if had and not reset and cur.status in ('ativo','atrasado','cortesia') then raise exception 'STATE_CONFLICT'; end if;
- reactivated_ := reset or (had and cur.reactivated);
+ -- only a restaurant that really activated before skips the implantação next time (a refunded, never-activated signup pays it)
+ reactivated_ := (reset and cur.current_period_end is not null) or (had and cur.reactivated);
  holds := had and not reset and cur.founder and cur.status='pendente' and cur.created_at > now() - interval '48 hours';
  eligible := coalesce(p_want_founder,false) and p_plan='profissional' and p_cycle='mensal';
  if not eligible then is_founder := false;

@@ -191,7 +191,7 @@ function setup(row = baseRow(), payments = {}, fail) {
     service: fakeService(db, fail),
     asaas: () => asaas,
     token: TOKEN,
-    notify: async (id, plan) => notified.push([id, plan]),
+    notify: async (id, plan, reactivation) => notified.push(reactivation ? [id, plan, true] : [id, plan]),
     log: (e, r) => logs.push([e, r]),
     today: () => TODAY,
   };
@@ -649,4 +649,13 @@ test("reactivation: first charge is the plan price only (no implantação) and i
   const wrong = setup(baseRow({ reactivated: true, setup_payment_id: "pay_r" }), { pay_r: { ...paid, id: "pay_r", value: 546 } });
   await deliver(wrong.deps, evt("PAYMENT_CONFIRMED", { id: "pay_r", customer: "cus_1", dueDate: "2026-11-20" }));
   assert.equal(wrong.row().status, "pendente");
+});
+
+test("owner notification: reactivated rows are announced as a reactivation, new ones as new subscribers", async () => {
+  const r = setup(baseRow({ reactivated: true }), { pay_1: { ...paid, value: 249 } });
+  await deliver(r.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.deepEqual(r.notified, [[RID, "profissional", true]]);
+  const n = setup(baseRow(), { pay_1: paid });
+  await deliver(n.deps, evt("PAYMENT_CONFIRMED", { id: "pay_1", customer: "cus_1", dueDate: "2026-11-20" }));
+  assert.deepEqual(n.notified, [[RID, "profissional"]]);
 });

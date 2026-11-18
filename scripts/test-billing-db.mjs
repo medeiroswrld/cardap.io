@@ -438,6 +438,13 @@ await ok("start_subscription: founder window is kept on repeat calls, claims are
   assert.equal(row.reactivated, true);
   for (const col of ["asaas_subscription_id", "setup_payment_id", "current_period_end", "cancel_at", "overdue_since", "pending_plan", "pending_cycle", "pending_since"])
     assert.equal(row[col], null, col);
+  // a cancelado row that never activated (no period end, e.g. refunded first charge) still pays the implantação later
+  await root();
+  await db.query("update restaurant_billing set status='cancelado', reactivated=false, current_period_end=null, cancel_at=null where restaurant_id=$1", [ids[0]]);
+  await db.exec("set role service_role");
+  assert.equal((await start(ids[0], "essencial", "mensal", false)).reactivation, false);
+  await root();
+  assert.equal((await db.query("select reactivated from restaurant_billing where restaurant_id=$1", [ids[0]])).rows[0].reactivated, false);
   // a pendente row (retry) keeps the ids it already has
   await db.query("update restaurant_billing set asaas_customer_id='cus_keep', setup_payment_id='pay_keep' where restaurant_id=$1", [ids[4]]);
   await db.exec("set role service_role");
