@@ -51,6 +51,11 @@ export async function createTestDatabase(files = MIGRATIONS) {
  -- Test-only digest stand-in: PGlite lacks pgcrypto. Cryptography is not tested here.
  create function extensions.digest(text,text) returns bytea language sql immutable as $$select convert_to(md5($1),'UTF8')$$;
  grant usage on schema public,auth,storage to anon,authenticated,service_role;
+ -- Emulate Supabase default privileges: new objects in public are granted to all API roles,
+ -- so every explicit revoke in a migration is what actually protects them (as in production).
+ alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+ alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+ alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 `);
   for (const file of files) await applyMigration(db, file);
   return db;

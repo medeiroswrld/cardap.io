@@ -53,15 +53,36 @@ language sql stable security definer set search_path=public as $$
  select case when restaurant_billing_state(p_restaurant) in ('ativo','atrasado','cortesia')
    and (select plan from restaurant_billing where restaurant_id=p_restaurant) in ('profissional','agencia') then 'profissional' else 'essencial' end
 $$;
--- Founder slots (10 total): pending/active/overdue founders that are not effectively cancelled.
+-- Founder slots (10 total): active/overdue founders plus pending ones younger than 48h (so abandoned checkouts
+-- cannot squat a slot), none of them effectively cancelled.
 create function public.founder_slots_left() returns integer
 language sql stable security definer set search_path=public as $$
- select greatest(0,10-(select count(*) from restaurant_billing where founder and status in ('pendente','ativo','atrasado')
+ select greatest(0,10-(select count(*) from restaurant_billing where founder
+   and (status in ('ativo','atrasado') or (status='pendente' and created_at > now() - interval '48 hours'))
    and restaurant_billing_state(restaurant_id)<>'cancelado'))::int
 $$;
-revoke all on function public.restaurant_billing_state(uuid) from public;
-revoke all on function public.restaurant_plan(uuid) from public;
+-- Default privileges on Supabase grant EXECUTE directly to anon, so revoke from anon explicitly.
+revoke all on function public.restaurant_billing_state(uuid) from public, anon;
+revoke all on function public.restaurant_plan(uuid) from public, anon;
 grant execute on function public.restaurant_billing_state(uuid) to authenticated, service_role;
 grant execute on function public.restaurant_plan(uuid) to anon, authenticated, service_role;
-revoke all on function public.founder_slots_left() from public;
+revoke all on function public.founder_slots_left() from public, anon;
 grant execute on function public.founder_slots_left() to anon, authenticated, service_role;
+
+-- Every new restaurant gets a billing row (pendente until checkout).
+create function public.restaurant_billing_init() returns trigger
+language plpgsql security definer set search_path=public as $$
+begin
+ insert into restaurant_billing(restaurant_id,plan,status) values(new.id,'essencial','pendente') on conflict (restaurant_id) do nothing;
+ return new;
+end $$;
+revoke all on function public.restaurant_billing_init() from public, anon, authenticated;
+create trigger restaurants_billing_init after insert on public.restaurants
+ for each row execute function public.restaurant_billing_init();
+
+create function public.restaurant_billing_touch() returns trigger
+language plpgsql set search_path=public as $$
+begin new.updated_at=now(); return new; end $$;
+revoke all on function public.restaurant_billing_touch() from public, anon, authenticated;
+create trigger restaurant_billing_touch before update on public.restaurant_billing
+ for each row execute function public.restaurant_billing_touch();

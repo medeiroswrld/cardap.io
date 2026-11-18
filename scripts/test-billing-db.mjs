@@ -92,6 +92,7 @@ await ok("restaurant without a row is pendente / essencial", async () => {
     "insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa D','bil-d',true,$2)",
     [r4, SP],
   );
+  await db.query("delete from restaurant_billing where restaurant_id=$1", [r4]);
   assert.equal(await state(r4), "pendente");
   assert.equal(await plan(r4), "essencial");
   assert.equal(await state(crypto.randomUUID()), "pendente");
@@ -208,10 +209,7 @@ await ok("founder slots count", async () => {
       "insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa F',$2,true,$3)",
       [id, "bil-f" + i, SP],
     );
-    await db.query(
-      "insert into restaurant_billing(restaurant_id,plan,status,founder) values($1,'essencial','pendente',true)",
-      [id],
-    );
+    await db.query("update restaurant_billing set founder=true where restaurant_id=$1", [id]);
   }
   assert.equal(await rpc("founder_slots_left"), 0);
   await anon();
@@ -250,8 +248,66 @@ await ok("anon permissions", async () => {
     "permission denied",
   );
   await rejects(() => state(r1), "permission denied");
+  await rejects(() => state(crypto.randomUUID()), "permission denied");
   assert.ok(["essencial", "profissional"].includes(await plan(r1)));
   assert.equal(typeof (await rpc("founder_slots_left")), "number");
+});
+
+await ok("onboard_restaurant creates a pendente/essencial billing row via trigger", async () => {
+  const newOwner = "29000000-0000-4000-8000-0000000000c1";
+  await root();
+  await db.query("insert into auth.users values($1)", [newOwner]);
+  await login(newOwner);
+  const { rows } = await db.query("select public.onboard_restaurant('Casa Nova','bil-nova') id");
+  const id = rows[0].id;
+  await root();
+  const b = await db.query("select plan,status,founder,price_cents from restaurant_billing where restaurant_id=$1", [id]);
+  assert.deepEqual({ ...b.rows[0] }, { plan: "essencial", status: "pendente", founder: false, price_cents: 0 });
+  assert.equal(await state(id), "pendente");
+  assert.equal(await plan(id), "essencial");
+  // pre-existing restaurants were not touched by the trigger/backfill
+  assert.equal((await db.query("select count(*)::int n from restaurant_billing where status='cortesia' and plan='profissional'")).rows[0].n >= 1, true);
+  await db.query("delete from restaurants where id=$1", [id]);
+});
+
+await ok("founder pendente expires after 48h; ativo/atrasado never expire", async () => {
+  await root();
+  const id = crypto.randomUUID();
+  await db.query("insert into restaurants(id,name,slug,accepting_orders,timezone) values($1,'Casa G','bil-g',true,$2)", [id, SP]);
+  await db.query("update restaurant_billing set status='cortesia', founder=false");
+  await setBilling(id, "founder=true, status='pendente'");
+  assert.equal(await rpc("founder_slots_left"), 9);
+  await setBilling(id, "created_at=now()-interval '47 hours'");
+  assert.equal(await rpc("founder_slots_left"), 9);
+  await setBilling(id, "created_at=now()-interval '49 hours'");
+  assert.equal(await rpc("founder_slots_left"), 10);
+  await setBilling(id, "status='ativo'");
+  assert.equal(await rpc("founder_slots_left"), 9);
+  await setBilling(id, "status='atrasado', overdue_since=null");
+  assert.equal(await rpc("founder_slots_left"), 9);
+  await db.query("delete from restaurants where id=$1", [id]);
+});
+
+await ok("updated_at trigger bumps on update", async () => {
+  await root();
+  await db.query("update restaurant_billing set updated_at='2000-01-01' where restaurant_id=$1", [r1]);
+  await db.query("update restaurant_billing set updated_at='2000-01-01' where restaurant_id=$1", [r1]);
+  let { rows } = await db.query("select updated_at > now() - interval '1 minute' fresh from restaurant_billing where restaurant_id=$1", [r1]);
+  assert.equal(rows[0].fresh, true);
+  await db.query("update restaurant_billing set price_cents=price_cents where restaurant_id=$1", [r1]);
+  ({ rows } = await db.query("select updated_at > now() - interval '1 minute' fresh from restaurant_billing where restaurant_id=$1", [r1]));
+  assert.equal(rows[0].fresh, true);
+});
+
+await ok("service_role can write billing_events and billing rows", async () => {
+  await root();
+  await db.exec("set role service_role");
+  await db.query("insert into billing_events(id,type,payload) values('svc1','PAYMENT_RECEIVED','{}')");
+  await db.query("update restaurant_billing set status=status where restaurant_id=$1", [r1]);
+  const { rows } = await db.query("select count(*)::int n from billing_events where id='svc1'");
+  assert.equal(rows[0].n, 1);
+  await root();
+  await db.query("delete from billing_events where id='svc1'");
 });
 
 await ok("owner cannot read or write billing_events", async () => {
@@ -273,7 +329,7 @@ await ok("events: duplicate id rejected; event survives restaurant delete", asyn
     db.query("insert into billing_events(id,restaurant_id,type,payload) values('evt1',$1,'x','{}')", [r4]),
   );
   await root();
-  await db.query("insert into restaurant_billing(restaurant_id,plan,status) values($1,'essencial','pendente')", [r4]);
+  await db.query("insert into restaurant_billing(restaurant_id,plan,status) values($1,'essencial','pendente') on conflict (restaurant_id) do nothing", [r4]);
   await db.query("delete from restaurants where id=$1", [r4]);
   const ev = await db.query("select restaurant_id from billing_events where id='evt1'");
   assert.equal(ev.rows[0].restaurant_id, null);
