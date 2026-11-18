@@ -20,6 +20,7 @@ export const MIGRATIONS = [
   "016_menu_start_view.sql",
   "017_results_report.sql",
   "018_menu_theme.sql",
+  "019_coupons_origins.sql",
 ];
 
 // Supabase-owned schemas/roles are represented locally; business SQL is unchanged.
