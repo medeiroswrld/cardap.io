@@ -5607,6 +5607,7 @@ h3,
 
 /* Spec K — Fome Play design system (management area + customer menu without its own theme). */
 html[data-app="gestao"],
+html[data-app="site"],
 html[data-app="menu"]:not([data-own-theme]) {
   --background: #f6f5f3;
   --sidebar: #ffffff;
@@ -5633,6 +5634,7 @@ html[data-app="menu"]:not([data-own-theme]) {
   --font-heading: "Poppins", sans-serif;
 }
 html[data-app="gestao"][data-mode="dark"],
+html[data-app="site"][data-mode="dark"],
 html[data-app="menu"][data-mode="dark"]:not([data-own-theme]) {
   --background: #161618;
   --sidebar: #1f1f22;
@@ -5652,7 +5654,8 @@ html[data-app="menu"][data-mode="dark"]:not([data-own-theme]) {
   --danger-text: #fecaca;
   --card-shadow: none;
 }
-html[data-app="gestao"] body {
+html[data-app="gestao"] body,
+html[data-app="site"] body {
   font-weight: 400;
 }
 .mode-toggle {

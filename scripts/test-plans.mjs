@@ -319,3 +319,38 @@ test("asaas client: 4xx (except auth/404/throttle) is ASAAS_REJECTED, lists subs
   assert.equal(m.calls[1].url, "https://api-sandbox.asaas.com/v3/customers/cus_1");
   assert.deepEqual(JSON.parse(m.calls[1].init.body), { notificationDisabled: false });
 });
+
+const sales = loader()("src/lib/sales.ts");
+test("safeRedirect only allows same-origin paths and https asaas.com", () => {
+  for (const ok of ["/gestao", "/gestao?pagamento=documento", "https://www.asaas.com/i/abc", "https://asaas.com/i/1", "https://sandbox.asaas.com/i/1"])
+    assert.ok(sales.safeRedirect(ok), ok);
+  for (const bad of ["//evil.com", "/\\evil.com", "http://www.asaas.com/i/1", "https://asaas.com.evil.com/i", "https://evilasaas.com/i", "https://user@www.asaas.com/i", "javascript:alert(1)", "", null, 5])
+    assert.equal(sales.safeRedirect(bad), null, String(bad));
+});
+test("agencyWhatsappUrl needs a configured number", () => {
+  assert.equal(sales.agencyWhatsappUrl(undefined), null);
+  assert.equal(sales.agencyWhatsappUrl(""), null);
+  assert.equal(sales.agencyWhatsappUrl("12"), null);
+  const url = sales.agencyWhatsappUrl("+55 (15) 99999-0000");
+  assert.ok(url.startsWith("https://wa.me/5515999990000?text="));
+  assert.ok(url.includes(encodeURIComponent("Oi! Quero saber do plano Agência do Fome Play.")));
+});
+test("brl drops zero cents", () => {
+  assert.match(sales.brl(24900), /^R\$\s?249$/);
+  assert.match(sales.brl(14933), /149,33/);
+});
+
+test("validateSubscription mirrors the API schema", () => {
+  const ok = { restaurantName: "Casa do Chef", ownerName: "Ana", email: "ana@exemplo.com", phone: "(15) 99999-0000", document: "529.982.247-25", password: "12345678", acceptTerms: true };
+  assert.deepEqual(sales.validateSubscription(ok), {});
+  const bad = sales.validateSubscription({ restaurantName: "A", ownerName: "", email: "x", phone: "123", document: "111.111.111-11", password: "1234567", acceptTerms: false });
+  assert.deepEqual(Object.keys(bad).sort(), ["acceptTerms", "document", "email", "ownerName", "password", "phone", "restaurantName"]);
+  assert.deepEqual(sales.validateSubscription({ ...ok, document: "11.222.333/0001-81" }), {});
+});
+test("document and phone masks", () => {
+  assert.equal(sales.formatDocument("52998224725"), "529.982.247-25");
+  assert.equal(sales.formatDocument("11222333000181"), "11.222.333/0001-81");
+  assert.equal(sales.formatDocument("5299"), "529.9");
+  assert.equal(sales.formatPhone("15999990000"), "(15) 99999-0000");
+  assert.equal(sales.formatPhone("1533334444"), "(15) 3333-4444");
+});

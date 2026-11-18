@@ -16,7 +16,7 @@ test("stored choice wins over the system preference", () => {
 test("gestão paths are recognized", () => {
   for (const p of ["/gestao", "/gestao/abc", "/login", "/redefinir-senha", "/demo/gestao", "/demo/gestao/pedidos"])
     assert.equal(m.isGestaoPath(p), true, p);
-  for (const p of ["/", "/r/capiburguer", "/r/demo", "/gestaox", "/privacidade"])
+  for (const p of ["/", "/assinar", "/r/capiburguer", "/r/demo", "/gestaox", "/privacidade"])
     assert.equal(m.isGestaoPath(p), false, p);
 });
 
@@ -25,7 +25,9 @@ test("app scope by path", () => {
     assert.equal(m.appScope(p), "gestao", p);
   for (const p of ["/r/capiburguer", "/r/demo", "/r/demo/pedidos", "/r/x/pedido/123", "/r/x/privacidade"])
     assert.equal(m.appScope(p), "menu", p);
-  for (const p of ["/", "/gestaox", "/r", "/r/", "/privacidade"]) assert.equal(m.appScope(p), null, p);
+  for (const p of ["/gestaox", "/r", "/r/", "/privacidade", "/assinarx", "/assinar-obrigado"]) assert.equal(m.appScope(p), null, p);
+  for (const p of ["/", "/assinar", "/assinar/"]) assert.equal(m.appScope(p), "site", p);
+  assert.equal(m.isGestaoPath("/"), false);
 });
 
 function runScript({ stored, prefersDark, path, storageThrows = false }) {
@@ -43,7 +45,7 @@ function runScript({ stored, prefersDark, path, storageThrows = false }) {
 test("the head script agrees with resolveMode and isGestaoPath", () => {
   for (const stored of ["dark", "light", null, "x"])
     for (const prefersDark of [true, false])
-      for (const path of ["/gestao/1", "/r/capiburguer", "/login", "/"]) {
+      for (const path of ["/gestao/1", "/r/capiburguer", "/login", "/", "/assinar", "/privacidade"]) {
         const r = runScript({ stored, prefersDark, path });
         assert.equal(r.mode, m.resolveMode(stored, prefersDark));
         assert.equal(r.app, m.appScope(path) ?? undefined);

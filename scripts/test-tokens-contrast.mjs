@@ -13,8 +13,8 @@ function block(selector) {
   const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
   return Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 }
-const light = block('html[data-app="gestao"],\nhtml[data-app="menu"]:not([data-own-theme])');
-const dark = { ...light, ...block('html[data-app="gestao"][data-mode="dark"],\nhtml[data-app="menu"][data-mode="dark"]:not([data-own-theme])') };
+const light = block('html[data-app="gestao"],\nhtml[data-app="site"],\nhtml[data-app="menu"]:not([data-own-theme])');
+const dark = { ...light, ...block('html[data-app="gestao"][data-mode="dark"],\nhtml[data-app="site"][data-mode="dark"],\nhtml[data-app="menu"][data-mode="dark"]:not([data-own-theme])') };
 const root = css.match(/:root\s*\{[^}]*\}/g).join("\n");
 const rootVar = (name) => root.match(new RegExp(`${name}:\s*([^;]+);`))?.[1].trim();
 
