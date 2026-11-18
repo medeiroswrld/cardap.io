@@ -1297,6 +1297,23 @@ button:hover:not(:disabled) {
 .print-kit .field-help {
   margin: 0;
 }
+.print-kit .field-help a {
+  color: inherit;
+  text-decoration: underline;
+}
+.print-kit-command {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-all;
+  user-select: all;
+}
 .dialog-heading {
   display: flex;
   align-items: start;

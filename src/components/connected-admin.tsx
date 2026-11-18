@@ -54,6 +54,10 @@ import { ResultsReportPanel } from "./results-report";
 import { ModeToggle } from "./mode-toggle";
 import { AdminOverview } from "./admin-overview";
 type Save = (body: unknown) => Promise<void>;
+// Pasted into Windows + R: downloads the setup script as text (no browser
+// download, so neither the browser nor Windows blocks it) and runs it.
+const PRINT_KIT_COMMAND =
+  "powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ((New-Object Net.WebClient).DownloadString('https://fomeplay.com.br/downloads/impressora.ps1'))\"";
 const pages = [
   ["resumo", "Visão geral", LayoutDashboard],
   ["pedidos", "Pedidos", ShoppingBag],
@@ -77,6 +81,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [printHelp, setPrintHelp] = useState(false);
+  const [printCopied, setPrintCopied] = useState(false);
   const refresh = useCallback(async () => {
     try {
       const next = await requestJson<Workspace>(
@@ -398,7 +403,10 @@ export function ConnectedAdmin({ id }: { id: string }) {
       )}
       <Modal
         open={printHelp}
-        onOpenChange={setPrintHelp}
+        onOpenChange={(open) => {
+          setPrintHelp(open);
+          setPrintCopied(false);
+        }}
         title="Impressão automática sem janela"
       >
         <div className="print-kit">
@@ -407,22 +415,39 @@ export function ConnectedAdmin({ id }: { id: string }) {
             ficam &quot;Recebido&quot;, sem abrir a janela de impressão.
           </p>
           <ol>
-            <li>Baixe o instalador e dê dois cliques nele.</li>
-            <li>Escolha a impressora térmica na lista.</li>
+            <li>
+              No computador da impressora, aperte as teclas{" "}
+              <strong>Windows + R</strong>.
+            </li>
+            <li>
+              Clique em &quot;Copiar comando&quot;, cole na caixa que abriu
+              (Ctrl + V) e aperte Enter.
+            </li>
+            <li>Digite o número da impressora térmica e aperte Enter.</li>
             <li>
               Entre com o e-mail e a senha do restaurante na janela que abrir.
               Pronto: ela abre sozinha quando o computador ligar.
             </li>
           </ol>
-          <Button asChild>
-            <a href="/downloads/fomeplay-impressora.zip" download>
-              Baixar instalador
-            </a>
+          <code className="print-kit-command">{PRINT_KIT_COMMAND}</code>
+          <Button
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(PRINT_KIT_COMMAND)
+                .then(() => setPrintCopied(true))
+                .catch(() => setPrintCopied(false))
+            }
+          >
+            {printCopied ? "Comando copiado" : "Copiar comando"}
           </Button>
           <p className="field-help">
-            Se o Windows mostrar um aviso azul, clique em &quot;Mais
-            informações&quot; e depois em &quot;Executar assim mesmo&quot;.
-            Deixe a janela do Fome Play aberta (pode minimizar).
+            Deixe a janela do Fome Play aberta (pode minimizar). Prefere um
+            arquivo?{" "}
+            <a href="/downloads/fomeplay-impressora.zip" download>
+              Baixar instalador
+            </a>{" "}
+            (se o navegador bloquear, clique em &quot;Manter&quot; no
+            download).
           </p>
         </div>
       </Modal>
