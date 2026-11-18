@@ -1,7 +1,15 @@
 -- N: owner finance — fees, expenses/other income, cash day, month result, bills.
-alter table public.restaurants
- add column card_fee_percent numeric(4,2) not null default 0 check (card_fee_percent between 0 and 15),
- add column pix_fee_percent numeric(4,2) not null default 0 check (pix_fee_percent between 0 and 15);
+-- Fee percents live outside restaurants (publicly selectable): owner-only table.
+create table public.restaurant_finance_settings (
+ restaurant_id uuid primary key references public.restaurants(id) on delete cascade,
+ card_fee_percent numeric(4,2) not null default 0 check (card_fee_percent between 0 and 15),
+ pix_fee_percent numeric(4,2) not null default 0 check (pix_fee_percent between 0 and 15),
+ updated_at timestamptz not null default now()
+);
+alter table public.restaurant_finance_settings enable row level security;
+revoke all on public.restaurant_finance_settings from anon, authenticated;
+grant select on public.restaurant_finance_settings to authenticated;
+create policy owner_read on public.restaurant_finance_settings for select to authenticated using (is_member(restaurant_id, true));
 
 create table public.finance_entries (
  id uuid primary key default gen_random_uuid(),
@@ -14,6 +22,9 @@ create table public.finance_entries (
  due_date date,
  paid_at date,
  created_at timestamptz not null default now(),
+ check (entry_date >= date '2000-01-01' and entry_date <= date '2100-12-31'
+   and (due_date is null or (due_date >= date '2000-01-01' and due_date <= date '2100-12-31'))
+   and (paid_at is null or (paid_at >= date '2000-01-01' and paid_at <= date '2100-12-31'))),
  check ((kind='expense' and category is not null and length(trim(description)) between 2 and 80 and amount_cents <= 100000000 and (paid_at is not null or due_date is not null))
      or (kind='income' and category is null and due_date is null and paid_at = entry_date and length(trim(description)) between 2 and 60 and amount_cents <= 10000000))
 );
@@ -29,10 +40,23 @@ language plpgsql security definer set search_path=public as $$
 begin
  if not is_member(p_restaurant,true) then raise exception 'FORBIDDEN'; end if;
  if p_card is null or p_pix is null or p_card<0 or p_card>15 or p_pix<0 or p_pix>15 then raise exception 'INVALID_INPUT'; end if;
- update restaurants set card_fee_percent=round(p_card,2),pix_fee_percent=round(p_pix,2) where id=p_restaurant;
+ insert into restaurant_finance_settings(restaurant_id,card_fee_percent,pix_fee_percent,updated_at)
+ values(p_restaurant,round(p_card,2),round(p_pix,2),now())
+ on conflict(restaurant_id) do update set card_fee_percent=excluded.card_fee_percent,pix_fee_percent=excluded.pix_fee_percent,updated_at=now();
 end $$;
 revoke all on function public.save_payment_fees(uuid,numeric,numeric) from public,anon;
 grant execute on function public.save_payment_fees(uuid,numeric,numeric) to authenticated;
+
+create function public.get_payment_fees(p_restaurant uuid) returns jsonb
+language plpgsql stable security definer set search_path=public as $$
+declare c numeric; x numeric;
+begin
+ if not is_member(p_restaurant,true) then raise exception 'FORBIDDEN'; end if;
+ select card_fee_percent,pix_fee_percent into c,x from restaurant_finance_settings where restaurant_id=p_restaurant;
+ return jsonb_build_object('card_fee_percent',coalesce(c,0),'pix_fee_percent',coalesce(x,0));
+end $$;
+revoke all on function public.get_payment_fees(uuid) from public,anon;
+grant execute on function public.get_payment_fees(uuid) to authenticated;
 
 create function public.save_finance_entry(p_restaurant uuid,p_id uuid,p_entry jsonb) returns uuid
 language plpgsql security definer set search_path=public as $$
@@ -46,7 +70,9 @@ begin
   insert into finance_entries(id,restaurant_id,kind,description,category,amount_cents,entry_date,due_date,paid_at)
   values(coalesce(p_id,gen_random_uuid()),p_restaurant,'income',trim(p_entry->>'description'),null,(p_entry->>'amount_cents')::int,d,null,d)
   on conflict(id) do update set description=excluded.description,amount_cents=excluded.amount_cents,entry_date=excluded.entry_date,paid_at=excluded.paid_at
+   where finance_entries.restaurant_id=excluded.restaurant_id and finance_entries.kind=excluded.kind
   returning id into saved;
+  if saved is null then raise exception 'NOT_FOUND'; end if;
  else
   paid:=coalesce((p_entry->>'paid')::boolean,false);
   due:=nullif(p_entry->>'due_date','')::date;
@@ -55,7 +81,9 @@ begin
   values(coalesce(p_id,gen_random_uuid()),p_restaurant,'expense',trim(p_entry->>'description'),p_entry->>'category',(p_entry->>'amount_cents')::int,d,due,
    case when paid then coalesce(nullif(p_entry->>'paid_at','')::date,d) end)
   on conflict(id) do update set description=excluded.description,category=excluded.category,amount_cents=excluded.amount_cents,entry_date=excluded.entry_date,due_date=excluded.due_date,paid_at=excluded.paid_at
+   where finance_entries.restaurant_id=excluded.restaurant_id and finance_entries.kind=excluded.kind
   returning id into saved;
+  if saved is null then raise exception 'NOT_FOUND'; end if;
  end if;
  return saved;
 exception when check_violation or not_null_violation or invalid_text_representation or numeric_value_out_of_range or datetime_field_overflow or invalid_datetime_format then raise exception 'INVALID_INPUT';
@@ -78,6 +106,7 @@ language plpgsql security definer set search_path=public as $$
 declare tz text;
 begin
  if not is_member(p_restaurant,true) then raise exception 'FORBIDDEN'; end if;
+ if p_paid is null then raise exception 'INVALID_INPUT'; end if;
  select timezone into tz from restaurants where id=p_restaurant;
  update finance_entries set
   paid_at=case when p_paid then (now() at time zone tz)::date end,
@@ -90,8 +119,9 @@ grant execute on function public.set_entry_paid(uuid,uuid,boolean) to authentica
 
 -- Delivered Fome Play sales in [p_from, p_to) local dates, by method, plus fee estimates.
 create function public.finance_sales(p_restaurant uuid,p_from date,p_to date) returns jsonb
-language sql stable security definer set search_path=public as $$
- with r as (select timezone tz,card_fee_percent cardp,pix_fee_percent pixp from restaurants where id=p_restaurant),
+language sql stable security invoker set search_path=public as $$
+ with r as (select rr.timezone tz,coalesce(f.card_fee_percent,0) cardp,coalesce(f.pix_fee_percent,0) pixp
+   from restaurants rr left join restaurant_finance_settings f on f.restaurant_id=rr.id where rr.id=p_restaurant),
  o as (
   select case when o.fulfillment='mesa' then 'mesa' else coalesce(o.payment_method,'outro') end m,o.total_cents,o.delivery_fee_cents,o.discount_cents
   from orders o,r where o.restaurant_id=p_restaurant and o.status='entregue'
@@ -125,25 +155,25 @@ grant execute on function public.cash_day(uuid,date) to authenticated;
 
 create function public.finance_month(p_restaurant uuid,p_month date) returns jsonb
 language plpgsql stable security definer set search_path=public as $$
-declare m date; prev date; s jsonb; ps jsonb; inc bigint; pinc bigint; exp bigint; pexp bigint; profit bigint; pprofit bigint;
+declare m date; prev date; next_m date; s jsonb; ps jsonb; inc bigint; pinc bigint; exp bigint; pexp bigint; profit bigint; pprofit bigint;
 begin
  if not is_member(p_restaurant,true) then raise exception 'FORBIDDEN'; end if;
  if p_month is null then raise exception 'INVALID_INPUT'; end if;
- m:=date_trunc('month',p_month)::date; prev:=(m-interval '1 month')::date;
- s:=finance_sales(p_restaurant,m,(m+interval '1 month')::date);
+ m:=date_trunc('month',p_month)::date; prev:=(m-interval '1 month')::date; next_m:=(m + interval '1 month')::date;
+ s:=finance_sales(p_restaurant,m,next_m);
  ps:=finance_sales(p_restaurant,prev,m);
- select coalesce(sum(amount_cents) filter (where kind='income' and entry_date>=m and entry_date<m+interval '1 month'),0),
+ select coalesce(sum(amount_cents) filter (where kind='income' and entry_date>=m and entry_date<next_m),0),
         coalesce(sum(amount_cents) filter (where kind='income' and entry_date>=prev and entry_date<m),0),
-        coalesce(sum(amount_cents) filter (where kind='expense' and entry_date>=m and entry_date<m+interval '1 month'),0),
+        coalesce(sum(amount_cents) filter (where kind='expense' and entry_date>=m and entry_date<next_m),0),
         coalesce(sum(amount_cents) filter (where kind='expense' and entry_date>=prev and entry_date<m),0)
-  into inc,pinc,exp,pexp from finance_entries where restaurant_id=p_restaurant and entry_date>=prev and entry_date<m+interval '1 month';
+  into inc,pinc,exp,pexp from finance_entries where restaurant_id=p_restaurant and entry_date>=prev and entry_date<next_m;
  profit:=(s->>'sold_cents')::bigint+inc-(s->>'machine_fee_cents')::bigint-exp;
  pprofit:=(ps->>'sold_cents')::bigint+pinc-(ps->>'machine_fee_cents')::bigint-pexp;
  return jsonb_build_object('month',m,'sales',s,'other_income_cents',inc,'expenses_cents',exp,'profit_cents',profit,'previous_profit_cents',pprofit,
   'by_category',coalesce((select jsonb_agg(jsonb_build_object('category',category,'total_cents',t) order by t desc,category) from
-    (select category,sum(amount_cents)::bigint t from finance_entries where restaurant_id=p_restaurant and kind='expense' and entry_date>=m and entry_date<m+interval '1 month' group by category) c),'[]'::jsonb),
+    (select category,sum(amount_cents)::bigint t from finance_entries where restaurant_id=p_restaurant and kind='expense' and entry_date>=m and entry_date<next_m group by category) c),'[]'::jsonb),
   'entries',coalesce((select jsonb_agg(jsonb_build_object('id',id,'kind',kind,'description',description,'category',category,'amount_cents',amount_cents,'entry_date',entry_date,'due_date',due_date,'paid_at',paid_at) order by entry_date desc,created_at desc) from
-    finance_entries where restaurant_id=p_restaurant and entry_date>=m and entry_date<m+interval '1 month'),'[]'::jsonb));
+    finance_entries where restaurant_id=p_restaurant and entry_date>=m and entry_date<next_m),'[]'::jsonb));
 end $$;
 revoke all on function public.finance_month(uuid,date) from public,anon;
 grant execute on function public.finance_month(uuid,date) to authenticated;

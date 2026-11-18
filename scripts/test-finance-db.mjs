@@ -78,9 +78,22 @@ await login(ownerA);
 await ok("owner saves fees", async () => {
   await rpc("save_payment_fees", a, 3.5, 1);
   await root();
-  const { rows } = await db.query("select card_fee_percent c,pix_fee_percent p from restaurants where id=$1", [a]);
+  const { rows } = await db.query("select card_fee_percent c,pix_fee_percent p from restaurant_finance_settings where restaurant_id=$1", [a]);
   assert.equal(Number(rows[0].c), 3.5);
   assert.equal(Number(rows[0].p), 1);
+  await login(ownerA);
+  const f = await rpc("get_payment_fees", a);
+  assert.equal(Number(f.card_fee_percent), 3.5);
+  assert.equal(Number(f.pix_fee_percent), 1);
+});
+await ok("fees default to zero without a row; other owner cannot read", async () => {
+  await login(ownerB);
+  const f = await rpc("get_payment_fees", b);
+  assert.equal(Number(f.card_fee_percent), 0);
+  assert.equal(Number(f.pix_fee_percent), 0);
+  await rejects(() => rpc("get_payment_fees", a), "FORBIDDEN");
+  const { rows } = await db.query("select * from restaurant_finance_settings");
+  assert.equal(rows.length, 0);
   await login(ownerA);
 });
 await ok("fee validation", async () => {
@@ -155,6 +168,15 @@ await ok("save_finance_entry validations", async () => {
   await rejects(() => rpc("save_finance_entry", a, null, { ...exp, entry_date: "nope" }), "INVALID_INPUT");
   await rejects(() => rpc("save_finance_entry", a, null, { ...exp, kind: "other" }), "INVALID_INPUT");
   await rejects(() => rpc("save_finance_entry", a, null, null), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, {}), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { kind: "income", description: null, amount_cents: null, entry_date: null }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { kind: "expense", description: null, category: null, amount_cents: null, entry_date: null, paid: true }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { ...exp, entry_date: "infinity" }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { ...exp, entry_date: "9999-12-31" }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { ...exp, paid_at: "infinity" }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { ...exp, paid: false, due_date: "9999-12-31" }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { ...exp, entry_date: "1999-12-31" }), "INVALID_INPUT");
+  await rejects(() => rpc("save_finance_entry", a, null, { kind: "income", description: "Ok", amount_cents: 100, entry_date: "9999-12-31" }), "INVALID_INPUT");
   await rejects(() => rpc("save_finance_entry", a, null, { kind: "income", description: "x".repeat(61), amount_cents: 100, entry_date: D }), "INVALID_INPUT");
   await rejects(() => rpc("save_finance_entry", a, null, { kind: "income", description: "Ok", amount_cents: 10000001, entry_date: D }), "INVALID_INPUT");
 });
@@ -250,6 +272,15 @@ await ok("bills_due ordering, due_this_week, recently_paid, set_entry_paid", asy
   assert.equal(r.open.length, 3);
   assert.equal(r.recently_paid.length, 1);
   await rejects(() => rpc("set_entry_paid", a, crypto.randomUUID(), true), "NOT_FOUND");
+  await rejects(() => rpc("set_entry_paid", a, soon, null), "INVALID_INPUT");
+  const noDue = await rpc("save_finance_entry", a, null, { kind: "expense", description: "Paga sem venc", category: "contas", amount_cents: 1000, entry_date: tm5, paid: true });
+  await rpc("set_entry_paid", a, noDue, false);
+  await root();
+  const { rows: nd } = await db.query("select due_date::text d,paid_at from finance_entries where id=$1", [noDue]);
+  assert.equal(nd[0].d, tm5);
+  assert.equal(nd[0].paid_at, null);
+  await login(ownerA);
+  await rpc("delete_finance_entry", a, noDue);
   const inc = await rpc("save_finance_entry", a, null, { kind: "income", description: "Entrada", amount_cents: 100, entry_date: t0 });
   await rejects(() => rpc("set_entry_paid", a, inc, true), "NOT_FOUND");
   await rpc("delete_finance_entry", a, late);
@@ -266,6 +297,11 @@ await ok("staff blocked everywhere and sees no entries", async () => {
   await rejects(() => rpc("finance_month", a, D), "FORBIDDEN");
   await rejects(() => rpc("bills_due", a), "FORBIDDEN");
   await rejects(() => rpc("finance_sales", a, D, D), "permission denied");
+  await rejects(() => rpc("get_payment_fees", a), "FORBIDDEN");
+  const { rows: fr } = await db.query("select * from restaurant_finance_settings");
+  assert.equal(fr.length, 0);
+  const { rows: pub } = await db.query("select * from restaurants where id=$1", [a]);
+  assert.equal("card_fee_percent" in pub[0], false);
   const { rows } = await db.query("select * from finance_entries");
   assert.equal(rows.length, 0);
 });
@@ -296,6 +332,9 @@ await ok("anon denied", async () => {
   ])
     await rejects(() => rpc(fn, ...args), "permission denied");
   await rejects(() => db.query("select * from finance_entries"), "permission denied");
+  await rejects(() => db.query("select * from restaurant_finance_settings"), "permission denied");
+  await rejects(() => rpc("get_payment_fees", a), "permission denied");
+  await rejects(() => rpc("finance_sales", a, D, D), "permission denied");
 });
 
 await root();
