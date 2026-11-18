@@ -51,12 +51,15 @@ import {
   unavailableModeMessage,
 } from "@/lib/fulfillment-draft";
 import {
+  DiscountRow,
   FulfillmentFields,
   FulfillmentTotals,
   MinimumNotice,
 } from "./fulfillment-fields";
 import type { Product } from "@/lib/types";
 import { BagOffers, useBagOffers } from "./bag-offers";
+import { CouponField, isCouponRefreshError, useCoupon } from "./coupon-field";
+import { captureCampaignParams } from "@/lib/campaign-params";
 const categoryIcons: Record<string, typeof Hamburger> = {
   burger: Hamburger,
   fries: Soup,
@@ -121,6 +124,8 @@ export function MenuApp() {
     };
   }, [view, ready, listState]);
   useEffect(() => {
+    // Campaign links: keep ?cupom=/?origem= for the session and clean the URL.
+    if (mode === "connected") captureCampaignParams(slug);
     queueMicrotask(() => {
       const value = Number(
         new URLSearchParams(window.location.search).get("mesa"),
@@ -130,7 +135,7 @@ export function MenuApp() {
         setHasTable(true);
       }
     });
-  }, []);
+  }, [mode, slug]);
   const categories = state.categories.filter(
     (c) =>
       c.visible &&
@@ -967,7 +972,7 @@ function ProductDetail({
 }
 function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
   const router = useRouter();
-  const { state, checkout, mode, slug, online } = useDemo();
+  const { state, checkout, mode, slug, online, restaurantId } = useDemo();
   // The flow is fixed when the checkout opens; a catalog refresh must not
   // silently turn an online order into a table order (or vice versa).
   const [useOnline] = useState(() => !!online && !hasTable);
@@ -987,6 +992,18 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
   const [busy, setBusy] = useState(false);
   const key = useRef<string>("");
   const total = state.bag.reduce((s, i) => s + i.price * i.quantity, 0);
+  const zone = draft && online ? online.zones.find((z) => z.id === draft.zoneId) ?? null : null;
+  const fee = useOnline && draft ? orderTotals(total, draft.fulfillment, zone).fee : 0;
+  // The coupon field only exists for real restaurants (hidden in the demo).
+  const coupon = useCoupon({
+    restaurantId: mode === "connected" ? restaurantId : undefined,
+    slug,
+    subtotal: total,
+    fee,
+  });
+  const discount = coupon.effective
+    ? { code: coupon.effective.code, cents: coupon.discount }
+    : null;
   return (
     <form
       className="form-stack"
@@ -1017,13 +1034,11 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             )
               throw new Error("Confira rua e número do endereço de entrega.");
             choice = draftToChoice(draft, online.zones);
-            const zone =
-              online.zones.find((z) => z.id === draft.zoneId) ?? null;
             if (
               choice.changeFor !== null &&
               !isValidChange(
                 choice.changeFor,
-                orderTotals(total, draft.fulfillment, zone).total,
+                orderTotals(total, draft.fulfillment, zone).total - coupon.discount,
                 choice.payment,
               )
             )
@@ -1031,6 +1046,10 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
                 "O troco precisa ser para um valor igual ou maior que o total.",
               );
           }
+          if (coupon.pendingTyped)
+            throw new Error(
+              "Toque em Aplicar para usar o cupom, ou limpe o campo para continuar sem ele.",
+            );
           if (!key.current) key.current = crypto.randomUUID();
           const order = await checkout({
             name,
@@ -1039,11 +1058,17 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             consent,
             key: key.current,
             online: choice,
+            coupon: coupon.effective
+              ? { code: coupon.effective.code, expectedDiscountCents: coupon.discount }
+              : undefined,
           });
           router.push(`/r/${slug}/pedido/${order.id}`);
         } catch (error) {
-          setError((error as Error).message);
+          const message = (error as Error).message;
+          setError(message);
           setBusy(false);
+          // Price or coupon changed meanwhile: show the current preview.
+          if (isCouponRefreshError(message)) coupon.refresh();
         }
       }}
     >
@@ -1120,16 +1145,31 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
           </div>
         ))}
         {useOnline && draft && online ? (
-          <FulfillmentTotals options={online} draft={draft} subtotal={total} />
+          <FulfillmentTotals
+            options={online}
+            draft={draft}
+            subtotal={total}
+            discount={discount}
+          />
         ) : (
           !useOnline && (
-            <div className="total-row">
-              <span>Total • pagamento no local</span>
-              <strong>{money(total)}</strong>
-            </div>
+            <>
+              {discount && (
+                <div>
+                  <span>Subtotal</span>
+                  <strong>{money(total)}</strong>
+                </div>
+              )}
+              <DiscountRow discount={discount} />
+              <div className="total-row">
+                <span>Total • pagamento no local</span>
+                <strong>{money(total - coupon.discount)}</strong>
+              </div>
+            </>
           )
         )}
       </div>
+      <CouponField coupon={coupon} />
       {useOnline && draft && online && (
         <MinimumNotice options={online} draft={draft} subtotal={total} />
       )}

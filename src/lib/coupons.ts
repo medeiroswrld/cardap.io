@@ -29,6 +29,12 @@ export function exceedsTotal(c: CouponPreview, subtotal: number, fee: number): b
 export function normalizeCode(s: string): string {
   return s.trim().toUpperCase();
 }
+// Same shape the order schema accepts; anything else from a link is ignored.
+export function cleanCouponCode(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const code = normalizeCode(raw);
+  return /^[A-Z0-9]{3,20}$/.test(code) ? code : null;
+}
 export function couponError(code: string, min?: number): string {
   if (code === "COUPON_INVALID") return "Cupom não encontrado.";
   if (code === "COUPON_EXPIRED") return "Este cupom expirou.";

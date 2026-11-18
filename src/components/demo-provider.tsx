@@ -28,6 +28,8 @@ export type Checkout = {
   consent: boolean;
   key: string;
   online?: OnlineChoice;
+  // Coupon the customer saw applied; the server validates it again.
+  coupon?: { code: string; expectedDiscountCents: number };
 };
 export type OnlineChoice =
   | { fulfillment: "retirada"; payment: PaymentMethod; changeFor: number | null }
@@ -47,6 +49,7 @@ export type OnlineChoice =
 type Context = {
   mode: "demo" | "connected";
   slug: string;
+  restaurantId?: string;
   state: DemoState;
   ready: boolean;
   session: string;

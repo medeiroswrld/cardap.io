@@ -74,3 +74,12 @@ test("prepaid Pix orders do not say Pix na hora", () => {
   assert.ok(prepaid.includes("Pix (pago pelo cardápio)"));
   assert.ok(!prepaid.includes("Pix na hora"));
 });
+
+test("ticket shows the coupon discount line and the items subtotal", () => {
+  const html = ticket.ticketHtml({ ...order, total_cents: 5200, coupon_code: "BEM10", discount_cents: 500 }, "Casa", 80);
+  assert.ok(html.includes("Desconto (BEM10)"));
+  assert.match(html, /Subtotal<\/span><span>R\$\s50,00/);
+  assert.match(html, /-R\$\s5,00/);
+  assert.match(html, /TOTAL<\/span><span>R\$\s52,00/);
+  assert.ok(!ticket.ticketHtml(order, "Casa", 80).includes("Desconto"));
+});

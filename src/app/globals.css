@@ -6178,3 +6178,71 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 .section-tabs button { flex: none; border: 0; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; font-weight: 600; background: var(--surface-2); color: var(--text); cursor: pointer; }
 .section-tabs button.active { background: var(--brand); color: var(--brand-contrast); }
 .section-tabs button:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 50%, transparent); outline-offset: 2px; }
+
+/* Spec M — coupon field in the checkout, discount lines. Only always-available tokens (own-theme safe). */
+.coupon-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.coupon-field > label {
+  font-weight: 700;
+  font-size: 11px;
+}
+.coupon-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.coupon-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.coupon-row input::placeholder {
+  text-transform: none;
+}
+.coupon-row .button {
+  flex: none;
+}
+.coupon-applied {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.coupon-applied.is-inactive {
+  background: var(--soft);
+  color: var(--text);
+}
+.coupon-remove {
+  font-size: 11px;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px 2px;
+}
+.coupon-message {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.checkout-summary > .discount-row {
+  color: var(--green);
+}
+.checkout-summary > .discount-row strong {
+  font-variant-numeric: tabular-nums;
+}
+.discount-note {
+  color: var(--green);
+}

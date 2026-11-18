@@ -5,6 +5,7 @@ import { loader } from "./lib/ts-loader.mjs";
 const load = loader();
 const c = load("src/lib/coupons.ts");
 const o = load("src/lib/origins.ts");
+const { orderPayload } = loader()("src/lib/order-payload.ts");
 const pct = { code: "BEMVINDO", kind: "percent", value: 10, min_order_cents: 0, valid_until: null };
 const fixed = { code: "CINCO", kind: "fixed", value: 500, min_order_cents: 2000, valid_until: null };
 
@@ -59,4 +60,40 @@ test("origin labels", () => {
 });
 test("origin link", () => {
   assert.equal(o.originLink("pizzaria", "panfleto"), "https://fomeplay.com.br/r/pizzaria?origem=panfleto");
+});
+
+const baseOrder = {
+  key: "50000000-0000-4000-8000-000000000001",
+  name: "Ana",
+  phone: "11988887777",
+  marketing_consent: false,
+  items: [{ product_id: "40000000-0000-4000-8000-000000000001", quantity: 1, expected_price: 2500, note: "" }],
+  fulfillment: "retirada",
+  payment_method: "pix",
+};
+test("sanitizeOrigin keeps only clean slugs", () => {
+  assert.equal(o.sanitizeOrigin("Instagram"), "instagram");
+  assert.equal(o.sanitizeOrigin("  ifood "), "ifood");
+  assert.equal(o.sanitizeOrigin("a"), null);
+  assert.equal(o.sanitizeOrigin("x".repeat(31)), null);
+  assert.equal(o.sanitizeOrigin("rua do <b>"), null);
+  assert.equal(o.sanitizeOrigin("panfleto_2"), null);
+  assert.equal(o.sanitizeOrigin(null), null);
+});
+test("cleanCouponCode normalizes or drops", () => {
+  assert.equal(c.cleanCouponCode(" bem10 "), "BEM10");
+  assert.equal(c.cleanCouponCode("ab"), null);
+  assert.equal(c.cleanCouponCode("bem 10!"), null);
+});
+test("order schema: malformed origin becomes null, never breaks the order", () => {
+  const r = orderPayload.safeParse({ ...baseOrder, origin: "Não é slug!!" });
+  assert.equal(r.success, true);
+  assert.equal(r.data.origin, null);
+  assert.equal(orderPayload.parse({ ...baseOrder, origin: "instagram" }).origin, "instagram");
+  assert.equal(orderPayload.parse(baseOrder).origin, undefined);
+});
+test("order schema: coupon code is normalized, discount required with it", () => {
+  const ok = orderPayload.parse({ ...baseOrder, coupon_code: " bem10 ", expected_discount_cents: 250 });
+  assert.equal(ok.coupon_code, "BEM10");
+  assert.equal(orderPayload.safeParse({ ...baseOrder, coupon_code: "bem10" }).success, false);
 });

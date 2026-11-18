@@ -190,6 +190,12 @@ export function ConnectedTracking({
                 <strong>{money(item.quantity * item.unit_price_cents)}</strong>
               </div>
             ))}
+            {(order.discount_cents ?? 0) > 0 && (
+              <div className="discount-row">
+                <span>Desconto{order.coupon_code ? ` (${order.coupon_code})` : ""}</span>
+                <strong>−{money(order.discount_cents ?? 0)}</strong>
+              </div>
+            )}
             {order.delivery_fee_cents > 0 && (
               <div>
                 <span>Taxa de entrega</span>

@@ -15,3 +15,10 @@ export function originLabel(slug: string | null, custom: { slug: string; name: s
 export function originLink(restaurantSlug: string, originSlug: string): string {
   return `https://fomeplay.com.br/r/${restaurantSlug}?origem=${encodeURIComponent(originSlug)}`;
 }
+
+// A campaign link can carry anything in ?origem=; only a clean slug is ever stored or sent.
+export function sanitizeOrigin(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const slug = raw.trim().toLowerCase();
+  return /^[a-z0-9-]{2,30}$/.test(slug) ? slug : null;
+}

@@ -160,6 +160,12 @@ export function OrderBoard({
                       {order.delivery_fee_cents > 0 && (
                         <p>Taxa {money(order.delivery_fee_cents)}</p>
                       )}
+                      {(order.discount_cents ?? 0) > 0 && (
+                        <p className="discount-note">
+                          Desconto{order.coupon_code ? ` (${order.coupon_code})` : ""}{" "}
+                          −{money(order.discount_cents ?? 0)}
+                        </p>
+                      )}
                       <strong>{money(order.total_cents)}</strong>
                       {order.cancellation_reason && (
                         <p className="notice">{order.cancellation_reason}</p>

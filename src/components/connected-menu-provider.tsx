@@ -8,6 +8,7 @@ import { ApiRequestError, apiErrorMessages, requestJson } from "@/lib/client-api
 import { ensureGuestSession, forgetGuestSession } from "@/lib/guest-session";
 import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
+import { clearStoredCoupon, readStoredOrigin } from "@/lib/campaign-params";
 export function ConnectedMenuProvider({
   catalog: initialCatalog,
   children,
@@ -175,19 +176,27 @@ export function ConnectedMenuProvider({
       phone: data.phone.replace(/\D/g, ""),
       marketing_consent: data.consent,
     };
+    const campaign: Record<string, unknown> = {};
+    if (data.coupon) {
+      campaign.coupon_code = data.coupon.code;
+      campaign.expected_discount_cents = data.coupon.expectedDiscountCents;
+    }
+    const origin = readStoredOrigin(catalog.restaurant.slug);
+    if (origin) campaign.origin = origin;
     let body: Record<string, unknown>;
     if (!data.online) {
       const table = catalog.tables.find(
         (t) => t.active && t.number === data.table,
       );
       if (!table) throw new Error("Escolha uma mesa válida.");
-      body = { table_id: table.id, ...customer, items };
+      body = { table_id: table.id, ...customer, ...campaign, items };
     } else if (data.online.fulfillment === "retirada") {
       body = {
         fulfillment: "retirada",
         payment_method: data.online.payment,
         change_for_cents: data.online.changeFor,
         ...customer,
+        ...campaign,
         items,
       };
     } else {
@@ -205,6 +214,7 @@ export function ConnectedMenuProvider({
           reference: a.reference.trim(),
         },
         ...customer,
+        ...campaign,
         items,
       };
     }
@@ -255,6 +265,7 @@ export function ConnectedMenuProvider({
       throw error;
     }
     // The server has confirmed: local storage failure must not turn success into a retry.
+    clearStoredCoupon(catalog.restaurant.slug);
     try {
       localStorage.removeItem(pendingKey);
       localStorage.removeItem(bagKey);
@@ -291,6 +302,7 @@ export function ConnectedMenuProvider({
       value={{
         mode: "connected",
         slug: catalog.restaurant.slug,
+        restaurantId: catalog.restaurant.id,
         state,
         ready,
         session: "",

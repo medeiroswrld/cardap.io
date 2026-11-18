@@ -157,10 +157,12 @@ export function FulfillmentTotals({
   options,
   draft,
   subtotal,
+  discount,
 }: {
   options: OnlineOptions;
   draft: FulfillmentDraft;
   subtotal: number;
+  discount?: { code: string; cents: number } | null;
 }) {
   const zone = options.zones.find((z) => z.id === draft.zoneId) ?? null;
   const totals = orderTotals(subtotal, draft.fulfillment, zone);
@@ -170,6 +172,7 @@ export function FulfillmentTotals({
         <span>Subtotal</span>
         <strong>{money(totals.subtotal)}</strong>
       </div>
+      <DiscountRow discount={discount} />
       {draft.fulfillment === "entrega" && (
         <div>
           <span>Taxa de entrega</span>
@@ -178,9 +181,19 @@ export function FulfillmentTotals({
       )}
       <div className="total-row">
         <span>Total • pagamento na {draft.fulfillment === "entrega" ? "entrega" : "retirada"}</span>
-        <strong>{money(totals.total)}</strong>
+        <strong>{money(totals.total - (discount?.cents ?? 0))}</strong>
       </div>
     </>
+  );
+}
+
+export function DiscountRow({ discount }: { discount?: { code: string; cents: number } | null }) {
+  if (!discount || discount.cents <= 0) return null;
+  return (
+    <div className="discount-row">
+      <span>Desconto ({discount.code})</span>
+      <strong>−{money(discount.cents)}</strong>
+    </div>
   );
 }
 

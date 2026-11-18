@@ -15,6 +15,8 @@ export type TicketOrder = {
   customer_phone?: string;
   total_cents: number;
   delivery_fee_cents: number;
+  coupon_code?: string | null;
+  discount_cents?: number;
   payment_method: PaymentMethod | null;
   change_for_cents: number | null;
   estimate_minutes: number | null;
@@ -90,7 +92,9 @@ export function ticketHtml(
       return lines.join("");
     })
     .join("");
-  const subtotal = order.total_cents - order.delivery_fee_cents;
+  const discount = order.discount_cents ?? 0;
+  // total = items - discount + fee, so the items subtotal adds the discount back.
+  const subtotal = order.total_cents - order.delivery_fee_cents + discount;
   const a = order.order_addresses;
   const online = order.fulfillment !== "mesa";
   const parts: string[] = [
@@ -112,11 +116,17 @@ export function ticketHtml(
   }
   if (order.customer_name || (order.fulfillment === "entrega" && a)) parts.push(`<hr>`);
   parts.push(items, `<hr>`);
-  if (order.delivery_fee_cents > 0)
-    parts.push(
-      `<div class="row"><span>Subtotal</span><span>${brl(subtotal)}</span></div>`,
-      `<div class="row"><span>Taxa de entrega</span><span>${brl(order.delivery_fee_cents)}</span></div>`,
-    );
+  if (order.delivery_fee_cents > 0 || discount > 0) {
+    parts.push(`<div class="row"><span>Subtotal</span><span>${brl(subtotal)}</span></div>`);
+    if (discount > 0)
+      parts.push(
+        `<div class="row"><span>Desconto${order.coupon_code ? ` (${e(order.coupon_code)})` : ""}</span><span>-${brl(discount)}</span></div>`,
+      );
+    if (order.delivery_fee_cents > 0)
+      parts.push(
+        `<div class="row"><span>Taxa de entrega</span><span>${brl(order.delivery_fee_cents)}</span></div>`,
+      );
+  }
   parts.push(`<div class="row big"><span>TOTAL</span><span>${brl(order.total_cents)}</span></div>`);
   const prepaidPix =
     order.payment_method === "pix" &&

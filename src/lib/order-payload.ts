@@ -27,14 +27,17 @@ const common = {
     .string()
     .trim()
     .regex(/^[A-Za-z0-9]{3,20}$/)
+    .transform((v) => v.toUpperCase())
     .nullable()
     .optional(),
   expected_discount_cents: z.number().int().min(0).max(10000000).nullable().optional(),
+  // A malformed origin (hand-edited link) must never block an order: it becomes null.
   origin: z
     .string()
     .regex(/^[a-z0-9-]{2,30}$/)
     .nullable()
-    .optional(),
+    .optional()
+    .catch(null),
 };
 const payment = z.enum(["dinheiro", "cartao", "pix"]);
 const change = z.number().int().min(1).max(10000000).nullable().optional();
