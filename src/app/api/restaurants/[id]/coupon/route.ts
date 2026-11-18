@@ -6,7 +6,7 @@ import { rateLimitAddress } from "@/lib/rate-limit-identity";
 import { serviceClient } from "@/lib/supabase/server";
 import { normalizeCode } from "@/lib/coupons";
 import { apiError, noStore } from "@/lib/server-security";
-import { restaurantPlan } from "@/lib/billing-server";
+import { readBilling } from "@/lib/billing-server";
 import { allows } from "@/lib/plans";
 
 // Public preview for the menu. check_coupon is granted to service_role only, so
@@ -26,7 +26,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
       return Response.json({ error: "COUPON_INVALID" }, { status: 400, headers: noStore });
     // Essencial has no coupons: every code is simply unknown.
     const service = serviceClient();
-    if (!allows(await restaurantPlan(id, service), "coupons"))
+    if (!allows((await readBilling(id)).plan, "coupons"))
       return Response.json({ error: "COUPON_INVALID" }, { status: 400, headers: noStore });
     const { data, error } = await service.rpc("check_coupon", {
       p_restaurant: id,

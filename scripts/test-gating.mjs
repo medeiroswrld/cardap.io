@@ -215,7 +215,7 @@ test("every Profissional route calls requirePlan with its feature", () => {
 
 test("public side: coupon preview, orders and catalog follow the plan", () => {
   const coupon = read(`${API}/coupon/route.ts`);
-  assert.match(coupon, /allows\(await restaurantPlan\(id, service\), "coupons"\)[\s\S]*COUPON_INVALID/);
+  assert.match(coupon, /allows\(\(await readBilling\(id\)\)\.plan, "coupons"\)[\s\S]*COUPON_INVALID/);
   assert.ok(coupon.indexOf('"coupons"') < coupon.indexOf('rpc("check_coupon"'));
   const orders = read(`${API}/orders/route.ts`);
   assert.ok(orders.includes("gateOrder(payload, plan, state)"));
@@ -277,9 +277,10 @@ test("orders and workspace read billing through readBilling; the state function 
   assert.match(sql, /grant execute on function public\.restaurant_billing_state\(uuid\) to service_role;/);
 });
 
-test("catalog: a failed plan read serves profissional and is not cached", async () => {
+test("catalog: the plan is read outside the cache; a failed read serves profissional and is never stored", async () => {
   const cache = new Map();
   let planAnswer = { data: null, error: { code: "PGRST202" } };
+  let planCalls = 0;
   const builder = (data) => {
     const b = new Proxy({}, {
       get: (_, key) =>
@@ -291,7 +292,7 @@ test("catalog: a failed plan read serves profissional and is not cached", async 
   };
   const client = {
     from: (table) => builder(table === "restaurants" ? { id: "r1", slug: "casa" } : []),
-    rpc: async (fn) => (fn === "restaurant_plan" ? planAnswer : { data: true, error: null }),
+    rpc: async (fn) => { if (fn === "restaurant_plan") { planCalls++; return planAnswer; } return { data: true, error: null }; },
   };
   const catalogModule = loader({
     "next/cache": { unstable_cache: (fn, key) => async () => { const k = key.join("/"); if (!cache.has(k)) cache.set(k, await fn()); return cache.get(k); } },
@@ -305,9 +306,23 @@ test("catalog: a failed plan read serves profissional and is not cached", async 
   warnings.length = 0;
   const degraded = await catalogModule.readCatalog("casa");
   assert.equal(degraded.plan, "profissional");
-  assert.equal(cache.size, 0); // the degraded answer was not stored
   assert.ok(warnings.some(([e]) => e === "billing.state_unavailable"));
+  // the cached part never holds a plan, so the degraded answer cannot be remembered
+  assert.equal([...cache.values()].some((c) => c && "plan" in c), false);
   planAnswer = { data: "essencial", error: null };
   assert.equal((await catalogModule.readCatalog("casa")).plan, "essencial");
-  assert.equal(cache.size, 1);
+  planAnswer = { data: "profissional", error: null };
+  assert.equal((await catalogModule.readCatalog("casa")).plan, "profissional"); // a plan change shows at once
+  assert.equal(planCalls, 3);
+  assert.equal(cache.size, 1); // the catalog itself stays cached
+});
+
+test("menu_theme on Essencial: the color picker's payload (preset personalizado) saves brand and mode", () => {
+  const picker = { brand: "#c0392b", preset: "personalizado", mode: "light" };
+  assert.deepEqual(p.essencialTheme(picker, {}), { theme: { brand: "#c0392b", mode: "light" }, denied: false });
+  // a real preset still means the Profissional look
+  assert.equal(p.essencialTheme({ ...picker, preset: "noite" }, {}).denied, true);
+  // the stored preset survives a picker save
+  const stored = { preset: "noite", heading_font: "forte" };
+  assert.deepEqual(p.essencialTheme(picker, stored).theme, { preset: "noite", heading_font: "forte", brand: "#c0392b", mode: "light" });
 });

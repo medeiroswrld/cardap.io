@@ -5,7 +5,8 @@ import { unstable_cache } from "next/cache";
 import { isConfigured } from "./supabase/server";
 import { catalogTag } from "./catalog-cache";
 import type { Catalog } from "./connected-types";
-async function fetchCatalog(slug: string): Promise<Catalog | null> {
+type CachedCatalog = Omit<Catalog, "plan">;
+async function fetchCatalog(slug: string): Promise<CachedCatalog | null> {
   const client = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -24,7 +25,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     throw new Error("DATABASE_ERROR");
   }
   if (!restaurant) return null;
-  const [categories, products, media, tables, options, optionLinks, zones, pixEnabled, planResult] =
+  const [categories, products, media, tables, options, optionLinks, zones, pixEnabled] =
     await Promise.all([
       client
         .from("categories")
@@ -70,7 +71,6 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
         .eq("active", true)
         .order("position"),
       client.rpc("restaurant_pix_enabled", { p_restaurant: restaurant.id }),
-      client.rpc("restaurant_plan", { p_restaurant: restaurant.id }),
     ]);
   if (
     [categories, products, media, tables, options, optionLinks, zones].some(
@@ -90,8 +90,7 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
       errorCode: "DATABASE_ERROR",
     });
   }
-  const catalog = {
-    plan: planResult.data === "essencial" ? "essencial" : "profissional",
+  return {
     restaurant,
     options: options.data,
     optionLinks: optionLinks.data,
@@ -101,29 +100,36 @@ async function fetchCatalog(slug: string): Promise<Catalog | null> {
     tables: tables.data,
     zones: zones.data,
     pixOnline: pixEnabled.data === true,
-  } as Catalog;
-  // A failed plan read must not hide offers a paying restaurant is entitled to, nor be remembered for 60 s:
-  // throwing keeps unstable_cache from storing it; readCatalog serves the catalog as profissional.
-  if (planResult.error) throw new PlanUnavailable(catalog);
-  return catalog;
+  } as CachedCatalog;
 }
-export class PlanUnavailable extends Error {
-  constructor(readonly catalog: Catalog) {
-    super("PLAN_UNAVAILABLE");
+
+// The plan is read outside the cached catalog, on every menu load (one small rpc): a failure falls back to
+// profissional (no offers hidden from a paying restaurant) without that answer ever being cached, and a
+// plan change shows at once.
+async function readPlan(restaurantId: string): Promise<Catalog["plan"]> {
+  try {
+    const client = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } },
+    );
+    const { data, error } = await client.rpc("restaurant_plan", { p_restaurant: restaurantId });
+    if (error) throw error;
+    return data === "essencial" ? "essencial" : "profissional";
+  } catch {
+    logger.warn("billing.state_unavailable", { operation: "supabase.catalog", errorCode: "DATABASE_ERROR" });
+    return "profissional";
   }
 }
 
 // Short shared cache for the public menu; invalidated by owner mutations.
-export function readCatalog(slug: string): Promise<Catalog | null> {
+export async function readCatalog(slug: string): Promise<Catalog | null> {
   if (!isConfigured()) throw new Error("INTEGRATION_UNAVAILABLE");
-  // Bump "v4" whenever the Catalog shape changes so old cached entries are ignored.
-  return unstable_cache(() => fetchCatalog(slug), ["catalog", "v4", slug], {
+  // Bump "v5" whenever the cached Catalog shape changes so old cached entries are ignored.
+  const cached = await unstable_cache(() => fetchCatalog(slug), ["catalog", "v5", slug], {
     revalidate: 60,
     tags: [catalogTag(slug)],
-  })().catch((error: unknown) => {
-    const unavailable = error as Partial<PlanUnavailable> | null;
-    if (unavailable?.message !== "PLAN_UNAVAILABLE" || !unavailable.catalog) throw error;
-    logger.warn("billing.state_unavailable", { operation: "supabase.catalog", errorCode: "DATABASE_ERROR" });
-    return unavailable.catalog;
-  });
+  })();
+  if (!cached) return null;
+  return { ...cached, plan: await readPlan(cached.restaurant.id) };
 }

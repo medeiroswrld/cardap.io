@@ -174,6 +174,7 @@ export function essencialTheme(
   let denied = false;
   for (const [key, value] of Object.entries(theme)) {
     if ((BASIC_THEME_KEYS as readonly string[]).includes(key)) kept[key] = value;
+    else if (key === "preset" && value === "personalizado") continue; // the color picker's marker, not a preset
     else if (stored?.[key] !== value) denied = true;
   }
   return { theme: kept, denied };
