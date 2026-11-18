@@ -1,7 +1,8 @@
 // Management sidebar: 6 sections; related pages are tabs inside a section (spec L).
 export type PageKey =
   | "resumo" | "pedidos" | "produtos" | "opcionais" | "categorias" | "qr"
-  | "contatos" | "avaliacoes" | "resultados" | "metricas" | "configuracoes";
+  | "contatos" | "avaliacoes" | "cupons" | "reconquistar"
+  | "resultados" | "metricas" | "origem" | "configuracoes";
 export type SectionKey = "resumo" | "pedidos" | "cardapio" | "clientes" | "relatorios" | "configuracoes";
 export type Section = { key: SectionKey; label: string; pages: PageKey[] };
 
@@ -9,8 +10,8 @@ export const SECTIONS: Section[] = [
   { key: "resumo", label: "Visão geral", pages: ["resumo"] },
   { key: "pedidos", label: "Pedidos", pages: ["pedidos"] },
   { key: "cardapio", label: "Cardápio", pages: ["produtos", "opcionais", "categorias", "qr"] },
-  { key: "clientes", label: "Clientes", pages: ["contatos", "avaliacoes"] },
-  { key: "relatorios", label: "Relatórios", pages: ["resultados", "metricas"] },
+  { key: "clientes", label: "Clientes", pages: ["contatos", "avaliacoes", "cupons", "reconquistar"] },
+  { key: "relatorios", label: "Relatórios", pages: ["resultados", "metricas", "origem"] },
   { key: "configuracoes", label: "Configurações", pages: ["configuracoes"] },
 ];
 

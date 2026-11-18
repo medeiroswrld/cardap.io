@@ -6249,3 +6249,26 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 .discount-note {
   color: var(--green);
 }
+
+/* Cupons, Reconquistar e Origem (gestão) */
+.coupon-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.coupon-row { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.coupon-row p { margin: 0; }
+.coupon-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.coupon-code { font-size: 16px; letter-spacing: 0.04em; }
+.coupon-value { font-weight: 700; color: var(--text); }
+.coupon-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.origin-link { display: block; overflow-wrap: anywhere; font-size: 12px; color: var(--muted); }
+.origin-new { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.origin-new .form-label { flex: 1 1 220px; }
+.win-back-days { width: fit-content; max-width: 100%; }
+.win-back-days > button { font-size: 13px; }
+.win-back-table small { display: block; }
+@media (max-width: 640px) {
+  .win-back-table thead { display: none; }
+  .win-back-table, .win-back-table tbody, .win-back-table tr, .win-back-table td { display: block; width: 100%; }
+  .win-back-table tr { padding: 10px 0; border-top: 1px solid var(--border); }
+  .win-back-table td { border: 0; padding: 3px 0; }
+  .win-back-table td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 12px; }
+  .win-back-table td[data-label="Cliente"]::before { content: none; }
+}

@@ -62,8 +62,10 @@ export function winBackMessage(
   vars: { nome: string; restaurante: string; link: string },
 ): string {
   const first = vars.nome.trim().split(/\s+/)[0] ?? "";
+  // An empty name must not leave "Oi !" behind.
   return template
     .replaceAll("{nome}", first)
+    .replace(/[ 	]+([,!.?])/g, "$1")
     .replaceAll("{restaurante}", vars.restaurante)
     .replaceAll("{link}", vars.link);
 }

@@ -18,6 +18,9 @@ import {
   LayoutDashboard,
   MessageCircle,
   Trophy,
+  Ticket,
+  Megaphone,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import QRCode from "qrcode";
@@ -52,6 +55,9 @@ import { useOrderPrinting } from "./use-order-printing";
 import { isGoogleReviewUrl } from "@/lib/feedback";
 import { FeedbackAdmin } from "./feedback-admin";
 import { ResultsReportPanel } from "./results-report";
+import { CouponsAdmin } from "./coupons-admin";
+import { WinBackPanel } from "./win-back-panel";
+import { OriginsPanel } from "./origins-panel";
 import { ModeToggle } from "./mode-toggle";
 import { AdminOverview } from "./admin-overview";
 import {
@@ -76,6 +82,9 @@ const pages = [
   ["resultados", "Resultados", Trophy],
   ["avaliacoes", "Avaliações", MessageCircle],
   ["contatos", "Clientes", Users],
+  ["cupons", "Cupons", Ticket],
+  ["reconquistar", "Reconquistar", Megaphone],
+  ["origem", "Origem", Compass],
   ["configuracoes", "Configurações", Settings],
   ["qr", "QR das mesas", QrCode],
 ] as const;
@@ -455,6 +464,35 @@ export function ConnectedAdmin({ id }: { id: string }) {
                 <FeedbackAdmin
                   feedback={data.feedback || []}
                   enabled={data.restaurant.feedback_enabled}
+                  save={save}
+                  busy={busy}
+                />
+              )}
+              {owner && page === "cupons" && (
+                <CouponsAdmin
+                  restaurantId={id}
+                  slug={data.restaurant.slug}
+                  timezone={data.restaurant.timezone}
+                  coupons={data.coupons ?? []}
+                  save={save}
+                  busy={busy}
+                />
+              )}
+              {owner && page === "reconquistar" && (
+                <WinBackPanel
+                  restaurantId={id}
+                  restaurantName={data.restaurant.name}
+                  slug={data.restaurant.slug}
+                  timezone={data.restaurant.timezone}
+                  coupons={data.coupons ?? []}
+                />
+              )}
+              {owner && page === "origem" && (
+                <OriginsPanel
+                  restaurantId={id}
+                  slug={data.restaurant.slug}
+                  timezone={data.restaurant.timezone}
+                  origins={data.origins ?? []}
                   save={save}
                   busy={busy}
                 />

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { loader } from "./lib/ts-loader.mjs";
 
 const s = loader()("src/lib/admin-sections.ts");
-const ALL = ["resumo", "pedidos", "produtos", "opcionais", "categorias", "qr", "contatos", "avaliacoes", "resultados", "metricas", "configuracoes"];
+const ALL = ["resumo", "pedidos", "produtos", "opcionais", "categorias", "qr", "contatos", "avaliacoes", "cupons", "reconquistar", "resultados", "metricas", "origem", "configuracoes"];
 
 test("every page belongs to exactly one section", () => {
   for (const page of ALL) {
@@ -18,6 +18,9 @@ test("section of a page", () => {
   assert.equal(s.sectionOf("avaliacoes"), "clientes");
   assert.equal(s.sectionOf("metricas"), "relatorios");
   assert.equal(s.sectionOf("pedidos"), "pedidos");
+  assert.equal(s.sectionOf("cupons"), "clientes");
+  assert.equal(s.sectionOf("reconquistar"), "clientes");
+  assert.equal(s.sectionOf("origem"), "relatorios");
 });
 
 test("staff only see overview and orders", () => {
@@ -25,4 +28,5 @@ test("staff only see overview and orders", () => {
   assert.equal(s.visibleSections(true).length, 6);
   assert.equal(s.pageAllowed("produtos", false), false);
   assert.equal(s.pageAllowed("pedidos", false), true);
+  for (const p of ["cupons", "reconquistar", "origem"]) assert.equal(s.pageAllowed(p, false), false, p);
 });
