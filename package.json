@@ -8,7 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "test:crm": "node --test scripts/test-crm-unit.mjs",
-    "test:online": "node --test scripts/test-online.mjs scripts/test-order-ticket.mjs scripts/test-pix.mjs scripts/test-bag-upsell.mjs scripts/test-opening-hours.mjs scripts/test-results-report.mjs scripts/test-menu-theme.mjs scripts/test-guest-session.mjs scripts/test-color-mode.mjs scripts/test-overview.mjs scripts/test-menu-look.mjs scripts/test-tokens-contrast.mjs",
+    "test:online": "node --test scripts/test-online.mjs scripts/test-order-ticket.mjs scripts/test-pix.mjs scripts/test-bag-upsell.mjs scripts/test-opening-hours.mjs scripts/test-results-report.mjs scripts/test-menu-theme.mjs scripts/test-guest-session.mjs scripts/test-color-mode.mjs scripts/test-overview.mjs scripts/test-menu-look.mjs scripts/test-tokens-contrast.mjs scripts/test-admin-sections.mjs",
     "typecheck": "tsc --noEmit",
     "build:print-kit": "powershell -NoProfile -Command \"Compress-Archive -Force -Path 'scripts/print-kit/Instalar impressao Fome Play.bat' -DestinationPath public/downloads/fomeplay-impressora.zip\"",
     "test": "playwright test",

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   MessageCircle,
   Trophy,
+  type LucideIcon,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { browserClient } from "@/lib/supabase/browser";
@@ -53,6 +54,13 @@ import { FeedbackAdmin } from "./feedback-admin";
 import { ResultsReportPanel } from "./results-report";
 import { ModeToggle } from "./mode-toggle";
 import { AdminOverview } from "./admin-overview";
+import {
+  pageAllowed,
+  sectionOf,
+  visibleSections,
+  type PageKey,
+  type SectionKey,
+} from "@/lib/admin-sections";
 type Save = (body: unknown) => Promise<void>;
 // Pasted into Windows + R: downloads the setup script as text (no browser
 // download, so neither the browser nor Windows blocks it) and runs it.
@@ -71,10 +79,21 @@ const pages = [
   ["configuracoes", "Configurações", Settings],
   ["qr", "QR das mesas", QrCode],
 ] as const;
+const SECTION_ICONS: Record<SectionKey, LucideIcon> = {
+  resumo: LayoutDashboard,
+  pedidos: ShoppingBag,
+  cardapio: Utensils,
+  clientes: Users,
+  relatorios: BarChart3,
+  configuracoes: Settings,
+};
 export function ConnectedAdmin({ id }: { id: string }) {
   const router = useRouter();
   const [data, setData] = useState<Workspace | null>(null);
-  const [page, setPage] = useState("resumo");
+  const [page, setPage] = useState<PageKey>("resumo");
+  const [lastTab, setLastTab] = useState<Partial<Record<SectionKey, PageKey>>>(
+    {},
+  );
   const [crmStamp, setCrmStamp] = useState(0);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -171,9 +190,29 @@ export function ConnectedAdmin({ id }: { id: string }) {
     data?.restaurant.timezone,
   );
   const owner = data?.role === "owner";
-  const allowed = pages.filter(
-    (p) => owner || p[0] === "pedidos" || p[0] === "resumo",
-  );
+  const sections = visibleSections(owner);
+  const section = sections.find((s) => s.key === sectionOf(page));
+  const go = (next: PageKey) => {
+    if (!pageAllowed(next, owner)) return;
+    setPage(next);
+    setLastTab((prev) => ({ ...prev, [sectionOf(next)]: next }));
+  };
+  const onTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!section) return;
+    const step =
+      event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = section.pages.indexOf(page);
+    const next =
+      section.pages[(index + step + section.pages.length) % section.pages.length];
+    go(next);
+    const tabs =
+      event.currentTarget.parentElement?.querySelectorAll<HTMLElement>(
+        "[role=tab]",
+      );
+    tabs?.[section.pages.indexOf(next)]?.focus();
+  };
   return (
     <div className="connected-admin">
       <aside className="connected-sidebar">
@@ -190,17 +229,28 @@ export function ConnectedAdmin({ id }: { id: string }) {
           {owner ? "Gestão do restaurante" : "Operação de pedidos"}
         </span>
         <nav aria-label="Gestão">
-          {allowed.map(([key, label, Icon]) => (
-            <button
-              key={key}
-              className={page === key ? "active" : ""}
-              aria-current={page === key ? "page" : undefined}
-              onClick={() => setPage(key)}
-            >
-              <Icon size={19} />
-              {label}
-            </button>
-          ))}
+          {sections.map((s) => {
+            const Icon = SECTION_ICONS[s.key];
+            const active = sectionOf(page) === s.key;
+            const remembered = lastTab[s.key];
+            return (
+              <button
+                key={s.key}
+                className={active ? "active" : ""}
+                aria-current={active ? "page" : undefined}
+                onClick={() =>
+                  go(
+                    remembered && s.pages.includes(remembered)
+                      ? remembered
+                      : s.pages[0],
+                  )
+                }
+              >
+                <Icon size={19} />
+                {s.label}
+              </button>
+            );
+          })}
         </nav>
         <div className="connected-sidebar-foot">
           <ModeToggle />
@@ -257,6 +307,24 @@ export function ConnectedAdmin({ id }: { id: string }) {
               </p>
             </div>
           </div>
+          {section && section.pages.length > 1 && (
+            <div className="section-tabs" role="tablist" aria-label={section.label}>
+              {section.pages.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="tab"
+                  aria-selected={p === page}
+                  tabIndex={p === page ? 0 : -1}
+                  className={p === page ? "active" : ""}
+                  onClick={() => go(p)}
+                  onKeyDown={onTabKey}
+                >
+                  {pages.find((x) => x[0] === p)?.[1]}
+                </button>
+              ))}
+            </div>
+          )}
           {loading && <p role="status">Carregando seus dados…</p>}
           {error && (
             <div role="alert" className="notice">
@@ -276,7 +344,7 @@ export function ConnectedAdmin({ id }: { id: string }) {
                   <AdminOverview
                     data={data}
                     owner={owner}
-                    onOpenOrders={() => setPage("pedidos")}
+                    onOpenOrders={() => go("pedidos")}
                   />
                   {owner &&
                     (!data.products.length ||
