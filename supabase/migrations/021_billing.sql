@@ -86,3 +86,8 @@ begin new.updated_at=now(); return new; end $$;
 revoke all on function public.restaurant_billing_touch() from public, anon, authenticated;
 create trigger restaurant_billing_touch before update on public.restaurant_billing
  for each row execute function public.restaurant_billing_touch();
+
+-- Hardening (found while emulating Supabase default privileges in tests): 007 granted
+-- select without revoking the defaults, so anon/authenticated also held TRUNCATE etc.
+revoke all on public.product_options, public.product_option_links from anon, authenticated;
+grant select on public.product_options, public.product_option_links to anon, authenticated;
