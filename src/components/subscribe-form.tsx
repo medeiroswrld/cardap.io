@@ -80,7 +80,7 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
       const data = (await res.json().catch(() => ({}))) as { redirect?: string; founder?: boolean; priceCents?: number; error?: string };
       if (!res.ok) {
         const message = typeof data.error === "string" ? data.error : "Não foi possível concluir. Tente novamente.";
-        if (res.status === 409) setFormError({ text: apiErrorMessages.EMAIL_IN_USE ?? message, login: true });
+        if (message === apiErrorMessages.EMAIL_IN_USE) setFormError({ text: message, login: true });
         else if (message === apiErrorMessages.INVALID_DOCUMENT) setServerErrors({ document: message });
         else if (message === apiErrorMessages.WEAK_PASSWORD) setServerErrors({ password: message });
         else setFormError({ text: message });
@@ -135,40 +135,40 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
           )}
         </fieldset>
 
-        <Field label="Nome do restaurante" error={show("restaurantName")}>
-          <input name="restaurantName" autoComplete="organization" value={values.restaurantName} maxLength={80}
-            onChange={(e) => set("restaurantName", e.target.value)} onBlur={() => blur("restaurantName")} />
+        <Field id={`${formId}-restaurantName`} label="Nome do restaurante" error={show("restaurantName")}>
+          {(a) => <input {...a} name="restaurantName" autoComplete="organization" value={values.restaurantName} maxLength={80}
+            onChange={(e) => set("restaurantName", e.target.value)} onBlur={() => blur("restaurantName")} />}
         </Field>
-        <Field label="Seu nome" error={show("ownerName")}>
-          <input name="ownerName" autoComplete="name" value={values.ownerName} maxLength={80}
-            onChange={(e) => set("ownerName", e.target.value)} onBlur={() => blur("ownerName")} />
+        <Field id={`${formId}-ownerName`} label="Seu nome" error={show("ownerName")}>
+          {(a) => <input {...a} name="ownerName" autoComplete="name" value={values.ownerName} maxLength={80}
+            onChange={(e) => set("ownerName", e.target.value)} onBlur={() => blur("ownerName")} />}
         </Field>
         <div className="s-two">
-          <Field label="E-mail" error={show("email")}>
-            <input name="email" type="email" autoComplete="email" inputMode="email" value={values.email} maxLength={254}
-              onChange={(e) => set("email", e.target.value)} onBlur={() => blur("email")} />
+          <Field id={`${formId}-email`} label="E-mail" error={show("email")}>
+            {(a) => <input {...a} name="email" type="email" autoComplete="email" inputMode="email" value={values.email} maxLength={254}
+              onChange={(e) => set("email", e.target.value)} onBlur={() => blur("email")} />}
           </Field>
-          <Field label="WhatsApp" error={show("phone")}>
-            <input name="phone" type="tel" autoComplete="tel-national" inputMode="tel" placeholder="(11) 99999-0000" value={values.phone}
-              onChange={(e) => set("phone", formatPhone(e.target.value))} onBlur={() => blur("phone")} />
+          <Field id={`${formId}-phone`} label="WhatsApp" error={show("phone")}>
+            {(a) => <input {...a} name="phone" type="tel" autoComplete="tel-national" inputMode="tel" placeholder="(11) 99999-0000" value={values.phone}
+              onChange={(e) => set("phone", formatPhone(e.target.value))} onBlur={() => blur("phone")} />}
           </Field>
         </div>
         <div className="s-two">
-          <Field label="CPF ou CNPJ" error={show("document")}>
-            <input name="document" inputMode="numeric" autoComplete="off" value={values.document}
-              onChange={(e) => set("document", formatDocument(e.target.value))} onBlur={() => blur("document")} />
+          <Field id={`${formId}-document`} label="CPF ou CNPJ" error={show("document")}>
+            {(a) => <input {...a} name="document" inputMode="numeric" autoComplete="off" value={values.document}
+              onChange={(e) => set("document", formatDocument(e.target.value))} onBlur={() => blur("document")} />}
           </Field>
-          <Field label="Senha" error={show("password")} hint="Mínimo de 8 caracteres">
-            <input name="password" type="password" autoComplete="new-password" value={values.password} maxLength={128}
-              onChange={(e) => set("password", e.target.value)} onBlur={() => blur("password")} />
+          <Field id={`${formId}-password`} label="Senha" error={show("password")} hint="Mínimo de 8 caracteres">
+            {(a) => <input {...a} name="password" type="password" autoComplete="new-password" value={values.password} maxLength={128}
+              onChange={(e) => set("password", e.target.value)} onBlur={() => blur("password")} />}
           </Field>
         </div>
         <div className="s-terms">
           <label>
-            <input type="checkbox" checked={values.acceptTerms} onChange={(e) => { set("acceptTerms", e.target.checked); blur("acceptTerms"); }} />
+            <input type="checkbox" aria-invalid={show("acceptTerms") ? true : undefined} aria-describedby={show("acceptTerms") ? `${formId}-terms-msg` : undefined} checked={values.acceptTerms} onChange={(e) => { set("acceptTerms", e.target.checked); blur("acceptTerms"); }} />
             <span>Li e aceito a <Link href="/privacidade" target="_blank">Política de Privacidade</Link>.</span>
           </label>
-          {show("acceptTerms") && <p className="s-error" role="alert">{show("acceptTerms")}</p>}
+          {show("acceptTerms") && <p id={`${formId}-terms-msg`} className="s-error" role="alert">{show("acceptTerms")}</p>}
         </div>
       </form>
 
@@ -187,7 +187,6 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
             <span>
               {formError.text}{" "}
               {formError.login && <Link href="/login">Entrar</Link>}
-              {notice && !notice.text && <Link href={notice.href}>Ir para a gestão</Link>}
             </span>
           </p>
         )}
@@ -204,22 +203,36 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
           </div>
         )}
 
-        <button type="submit" form={formId} className="s-btn s-btn-primary s-btn-block" disabled={busy || Boolean(notice)}>
-          {busy ? <Loader2 className="s-spin" size={18} /> : null}
-          {busy ? "Criando sua conta" : <>Ir para o pagamento <ArrowRight size={17} /></>}
-        </button>
+        {notice && !notice.text ? (
+          <Link href={notice.href} className="s-btn s-btn-primary s-btn-block">
+            Ir para a gestão <ArrowRight size={17} />
+          </Link>
+        ) : (
+          <button type="submit" form={formId} className="s-btn s-btn-primary s-btn-block" disabled={busy || Boolean(notice)}>
+            {busy ? <Loader2 className="s-spin" size={18} /> : null}
+            {busy ? "Criando sua conta" : <>Ir para o pagamento <ArrowRight size={17} /></>}
+          </button>
+        )}
         <p className="s-secure"><ShieldCheck size={15} /> Pagamento seguro no Asaas · 30 dias de garantia</p>
       </aside>
     </div>
   );
 }
 
-function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
+type FieldA11y = { id: string; "aria-invalid"?: true; "aria-describedby"?: string };
+
+function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: (a: FieldA11y) => React.ReactNode }) {
+  const msgId = `${id}-msg`;
+  const a: FieldA11y = { id };
+  if (error) a["aria-invalid"] = true;
+  if (error || hint) a["aria-describedby"] = msgId;
   return (
-    <label className={`s-field ${error ? "s-field-bad" : ""}`}>
-      <span>{label}</span>
-      {children}
-      {error ? <em className="s-error" role="alert">{error}</em> : hint ? <em className="s-hint">{hint}</em> : null}
-    </label>
+    <div className="s-field-wrap">
+      <label htmlFor={id} className={`s-field ${error ? "s-field-bad" : ""}`}>
+        <span>{label}</span>
+        {children(a)}
+      </label>
+      {error ? <em id={msgId} className="s-error" role="alert">{error}</em> : hint ? <em id={msgId} className="s-hint">{hint}</em> : null}
+    </div>
   );
 }

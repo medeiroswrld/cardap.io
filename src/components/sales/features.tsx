@@ -9,7 +9,8 @@ const ITEMS = [
 
 export function Features() {
   return (
-    <section className="s-section" aria-label="Diferenciais">
+    <section className="s-section" aria-labelledby="features-title">
+      <h2 id="features-title" className="sr-only">Por que o Fome Play</h2>
       <div className="s-wrap s-features">
         {ITEMS.map(({ icon: Icon, title, text }) => (
           <div className="s-feature" key={title}>

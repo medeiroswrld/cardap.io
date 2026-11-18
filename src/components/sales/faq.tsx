@@ -1,12 +1,12 @@
 import { ChevronDown } from "lucide-react";
 
 export const FAQ_ITEMS = [
-  { q: "Tem comissão?", a: "Não. Você paga só a mensalidade, sem taxa por pedido." },
+  { q: "Tem comissão?", a: "Não há comissão por pedido. Você paga o plano mensal e a implantação, que é um pagamento único." },
   { q: "Preciso de máquina ou app?", a: "Não. Funciona no navegador, no celular ou computador que você já tem." },
   { q: "Como recebo os pedidos?", a: "No painel, com aviso na tela. Dá para imprimir cada pedido." },
   { q: "Posso cancelar?", a: "Sim, quando quiser, pelo painel. O acesso segue até o fim do período pago." },
   { q: "O que é a implantação?", a: "Um pagamento único para deixar seu cardápio configurado e no ar." },
-  { q: "Funciona com meu iFood?", a: "Sim. Você mantém o iFood e leva o cliente a pedir direto no seu link." },
+  { q: "Funciona com meu iFood?", a: "Você continua no iFood e leva o cliente a pedir direto no seu link, sem comissão. Não há integração com o iFood." },
 ];
 
 export function Faq() {
