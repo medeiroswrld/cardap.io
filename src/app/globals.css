@@ -6229,6 +6229,9 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
   text-underline-offset: 3px;
   padding: 6px 2px;
 }
+.coupon-status:empty {
+  margin-top: -8px;
+}
 .coupon-message {
   padding: 10px 12px;
   border-radius: 8px;
@@ -6237,10 +6240,10 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
   background: var(--danger-bg);
   color: var(--danger-text);
 }
-.checkout-summary > .discount-row {
+.discount-row {
   color: var(--green);
 }
-.checkout-summary > .discount-row strong {
+.discount-row strong {
   font-variant-numeric: tabular-nums;
 }
 .discount-note {

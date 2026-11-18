@@ -86,6 +86,18 @@ test("WhatsApp text says Pix was paid through the menu for prepaid orders", () =
   assert.match(text({ ...base, order_status_events: [{ status: "aguardando_pagamento" }] }), /Pix \(pago pelo cardápio\)/);
 });
 
+test("WhatsApp link lists the coupon discount only when the order has one", () => {
+  const base = {
+    number: 7, customer_name: "Ana", customer_phone: "11988887777", fulfillment: "retirada",
+    total_cents: 4131, payment_method: null, change_for_cents: null,
+    items: [{ quantity: 1, product_name: "Burger" }], restaurantName: "Casa X",
+  };
+  const text = (o) => new URL(online.whatsappConfirmationLink(o)).searchParams.get("text");
+  assert.match(text({ ...base, coupon_code: "BEM10", discount_cents: 459 }), /Desconto \(BEM10\): −R\$\s?4,59\nTotal: /);
+  assert.doesNotMatch(text(base), /Desconto/);
+  assert.doesNotMatch(text({ ...base, coupon_code: "BEM10", discount_cents: 0 }), /Desconto/);
+});
+
 test("alert repeats while there are pending orders, unless muted", () => {
   assert.equal(alerts.pendingCount([{ status: "aguardando_aceite" }, { status: "recebido" }]), 1);
   const base = { pending: 1, newOrderIds: [], lastPlayedAt: 0, now: 25000, muted: false };

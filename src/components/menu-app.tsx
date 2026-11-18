@@ -58,7 +58,9 @@ import {
 } from "./fulfillment-fields";
 import type { Product } from "@/lib/types";
 import { BagOffers, useBagOffers } from "./bag-offers";
-import { CouponField, isCouponRefreshError, useCoupon } from "./coupon-field";
+import { CouponField, useCoupon } from "./coupon-field";
+import { isCouponRefreshCode } from "@/lib/coupons";
+import { apiErrorCode } from "@/lib/client-api";
 import { captureCampaignParams } from "@/lib/campaign-params";
 const categoryIcons: Record<string, typeof Hamburger> = {
   burger: Hamburger,
@@ -1009,9 +1011,10 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
       className="form-stack"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (busy) return;
+        if (busy || coupon.busy) return;
         setBusy(true);
         setError("");
+        let couponSent = false;
         try {
           let choice: OnlineChoice | undefined;
           if (useOnline) {
@@ -1051,6 +1054,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
               "Toque em Aplicar para usar o cupom, ou limpe o campo para continuar sem ele.",
             );
           if (!key.current) key.current = crypto.randomUUID();
+          couponSent = !!coupon.effective;
           const order = await checkout({
             name,
             phone,
@@ -1067,8 +1071,8 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
           const message = (error as Error).message;
           setError(message);
           setBusy(false);
-          // Price or coupon changed meanwhile: show the current preview.
-          if (isCouponRefreshError(message)) coupon.refresh();
+          // An order that carried a coupon and failed on price/coupon: show the current preview.
+          if (couponSent && isCouponRefreshCode(apiErrorCode(error))) coupon.refresh();
         }
       }}
     >
@@ -1201,10 +1205,12 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
       <Button
         type="submit"
         className="full-width"
-        disabled={busy || onlineGone}
+        disabled={busy || onlineGone || coupon.busy}
       >
         {busy
           ? "Salvando pedido…"
+          : coupon.busy
+            ? "Aplicando cupom…"
           : mode === "demo"
             ? "Enviar pedido de demonstração"
             : "Enviar pedido"}

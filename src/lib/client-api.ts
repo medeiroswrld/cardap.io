@@ -3,10 +3,14 @@ export class ApiRequestError extends Error {
     message: string,
     public readonly status: number,
     public readonly requestId?: string,
+    public readonly code?: string,
   ) {
     super(requestId ? `${message} Referência: ${requestId}` : message);
     this.name = "ApiRequestError";
   }
+}
+export function apiErrorCode(error: unknown): string | undefined {
+  return error instanceof ApiRequestError ? error.code : undefined;
 }
 export const apiErrorMessages: Record<string, string> = {
   LOW_CONTRAST: "Essas cores deixam o texto difícil de ler. Escolha cores com mais contraste.",
@@ -70,6 +74,9 @@ export async function requestJson<T>(
         : data.error) || "Não foi possível concluir. Tente novamente.",
       response.status,
       requestId,
+      typeof data.error === "string" && Object.hasOwn(apiErrorMessages, data.error)
+        ? data.error
+        : undefined,
     );
   }
   return data as T;

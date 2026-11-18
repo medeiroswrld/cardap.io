@@ -44,6 +44,16 @@ export function couponError(code: string, min?: number): string {
     return "O desconto não pode ser maior que o pedido. Adicione mais itens.";
   return "Não foi possível aplicar o cupom. Tente novamente.";
 }
+export const COUPON_PRICE_CHANGED_TEXT =
+  "O desconto do cupom mudou. Confira o total e envie de novo.";
+// After an order with a coupon fails with these codes, the preview may be stale.
+export function isCouponRefreshCode(code: string | undefined): boolean {
+  return code === "PRICE_CHANGED" || !!code?.startsWith("COUPON_");
+}
+// Only a definitive answer about the code itself discards it; network errors and rate limits keep it for a retry.
+export function dropsCoupon(code: string | undefined): boolean {
+  return code === "COUPON_INVALID" || code === "COUPON_EXPIRED";
+}
 export function couponLink(slug: string, code: string): string {
   return `${SITE_URL}/r/${slug}?cupom=${encodeURIComponent(code)}`;
 }

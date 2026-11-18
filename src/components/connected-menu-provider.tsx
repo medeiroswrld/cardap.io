@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { DemoContext, type Checkout } from "./demo-provider";
 import { catalogState, type Catalog } from "@/lib/connected-types";
 import type { BagItem, DemoState } from "@/lib/types";
-import { ApiRequestError, apiErrorMessages, requestJson } from "@/lib/client-api";
+import { ApiRequestError, requestJson } from "@/lib/client-api";
+import { COUPON_PRICE_CHANGED_TEXT } from "@/lib/coupons";
 import { ensureGuestSession, forgetGuestSession } from "@/lib/guest-session";
 import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
@@ -252,16 +253,23 @@ export function ConnectedMenuProvider({
       // Expired guest session: the next attempt creates a new one.
       if (error instanceof ApiRequestError && error.status === 401)
         forgetGuestSession(catalog.restaurant.id);
-      if (
-        data.online?.fulfillment === "entrega" &&
-        error instanceof ApiRequestError &&
-        error.message.startsWith(apiErrorMessages.PRICE_CHANGED)
-      )
-        throw new ApiRequestError(
-          "Um preço ou a taxa de entrega mudou. Escolha o bairro novamente e confira a sacola para ver o valor atual.",
-          error.status,
-          error.requestId,
-        );
+      // The code (not the text) tells callers what happened; texts below are per mode.
+      if (error instanceof ApiRequestError && error.code === "PRICE_CHANGED") {
+        if (data.coupon)
+          throw new ApiRequestError(
+            COUPON_PRICE_CHANGED_TEXT,
+            error.status,
+            error.requestId,
+            error.code,
+          );
+        if (data.online?.fulfillment === "entrega")
+          throw new ApiRequestError(
+            "Um preço ou a taxa de entrega mudou. Escolha o bairro novamente e confira a sacola para ver o valor atual.",
+            error.status,
+            error.requestId,
+            error.code,
+          );
+      }
       throw error;
     }
     // The server has confirmed: local storage failure must not turn success into a retry.

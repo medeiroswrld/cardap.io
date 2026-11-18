@@ -97,3 +97,25 @@ test("order schema: coupon code is normalized, discount required with it", () =>
   assert.equal(ok.coupon_code, "BEM10");
   assert.equal(orderPayload.safeParse({ ...baseOrder, coupon_code: "bem10" }).success, false);
 });
+
+test("coupon error codes: only invalid/expired drop the code, price and coupon errors refresh", () => {
+  assert.equal(c.dropsCoupon("COUPON_INVALID"), true);
+  assert.equal(c.dropsCoupon("COUPON_EXPIRED"), true);
+  for (const code of [undefined, "RATE_LIMITED", "COUPON_MIN_ORDER", "PRICE_CHANGED"])
+    assert.equal(c.dropsCoupon(code), false);
+  for (const code of ["PRICE_CHANGED", "COUPON_INVALID", "COUPON_EXPIRED", "COUPON_MIN_ORDER", "COUPON_EXCEEDS_TOTAL"])
+    assert.equal(c.isCouponRefreshCode(code), true);
+  for (const code of [undefined, "", "CLOSED", "UNAVAILABLE", "RATE_LIMITED"])
+    assert.equal(c.isCouponRefreshCode(code), false);
+});
+
+test("request errors carry the API code, so rewritten texts cannot hide it", async () => {
+  const api = loader()("src/lib/client-api.ts");
+  const e = new api.ApiRequestError("texto qualquer", 409, undefined, "PRICE_CHANGED");
+  assert.equal(api.apiErrorCode(e), "PRICE_CHANGED");
+  assert.equal(api.apiErrorCode(new Error("x")), undefined);
+  assert.equal(api.apiErrorCode(new api.ApiRequestError("x", 500)), undefined);
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: "PRICE_CHANGED" }), { status: 409, headers: { "content-type": "application/json" } });
+  await assert.rejects(api.requestJson("/x", {}), (err) => api.apiErrorCode(err) === "PRICE_CHANGED");
+});

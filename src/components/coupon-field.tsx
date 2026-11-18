@@ -1,21 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { apiErrorMessages, requestJson } from "@/lib/client-api";
+import { apiErrorCode, requestJson } from "@/lib/client-api";
 import {
   cleanCouponCode,
   couponError,
   discountFor,
+  dropsCoupon,
   exceedsTotal,
   type CouponPreview,
 } from "@/lib/coupons";
 import { clearStoredCoupon, readStoredCoupon, storeCoupon } from "@/lib/campaign-params";
-
-const refreshOn = ["PRICE_CHANGED", "COUPON_INVALID", "COUPON_EXPIRED", "COUPON_MIN_ORDER", "COUPON_EXCEEDS_TOTAL"];
-// Order errors after which the preview may be stale (price, expiry, minimum).
-export function isCouponRefreshError(message: string) {
-  return refreshOn.some((code) => message.startsWith(apiErrorMessages[code]));
-}
 
 export function useCoupon({
   restaurantId,
@@ -32,12 +27,19 @@ export function useCoupon({
   const [preview, setPreview] = useState<CouponPreview | null>(null);
   const [applyError, setApplyError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Last failure was transient (network, rate limit): the code is kept and Aplicar becomes a retry.
+  const [retry, setRetry] = useState(false);
+  // Polite announcements for successes ("aplicado", "removido"); errors go through `message`.
+  const [notice, setNotice] = useState("");
+  const autoApplied = useRef<string | null>(null);
 
   const apply = useCallback(
     async (raw: string) => {
       if (!restaurantId) return;
       const code = cleanCouponCode(raw);
       setApplyError("");
+      setNotice("");
+      setRetry(false);
       if (!code) {
         setPreview(null);
         setApplyError(couponError("COUPON_INVALID"));
@@ -51,10 +53,14 @@ export function useCoupon({
         setPreview(next);
         setInput(next.code);
         storeCoupon(slug, next.code);
+        setNotice(`Cupom ${next.code} aplicado`);
       } catch (error) {
-        setPreview(null);
         setApplyError((error as Error).message);
-        clearStoredCoupon(slug);
+        // Only "not found" / "expired" discard the code; anything else can be retried.
+        if (dropsCoupon(apiErrorCode(error))) {
+          setPreview(null);
+          clearStoredCoupon(slug);
+        } else setRetry(true);
       } finally {
         setBusy(false);
       }
@@ -67,6 +73,10 @@ export function useCoupon({
     if (!restaurantId) return;
     const stored = readStoredCoupon(slug);
     if (!stored) return;
+    // Once per stored code, even if the effect re-runs (StrictMode, apply identity).
+    const mark = `${slug}:${stored}`;
+    if (autoApplied.current === mark) return;
+    autoApplied.current = mark;
     queueMicrotask(() => {
       setInput(stored);
       void apply(stored);
@@ -92,14 +102,20 @@ export function useCoupon({
     discount,
     message: problem || applyError,
     // Typed but never applied (and nothing explaining why): the customer would lose the discount.
-    pendingTyped: !!input.trim() && !preview && !applyError,
+    // While an apply is in flight the submit button is disabled instead (see menu-app).
+    pendingTyped: !!input.trim() && !preview && !applyError && !busy,
     busy,
+    retry,
+    notice,
     apply: () => apply(input),
     remove() {
       setPreview(null);
       setApplyError("");
+      setRetry(false);
       setInput("");
+      setNotice("Cupom removido.");
       clearStoredCoupon(slug);
+      autoApplied.current = null;
     },
     refresh() {
       const code = preview?.code ?? cleanCouponCode(input);
@@ -112,6 +128,7 @@ export type CouponState = ReturnType<typeof useCoupon>;
 export function CouponField({ coupon }: { coupon: CouponState }) {
   if (!coupon.enabled) return null;
   const { preview, message } = coupon;
+  const text = message || coupon.notice;
   return (
     <div className="coupon-field">
       {preview ? (
@@ -120,7 +137,12 @@ export function CouponField({ coupon }: { coupon: CouponState }) {
             Cupom <strong>{preview.code}</strong>
             {coupon.effective ? " aplicado" : ""}
           </span>
-          <button type="button" className="coupon-remove" onClick={coupon.remove}>
+          <button
+            type="button"
+            className="coupon-remove"
+            aria-label={`Remover cupom ${preview.code}`}
+            onClick={coupon.remove}
+          >
             Remover
           </button>
         </div>
@@ -136,6 +158,8 @@ export function CouponField({ coupon }: { coupon: CouponState }) {
               autoComplete="off"
               spellCheck={false}
               placeholder="Digite o código"
+              aria-invalid={message ? true : undefined}
+              aria-describedby={message ? "coupon-message" : undefined}
               onChange={(e) => coupon.setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -150,16 +174,14 @@ export function CouponField({ coupon }: { coupon: CouponState }) {
               disabled={coupon.busy || !coupon.input.trim()}
               onClick={() => void coupon.apply()}
             >
-              {coupon.busy ? "Aplicando…" : "Aplicar"}
+              {coupon.busy ? "Aplicando…" : coupon.retry ? "Tentar de novo" : "Aplicar"}
             </Button>
           </div>
         </>
       )}
-      {message && (
-        <p className="coupon-message" role="status">
-          {message}
-        </p>
-      )}
+      <div id="coupon-message" className="coupon-status" role="status" aria-live="polite">
+        {text && <p className={message ? "coupon-message" : "sr-only"}>{text}</p>}
+      </div>
     </div>
   );
 }

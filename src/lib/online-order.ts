@@ -28,6 +28,8 @@ export type WhatsAppOrder = {
   customer_phone: string;
   fulfillment: Fulfillment;
   total_cents: number;
+  coupon_code?: string | null;
+  discount_cents?: number;
   payment_method: PaymentMethod | null;
   change_for_cents: number | null;
   items: { quantity: number; product_name: string }[];
@@ -71,6 +73,10 @@ export function whatsappConfirmationLink(order: WhatsAppOrder) {
         (order.change_for_cents
           ? ` (troco para ${brl(order.change_for_cents)})`
           : ""),
+    );
+  if ((order.discount_cents ?? 0) > 0)
+    lines.push(
+      `Desconto${order.coupon_code ? ` (${order.coupon_code})` : ""}: −${brl(order.discount_cents ?? 0)}`,
     );
   lines.push(`Total: ${brl(order.total_cents)}`, "Podemos confirmar?");
   return `https://wa.me/55${order.customer_phone}?text=${encodeURIComponent(lines.join("\n"))}`;
