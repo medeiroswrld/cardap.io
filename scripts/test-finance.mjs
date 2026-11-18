@@ -55,3 +55,22 @@ test("finance day validation", () => {
   assert.equal(f.isFinanceDay("2026-02-30"), false);
   assert.equal(f.isFinanceDay("18/11/2026"), false);
 });
+
+test("default cash day before 05:00 local is yesterday", () => {
+  // 07:59Z = 04:59 in Sao Paulo (UTC-3)
+  assert.equal(f.defaultCashDay("2026-11-18T07:59:00Z", "America/Sao_Paulo"), "2026-11-17");
+  assert.equal(f.defaultCashDay("2026-11-18T08:00:00Z", "America/Sao_Paulo"), "2026-11-18");
+  assert.equal(f.defaultCashDay("2026-11-18T03:00:00Z", "America/Sao_Paulo"), "2026-11-17");
+  assert.equal(f.defaultCashDay("2026-11-18T07:59:00Z", "UTC"), "2026-11-18");
+  assert.equal(f.defaultCashDay("2026-11-18T04:59:00Z", "UTC"), "2026-11-17");
+  assert.equal(f.defaultCashDay("2026-11-18T05:00:00Z", "UTC"), "2026-11-18");
+  assert.equal(f.defaultCashDay("2026-12-01T00:30:00Z", "UTC"), "2026-11-30");
+});
+
+test("clamp cash day", () => {
+  assert.equal(f.clampCashDay("2026-11-18", "2026-11-18"), "2026-11-18");
+  assert.equal(f.clampCashDay("2026-11-19", "2026-11-18"), "2026-11-18");
+  assert.equal(f.clampCashDay("2026-01-01", "2026-11-18"), "2026-08-20");
+  assert.equal(f.clampCashDay("", "2026-11-18"), null);
+  assert.equal(f.dayNumber("2026-11-19") - f.dayNumber("2026-11-18"), 1);
+});

@@ -2,17 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
-import { dueLabel, EXPENSE_CATEGORIES, type Bill, type Bills } from "@/lib/finance";
+import { dayNumber, dueLabel, EXPENSE_CATEGORIES, type Bill, type Bills } from "@/lib/finance";
 import { shortDate } from "./coupons-admin";
 import { Button } from "./ui/button";
 
 type Save = (body: unknown) => Promise<void>;
 
 const categoryLabel = (key: string) => EXPENSE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
-function dayNumber(date: string) {
-  const [y, m, d] = date.split("-").map(Number);
-  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
-}
 
 export function FinanceBills({
   restaurantId,
@@ -90,7 +86,13 @@ export function FinanceBills({
         </div>
         <span className={`status-pill tone-${label.tone}`}>{label.text}</span>
         <strong className="fin-bill-amount">{money(b.amount_cents)}</strong>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => void setPaid(b.id, true)}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          aria-label={`Marcar como paga: ${b.description}`}
+          onClick={() => void setPaid(b.id, true)}
+        >
           Marcar como pago
         </Button>
       </li>
@@ -140,7 +142,13 @@ export function FinanceBills({
                     </div>
                     <span className="status-pill tone-success">Paga</span>
                     <strong className="fin-bill-amount">{money(b.amount_cents)}</strong>
-                    <Button variant="outline" size="sm" disabled={busy} onClick={() => void setPaid(b.id, false)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      aria-label={`Desfazer pagamento: ${b.description}`}
+                      onClick={() => void setPaid(b.id, false)}
+                    >
                       Desfazer
                     </Button>
                   </li>

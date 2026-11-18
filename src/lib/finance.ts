@@ -6,7 +6,7 @@ export const EXPENSE_CATEGORIES = [
   { key: "embalagens", label: "Embalagens" },
   { key: "funcionarios", label: "Funcionários" },
   { key: "aluguel", label: "Aluguel" },
-  { key: "contas", label: "Contas (luz, água, internet)" },
+  { key: "contas", label: "Contas (luz, água, gás, internet)" },
   { key: "marketing", label: "Marketing" },
   { key: "impostos", label: "Impostos" },
   { key: "outros", label: "Outros" },
@@ -101,7 +101,7 @@ export function cashSummaryText(day: CashDay, restaurant: string): string {
   return `${restaurant ? `${restaurant} · ` : ""}${head} — ${parts.join(" · ")}`;
 }
 
-function dayNumber(date: string) {
+export function dayNumber(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   return Math.round(Date.UTC(y, m - 1, d) / 86400000);
 }
@@ -130,3 +130,31 @@ export function percentChange(current: number, previous: number): string | null 
 export const isFinanceDay = (value: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
   new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+
+export function addDays(iso: string, days: number) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+function localParts(nowIso: string, timeZone: string) {
+  const at = new Date(nowIso);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+  const hour =
+    Number(new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(at)) % 24;
+  return { day, hour };
+}
+
+// Default day for the cash screen: before 05:00 local the "day" is still last night's service.
+export function defaultCashDay(nowIso: string, timeZone: string): string {
+  const { day, hour } = localParts(nowIso, timeZone);
+  return hour < 5 ? addDays(day, -1) : day;
+}
+
+// Keeps a picked cash day inside [today - 90, today]; null when it is not a valid day.
+export function clampCashDay(value: string, today: string): string | null {
+  if (!isFinanceDay(value)) return null;
+  const min = addDays(today, -90);
+  if (value < min) return min;
+  if (value > today) return today;
+  return value;
+}

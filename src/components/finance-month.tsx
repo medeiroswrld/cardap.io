@@ -35,9 +35,14 @@ export function FinanceMonthPanel({
   save: Save;
   busy: boolean;
 }) {
-  const [options] = useState(() => monthOptions(new Date(), timezone));
-  const [today] = useState(() => todayIn(timezone));
-  const [month, setMonth] = useState(options[0].value);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const options = monthOptions(new Date(now), timezone);
+  const today = todayIn(timezone, new Date(now));
+  const [month, setMonth] = useState(() => monthOptions(new Date(), timezone)[0].value);
   const [report, setReport] = useState<FinanceMonth | null>(null);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -104,7 +109,7 @@ export function FinanceMonthPanel({
           </Button>
         </div>
       </div>
-      {loading && <p role="status">Carregando resultado…</p>}
+      {loading && !report && <p role="status">Carregando…</p>}
       {error && (
         <p role="alert" className="form-error">
           {error}{" "}
@@ -113,13 +118,15 @@ export function FinanceMonthPanel({
           </Button>
         </p>
       )}
-      {report && !loading && (
-        <>
+      {report && (
+        <div className={loading ? "fin-reloading" : undefined} aria-busy={loading}>
           <div className="fin-cards fin-numbers">
             <article className="admin-panel fin-card">
               <span>Receitas</span>
               <strong>{money(revenue)}</strong>
-              <small>Fome Play + outras receitas</small>
+              <small>
+                Fome Play {money(report.sales.sold_cents)} · Outras {money(report.other_income_cents)}
+              </small>
             </article>
             <article className="admin-panel fin-card">
               <span>Taxa da maquininha</span>
@@ -225,7 +232,7 @@ export function FinanceMonthPanel({
               <p className="field-help">Nenhum lançamento neste mês.</p>
             )}
           </div>
-        </>
+        </div>
       )}
       {editing && (
         <EntryForm

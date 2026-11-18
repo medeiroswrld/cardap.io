@@ -21,7 +21,7 @@ export function AdminOverview({
   onOpenOrders: () => void;
   onOpenBills?: () => void;
 }) {
-  const [dueThisWeek, setDueThisWeek] = useState(0);
+  const [dueState, setDueState] = useState<{ key: string; count: number } | null>(null);
   const [query, setQuery] = useState("");
   const restaurantId = data.restaurant.id;
   const [results, setResults] = useState<{
@@ -49,13 +49,14 @@ export function AdminOverview({
     let cancelled = false;
     requestJson<Bills>(`/api/restaurants/${restaurantId}/finance/bills`)
       .then((b) => {
-        if (!cancelled) setDueThisWeek(Number(b.due_this_week) || 0);
+        if (!cancelled) setDueState({ key: restaurantId, count: Number(b.due_this_week) || 0 });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [owner, restaurantId]);
+  const dueThisWeek = dueState && dueState.key === restaurantId ? dueState.count : 0;
   const status = results && results.key === restaurantId ? results.status : "loading";
 
   const open = useMemo(

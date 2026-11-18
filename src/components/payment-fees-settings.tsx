@@ -28,6 +28,8 @@ export function PaymentFeesSettings({
   const [pix, setPix] = useState("");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -36,21 +38,25 @@ export function PaymentFeesSettings({
         if (!active) return;
         setCard(show(Number(fees.card_fee_percent)));
         setPix(show(Number(fees.pix_fee_percent)));
+        setLoadFailed(false);
+        setError("");
         setReady(true);
       })
       .catch(() => {
-        if (active) setError("Não foi possível carregar as taxas agora.");
+        if (!active) return;
+        setLoadFailed(true);
+        setError("Não foi possível carregar as taxas agora.");
       });
     return () => {
       active = false;
     };
-  }, [restaurantId]);
+  }, [restaurantId, attempt]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const cardFee = parsePercent(card);
-    const pixFee = parsePercent(pix);
+    const cardFee = parsePercent(card.trim() === "" ? "0" : card);
+    const pixFee = parsePercent(pix.trim() === "" ? "0" : pix);
     if (cardFee === null || pixFee === null) {
       return setError("Informe taxas de 0 a 15%, com até 2 casas, ex.: 2,99.");
     }
@@ -76,6 +82,22 @@ export function PaymentFeesSettings({
       {error && (
         <p role="alert" className="form-error">
           {error}
+          {loadFailed && !ready && (
+            <>
+              {" "}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setLoadFailed(false);
+                  setError("");
+                  setAttempt((n) => n + 1);
+                }}
+              >
+                Tentar de novo
+              </Button>
+            </>
+          )}
         </p>
       )}
       <Button type="submit" disabled={busy || !ready}>

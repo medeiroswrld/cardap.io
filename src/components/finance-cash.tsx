@@ -4,16 +4,18 @@ import { Copy, Trash2 } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
 import { parseMoneyInput } from "@/lib/coupons";
-import { cashSummaryText, isFinanceDay, METHOD_LABELS, type CashDay } from "@/lib/finance";
+import {
+  addDays,
+  cashSummaryText,
+  clampCashDay,
+  defaultCashDay,
+  METHOD_LABELS,
+  type CashDay,
+} from "@/lib/finance";
 import { todayIn } from "./coupons-admin";
 import { Button } from "./ui/button";
 
 type Save = (body: unknown) => Promise<void>;
-
-export function addDays(iso: string, days: number) {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
 
 export function FinanceCash({
   restaurantId,
@@ -28,8 +30,13 @@ export function FinanceCash({
   save: Save;
   busy: boolean;
 }) {
-  const [today] = useState(() => todayIn(timezone));
-  const [day, setDay] = useState(today);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const today = todayIn(timezone, new Date(now));
+  const [day, setDay] = useState(() => defaultCashDay(new Date().toISOString(), timezone));
   const [report, setReport] = useState<CashDay | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -117,19 +124,25 @@ export function FinanceCash({
             value={day}
             min={addDays(today, -90)}
             max={today}
-            onChange={(e) => isFinanceDay(e.target.value) && setDay(e.target.value)}
+            onChange={(e) => {
+              const next = clampCashDay(e.target.value, today);
+              if (next) setDay(next);
+            }}
           />
         </label>
-        <Button variant="outline" disabled={!report} onClick={() => void copy()}>
-          <Copy size={16} /> Copiar resumo
-        </Button>
-        {note && (
-          <span role="status" className="field-help">
-            {note}
-          </span>
-        )}
+        <div className="fin-toolbar-actions">
+          {note && (
+            <span role="status" className="field-help">
+              {note}
+            </span>
+          )}
+          <Button variant="outline" disabled={!report || loading} onClick={() => void copy()}>
+            <Copy size={16} /> Copiar resumo
+          </Button>
+        </div>
       </div>
-      {loading && <p role="status">Carregando caixa…</p>}
+      <p className="field-help">Conta os pedidos entregues criados entre 00:00 e 23:59 desse dia.</p>
+      {loading && !report && <p role="status">Carregando…</p>}
       {error && (
         <p role="alert" className="form-error">
           {error}{" "}
@@ -138,8 +151,8 @@ export function FinanceCash({
           </Button>
         </p>
       )}
-      {report && !loading && (
-        <>
+      {report && (
+        <div className={loading ? "fin-reloading" : undefined} aria-busy={loading}>
           {hasSales ? (
             <div className="fin-cards">
               {report.methods.map((m) => (
@@ -234,7 +247,7 @@ export function FinanceCash({
               </p>
             )}
           </div>
-        </>
+        </div>
       )}
     </section>
   );
