@@ -6272,7 +6272,16 @@ html[data-app="menu"]:not([data-own-theme]) .tracking-steps > li.done .step-icon
 .win-back-days { width: fit-content; max-width: 100%; }
 .win-back-days > button { font-size: 13px; }
 .win-back-table small { display: block; }
+.win-back-called { color: var(--green); font-size: 12px; margin-bottom: 4px; }
+.win-back-queue { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+.win-back-queue p { margin: 0; }
+.win-back-queue-label { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.win-back-queue-name { display: grid; gap: 2px; }
+.win-back-queue-name strong { font-size: 1.15rem; }
+.win-back-queue-name span { color: var(--muted); font-size: 13px; }
+.win-back-queue-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 @media (max-width: 640px) {
+  .win-back-queue-actions > a { flex: 1 1 100%; justify-content: center; }
   .win-back-table thead { display: none; }
   .win-back-table, .win-back-table tbody, .win-back-table tr, .win-back-table td { display: block; width: 100%; }
   .win-back-table tr { padding: 10px 0; border-top: 1px solid var(--border); }

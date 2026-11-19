@@ -5,6 +5,14 @@ import { money } from "@/lib/utils";
 import { couponLink, whatsappUrl, winBackMessage, SITE_URL, type CouponRow } from "@/lib/coupons";
 import { Button } from "./ui/button";
 import { couponExpired, todayIn } from "./coupons-admin";
+import {
+  contactedRecently,
+  markContacted,
+  nextInQueue,
+  parseLog,
+  storageKey,
+  type ContactedLog,
+} from "@/lib/win-back-queue";
 
 type Lapsed = {
   id: string;
@@ -28,6 +36,11 @@ function dateText(iso: string, timeZone: string) {
   );
 }
 
+function dateLabel(day: string) {
+  const [, m, d] = day.split("-");
+  return `${d}/${m}`;
+}
+
 export function WinBackPanel({
   restaurantId,
   restaurantName,
@@ -49,11 +62,38 @@ export function WinBackPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const latest = useRef(0);
+  const [log, setLog] = useState<ContactedLog>({});
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
+  const [calledNow, setCalledNow] = useState(0);
   const today = todayIn(timezone);
   const usable = coupons.filter((c) => c.active && !couponExpired(c, today));
   const selected = usable.some((c) => c.code === couponCode) ? couponCode : "";
   const text = message ?? (selected ? DEFAULT_MESSAGE : DEFAULT_MESSAGE_NO_COUPON);
   const link = selected ? couponLink(slug, selected) : `${SITE_URL}/r/${slug}`;
+  const chatUrl = (r: Lapsed) =>
+    whatsappUrl(r.phone, winBackMessage(text, { nome: r.name, restaurante: restaurantName, link }));
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        setLog(parseLog(window.localStorage.getItem(storageKey(restaurantId))));
+      } catch {
+        setLog({});
+      }
+    });
+  }, [restaurantId]);
+
+  const remember = (id: string) => {
+    setLog((prev) => {
+      const next = markContacted(prev, id, today);
+      try {
+        window.localStorage.setItem(storageKey(restaurantId), JSON.stringify(next));
+      } catch {
+        // Private mode or blocked storage: the queue still works for this visit.
+      }
+      return next;
+    });
+  };
 
   const load = useCallback(
     async (offset: number) => {
@@ -83,16 +123,34 @@ export function WinBackPanel({
     queueMicrotask(() => {
       setRows([]);
       setTotal(0);
+      setSkipped(new Set());
+      setCalledNow(0);
       void load(0);
     });
   }, [load]);
+
+  const ids = rows.map((r) => r.id);
+  const nextIndex = nextInQueue(ids, log, skipped, today);
+  const current = nextIndex >= 0 ? rows[nextIndex] : null;
+  const pending = rows.filter((r) => !skipped.has(r.id) && !contactedRecently(log, r.id, today)).length;
+  const recent = rows.filter((r) => contactedRecently(log, r.id, today)).length;
+  const moreToLoad = rows.length < total;
+
+  // Reaching the end of the loaded page pulls the next one so the queue keeps going.
+  useEffect(() => {
+    if (!current && moreToLoad && !loading && !error && rows.length > 0) {
+      queueMicrotask(() => void load(rows.length));
+    }
+  }, [current, moreToLoad, loading, error, rows.length, load]);
+
+  const skip = (id: string) => setSkipped((prev) => new Set(prev).add(id));
 
   return (
     <section className="admin-panel connected-panel form-stack" aria-labelledby="winback-title">
       <h2 id="winback-title">Reconquistar clientes</h2>
       <p className="notice small">
         Clientes que autorizaram receber ofertas e não pedem há um tempo. Nada é enviado automaticamente: cada botão abre
-        uma conversa com a mensagem pronta.
+        uma conversa com a mensagem pronta. Use a fila para chamar um cliente atrás do outro.
       </p>
       <div className="segmented-control win-back-days" role="group" aria-label="Sumidos há">
         {DAYS.map((d) => (
@@ -137,6 +195,56 @@ export function WinBackPanel({
           <p role="status" className="field-help">
             {total} {total === 1 ? "cliente sumido" : "clientes sumidos"} há {days} dias ou mais.
           </p>
+          <div className="win-back-queue" aria-live="polite">
+            {current ? (
+              <>
+                <p className="win-back-queue-label">
+                  Próximo da fila{pending > 1 ? ` · faltam ${pending}` : ""}
+                  {moreToLoad ? "+" : ""}
+                </p>
+                <p className="win-back-queue-name">
+                  <strong>{current.name || "Sem nome"}</strong>
+                  <span>
+                    Último pedido {dateText(current.last_order_at, timezone)} · {current.orders_count}{" "}
+                    {current.orders_count === 1 ? "pedido" : "pedidos"} · {money(current.spent_cents)}
+                  </span>
+                </p>
+                <div className="win-back-queue-actions">
+                  <Button asChild>
+                    <a
+                      href={chatUrl(current)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        remember(current.id);
+                        setCalledNow((n) => n + 1);
+                      }}
+                    >
+                      Chamar e ir para o próximo
+                    </a>
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => skip(current.id)}>
+                    Pular
+                  </Button>
+                </div>
+              </>
+            ) : moreToLoad ? (
+              <p role="status">Carregando os próximos…</p>
+            ) : (
+              <p className="win-back-queue-done">
+                <strong>Fila concluída.</strong>{" "}
+                {calledNow > 0
+                  ? `Você chamou ${calledNow} ${calledNow === 1 ? "cliente" : "clientes"} agora.`
+                  : "Todos desta lista já foram chamados nos últimos 7 dias ou pulados."}
+              </p>
+            )}
+            {recent > 0 && (
+              <p className="field-help">
+                {recent} {recent === 1 ? "cliente já chamado" : "clientes já chamados"} nos últimos 7 dias neste
+                aparelho ficam fora da fila.
+              </p>
+            )}
+          </div>
           <div className="crm-table-wrap">
             <table className="overview-table win-back-table">
               <thead>
@@ -161,15 +269,16 @@ export function WinBackPanel({
                     <td data-label="Pedidos">{r.orders_count}</td>
                     <td data-label="Total gasto">{money(r.spent_cents)}</td>
                     <td>
+                      {contactedRecently(log, r.id, today) && (
+                        <small className="win-back-called">Chamado em {dateLabel(log[r.id])}</small>
+                      )}
                       <Button asChild variant="outline" size="sm">
                         <a
-                          href={whatsappUrl(
-                            r.phone,
-                            winBackMessage(text, { nome: r.name, restaurante: restaurantName, link }),
-                          )}
+                          href={chatUrl(r)}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Chamar ${r.name || "cliente"} no WhatsApp`}
+                          onClick={() => remember(r.id)}
                         >
                           Chamar no WhatsApp
                         </a>
