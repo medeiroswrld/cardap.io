@@ -40,16 +40,16 @@ const t = loader()("src/lib/turnstile.ts");
 const ok = (body) => async () => new Response(JSON.stringify(body), { status: 200 });
 
 test("verifyHuman is off without a secret", async () => {
-  await t.verifyHuman(undefined, null, { secret: "" });
+  await t.verifyHuman(undefined, null, { secret: "", siteKey: "" });
 });
 test("verifyHuman requires a token once configured", async () => {
-  await assert.rejects(t.verifyHuman(undefined, null, { secret: "s", fetcher: ok({ success: true }) }), /HUMAN_CHECK_FAILED/);
-  await assert.rejects(t.verifyHuman("", null, { secret: "s", fetcher: ok({ success: true }) }), /HUMAN_CHECK_FAILED/);
+  await assert.rejects(t.verifyHuman(undefined, null, { secret: "s", siteKey: "k", fetcher: ok({ success: true }) }), /HUMAN_CHECK_FAILED/);
+  await assert.rejects(t.verifyHuman("", null, { secret: "s", siteKey: "k", fetcher: ok({ success: true }) }), /HUMAN_CHECK_FAILED/);
 });
 test("verifyHuman accepts success and rejects failure", async () => {
   let sent;
   await t.verifyHuman("tok", "1.2.3.4", {
-    secret: "s",
+    secret: "s", siteKey: "k",
     fetcher: async (_url, init) => {
       sent = init.body.toString();
       return new Response(JSON.stringify({ success: true }));
@@ -57,15 +57,32 @@ test("verifyHuman accepts success and rejects failure", async () => {
   });
   assert.match(sent, /secret=s/);
   assert.match(sent, /remoteip=1.2.3.4/);
-  await assert.rejects(t.verifyHuman("tok", null, { secret: "s", fetcher: ok({ success: false }) }), /HUMAN_CHECK_FAILED/);
+  await assert.rejects(t.verifyHuman("tok", null, { secret: "s", siteKey: "k", fetcher: ok({ success: false }) }), /HUMAN_CHECK_FAILED/);
 });
 test("verifyHuman reports an outage separately", async () => {
   await assert.rejects(
-    t.verifyHuman("tok", null, { secret: "s", fetcher: async () => { throw new Error("down"); } }),
+    t.verifyHuman("tok", null, { secret: "s", siteKey: "k", fetcher: async () => { throw new Error("down"); } }),
     /HUMAN_CHECK_UNAVAILABLE/,
   );
   await assert.rejects(
-    t.verifyHuman("tok", null, { secret: "s", fetcher: async () => new Response("x", { status: 500 }) }),
+    t.verifyHuman("tok", null, { secret: "s", siteKey: "k", fetcher: async () => new Response("x", { status: 500 }) }),
     /HUMAN_CHECK_UNAVAILABLE/,
   );
+});
+test("verifyHuman with only one key set", async () => {
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    await t.verifyHuman(undefined, null, { secret: "s", siteKey: "" }); // widget hidden: do not lock everyone out
+    await assert.rejects(t.verifyHuman("tok", null, { secret: "", siteKey: "k" }), /HUMAN_CHECK_UNAVAILABLE/);
+  } finally {
+    console.error = quiet;
+  }
+});
+test("verifyHuman rejects a token minted for another action", async () => {
+  await assert.rejects(
+    t.verifyHuman("tok", null, { secret: "s", siteKey: "k", fetcher: ok({ success: true, action: "login" }) }),
+    /HUMAN_CHECK_FAILED/,
+  );
+  await t.verifyHuman("tok", null, { secret: "s", siteKey: "k", fetcher: ok({ success: true, action: "assinar" }) });
 });

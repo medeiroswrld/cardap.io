@@ -1,4 +1,5 @@
 "use client";
+import { ACTION } from "@/lib/turnstile";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
 // Cloudflare Turnstile widget. Renders nothing when NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set.
@@ -64,7 +65,7 @@ export const HumanCheck = forwardRef<
         widget.current = api.render(box.current, {
           sitekey: TURNSTILE_SITE_KEY,
           language: "pt-br",
-          action: "assinar",
+          action: ACTION,
           callback: (token: string) => callbacks.current.onToken(token),
           "expired-callback": () => callbacks.current.onToken(""),
           "error-callback": () => {

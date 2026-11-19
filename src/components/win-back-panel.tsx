@@ -65,6 +65,8 @@ export function WinBackPanel({
   const [log, setLog] = useState<ContactedLog>({});
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
   const [calledNow, setCalledNow] = useState(0);
+  // A later page that adds nobody new (list shifted while paging) stops the auto-load.
+  const [stalled, setStalled] = useState(false);
   const today = todayIn(timezone);
   const usable = coupons.filter((c) => c.active && !couponExpired(c, today));
   const selected = usable.some((c) => c.code === couponCode) ? couponCode : "";
@@ -109,7 +111,9 @@ export function WinBackPanel({
         setRows((prev) => {
           if (offset === 0) return page.rows;
           const seen = new Set(prev.map((r) => r.id));
-          return [...prev, ...page.rows.filter((r) => !seen.has(r.id))];
+          const fresh = page.rows.filter((r) => !seen.has(r.id));
+          if (fresh.length === 0) setStalled(true);
+          return [...prev, ...fresh];
         });
       } catch {
         if (id === latest.current) setError("Não foi possível carregar a lista. Tente novamente.");
@@ -125,6 +129,7 @@ export function WinBackPanel({
       setTotal(0);
       setSkipped(new Set());
       setCalledNow(0);
+      setStalled(false);
       void load(0);
     });
   }, [load]);
@@ -134,7 +139,7 @@ export function WinBackPanel({
   const current = nextIndex >= 0 ? rows[nextIndex] : null;
   const pending = rows.filter((r) => !skipped.has(r.id) && !contactedRecently(log, r.id, today)).length;
   const recent = rows.filter((r) => contactedRecently(log, r.id, today)).length;
-  const moreToLoad = rows.length < total;
+  const moreToLoad = rows.length < total && !stalled;
 
   // Reaching the end of the loaded page pulls the next one so the queue keeps going.
   useEffect(() => {
@@ -278,7 +283,10 @@ export function WinBackPanel({
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Chamar ${r.name || "cliente"} no WhatsApp`}
-                          onClick={() => remember(r.id)}
+                          onClick={() => {
+                            if (!contactedRecently(log, r.id, today)) setCalledNow((n) => n + 1);
+                            remember(r.id);
+                          }}
                         >
                           Chamar no WhatsApp
                         </a>
