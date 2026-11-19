@@ -97,6 +97,8 @@ export const errorCodes = [
   "FOUNDER_CONFIRM_REQUIRED",
   "WEAK_PASSWORD",
   "ASAAS_REJECTED",
+  "HUMAN_CHECK_FAILED",
+  "HUMAN_CHECK_UNAVAILABLE",
   "23505",
   "42501",
   "PGRST116",
@@ -278,6 +280,7 @@ export function errorStatus(code: ErrorCode) {
       "INVALID_CHANGE",
       "AUTH_REJECTED",
       "VIDEO_UPLOAD_INCOMPLETE",
+      "HUMAN_CHECK_FAILED",
     ].includes(code)
   )
     return 400;
@@ -291,6 +294,7 @@ export function errorStatus(code: ErrorCode) {
       "VIDEO_STORAGE_UNAVAILABLE",
       "AUTH_UNAVAILABLE",
       "BILLING_UNAVAILABLE",
+      "HUMAN_CHECK_UNAVAILABLE",
     ].includes(code)
   )
     return 503;

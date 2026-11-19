@@ -41,6 +41,7 @@ export const apiErrorMessages: Record<string, string> = {
   PLAN_REQUIRED: "Disponível no plano Profissional.",
   ASAAS_REJECTED: "O Asaas recusou a operação. Confira os dados e tente de novo.",
   EMAIL_IN_USE: "Este e-mail já tem conta. Entre para continuar.",
+  HUMAN_CHECK_FAILED: "Não conseguimos confirmar que você não é um robô. Marque a verificação e tente de novo.",
   INVALID_DOCUMENT: "CPF ou CNPJ inválido.",
   BILLING_UNAVAILABLE: "Assinaturas indisponíveis no momento. Fale com a gente.",
   FOUNDER_CONFIRM_REQUIRED:

@@ -158,3 +158,10 @@ test("order payload: table orders unchanged, online orders need payment and addr
   assert.equal(orderSchema.orderPayload.safeParse({ ...base, fulfillment: "retirada", payment_method: "pix", expected_fee_cents: 0 }).success, false);
   assert.equal(orderSchema.orderPayload.safeParse({ ...delivery, payment_method: "pix", change_for_cents: null, table_id: table.table_id }).success, false);
 });
+
+test("CSP allows only the Turnstile script and frame host beyond self", () => {
+  const csp = security.contentSecurityPolicy({ dev: false });
+  assert.match(csp, /script-src 'self' 'unsafe-inline' https:\/\/challenges\.cloudflare\.com;/);
+  assert.match(csp, /frame-src https:\/\/challenges\.cloudflare\.com;/);
+  assert.match(csp, /frame-ancestors 'none'/);
+});

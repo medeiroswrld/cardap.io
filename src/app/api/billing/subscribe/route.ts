@@ -8,6 +8,8 @@ import { asaasConfigFromEnv, asaasFromEnv } from "@/lib/asaas";
 import { isValidDocument, normalizeDocument, normalizePhone } from "@/lib/cpf-cnpj";
 import { slugFromName } from "@/lib/plans";
 import { provisionCheckout } from "@/lib/billing-server";
+import { verifyHuman } from "@/lib/turnstile";
+import { rateLimitAddress } from "@/lib/rate-limit-identity";
 
 const schema = z.object({
   plan: z.enum(["essencial", "profissional"]),
@@ -26,6 +28,7 @@ const schema = z.object({
     .refine(isValidDocument, "INVALID_DOCUMENT"),
   password: z.string().min(8).max(128),
   acceptTerms: z.literal(true),
+  humanToken: z.string().max(2048).optional(),
 });
 
 async function createOwnerAccount(email: string, password: string, name: string) {
@@ -72,6 +75,8 @@ async function handlePOST(request: Request) {
     checkOrigin(request);
     await enforceBillingLimit(request);
     const input = schema.parse(await request.json());
+    const ip = rateLimitAddress(request.headers, Boolean(process.env.VERCEL));
+    await verifyHuman(input.humanToken, ip === "shared-origin" ? null : ip);
     // Fail before creating anything when billing is not configured.
     if (!asaasConfigFromEnv()) throw new Error("BILLING_UNAVAILABLE");
     const userId = await createOwnerAccount(input.email, input.password, input.ownerName);

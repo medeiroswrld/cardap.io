@@ -28,6 +28,8 @@ function supabaseOrigins(url?: string) {
   }
 }
 
+const TURNSTILE = "https://challenges.cloudflare.com";
+
 export function contentSecurityPolicy(o: SecurityHeaderOptions) {
   const supabase = supabaseOrigins(o.supabaseUrl);
   const stream = o.legacyStream ? STREAM_HOSTS : [];
@@ -35,7 +37,7 @@ export function contentSecurityPolicy(o: SecurityHeaderOptions) {
     "default-src": ["'self'"],
     // App Router inline bootstrap scripts need 'unsafe-inline' without nonces;
     // nonces would force dynamic rendering of every page.
-    "script-src": ["'self'", "'unsafe-inline'", ...(o.dev ? ["'unsafe-eval'"] : [])],
+    "script-src": ["'self'", "'unsafe-inline'", ...(o.dev ? ["'unsafe-eval'"] : []), TURNSTILE],
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", ...supabase.http, ...stream],
     "media-src": ["'self'", "blob:", ...supabase.http, ...stream],
@@ -46,6 +48,8 @@ export function contentSecurityPolicy(o: SecurityHeaderOptions) {
       ...stream,
       ...(o.dev ? ["ws:"] : []),
     ],
+    // Cloudflare Turnstile (anti-bot check on /assinar) renders in an iframe.
+    "frame-src": [TURNSTILE],
     "font-src": ["'self'", "data:"],
     "worker-src": ["'self'", "blob:"],
     "frame-ancestors": ["'none'"],

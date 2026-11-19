@@ -23,6 +23,7 @@ import {
   type SubscribeErrors,
   type SubscribeFields,
 } from "@/lib/sales";
+import { HumanCheck, TURNSTILE_SITE_KEY, type HumanCheckHandle } from "./human-check";
 
 const PLAN_NAMES: Record<SellablePlan, string> = { essencial: "Essencial", profissional: "Profissional" };
 const EMPTY: SubscribeFields = { restaurantName: "", ownerName: "", email: "", phone: "", document: "", password: "", acceptTerms: false };
@@ -45,6 +46,9 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const humanCheck = useRef<HumanCheckHandle>(null);
+  const [humanToken, setHumanToken] = useState("");
+  const [humanError, setHumanError] = useState("");
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const expectFounder = founderLeft > 0 && plan === "profissional" && cycle === "mensal";
@@ -69,16 +73,22 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
     if (busy || notice) return;
     setTouched({ restaurantName: true, ownerName: true, email: true, phone: true, document: true, password: true, acceptTerms: true });
     if (Object.keys(validateSubscription(values)).length) return;
+    if (TURNSTILE_SITE_KEY && !humanToken) {
+      setHumanError("Marque a verificação \"Não sou um robô\" para continuar.");
+      return;
+    }
     setBusy(true);
     setFormError(null);
     try {
       const res = await fetch("/api/billing/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, cycle, ...values, acceptTerms: true }),
+        body: JSON.stringify({ plan, cycle, ...values, acceptTerms: true, humanToken: humanToken || undefined }),
       });
       const data = (await res.json().catch(() => ({}))) as { redirect?: string; founder?: boolean; priceCents?: number; error?: string };
       if (!res.ok) {
+        // A Turnstile token is single-use: get a fresh one before the next try.
+        humanCheck.current?.reset();
         const message = typeof data.error === "string" ? data.error : "Não foi possível concluir. Tente novamente.";
         if (message === apiErrorMessages.EMAIL_IN_USE) setFormError({ text: message, login: true });
         else if (message === apiErrorMessages.INVALID_DOCUMENT) setServerErrors({ document: message });
@@ -170,6 +180,15 @@ export function SubscribeForm({ founderLeft }: { founderLeft: number }) {
           </label>
           {show("acceptTerms") && <p id={`${formId}-terms-msg`} className="s-error" role="alert">{show("acceptTerms")}</p>}
         </div>
+        <HumanCheck
+          ref={humanCheck}
+          onToken={(token) => {
+            setHumanToken(token);
+            if (token) setHumanError("");
+          }}
+          onUnavailable={() => setHumanError("A verificação não carregou. Atualize a página ou tente outra conexão.")}
+        />
+        {humanError && <p className="s-error" role="alert">{humanError}</p>}
       </form>
 
       <aside className="s-summary" aria-label="Resumo">
