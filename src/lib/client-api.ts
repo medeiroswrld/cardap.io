@@ -38,6 +38,8 @@ export const apiErrorMessages: Record<string, string> = {
   COUPON_USED: "Este cupom já foi usado em pedidos. Você pode pausá-lo.",
   DUE_DATE_REQUIRED: "Informe o vencimento da conta.",
   LIMIT_REACHED: "Limite de 20 origens atingido.",
+  UNAUTHORIZED: "Sua sessão expirou. Atualize a página e tente novamente.",
+  GUEST_SESSION_EXPIRED: "Sua sessão expirou. Atualize a página e tente novamente.",
   RATE_LIMITED:
     "Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente ou chame a equipe.",
 };

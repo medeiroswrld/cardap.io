@@ -1102,7 +1102,7 @@ function Checkout({ table, hasTable }: { table: number; hasTable: boolean }) {
             type="tel"
             inputMode="tel"
             autoComplete="tel-national"
-            pattern="[0-9()+\s-]{10,18}"
+            pattern="[0-9()+.\s-]{8,24}"
             placeholder="(11) 99999-9999"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -1251,7 +1251,7 @@ function Newsletter({ onComplete }: { onComplete: () => void }) {
       </label>
       <label className="form-label">
         WhatsApp com DDD
-        <input name="phone" type="tel" required pattern="[0-9()+\s-]{10,18}" />
+        <input name="phone" type="tel" required pattern="[0-9()+.\s-]{8,24}" />
       </label>
       <label className="checkbox-label">
         <input

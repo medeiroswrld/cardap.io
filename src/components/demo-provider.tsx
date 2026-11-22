@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { initialState } from "@/lib/fixtures";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import type { PaymentMethod } from "@/lib/order-flow";
 import type { OnlineOptions } from "@/lib/fulfillment-draft";
 import {
@@ -203,7 +204,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       if (!s.bag.length) throw new Error("Sua sacola está vazia.");
       if (
         data.name.trim().length < 2 ||
-        !/^\d{10,11}$/.test(data.phone.replace(/\D/g, ""))
+        !isValidPhone(normalizePhone(data.phone))
       )
         throw new Error("Informe seu nome e WhatsApp com DDD.");
       const items = s.bag.map((b) => {
@@ -307,7 +308,7 @@ function saveContact(
   consent: boolean,
   source: string,
 ) {
-  const normalized = phone.replace(/\D/g, "");
+  const normalized = normalizePhone(phone);
   const at = new Date().toISOString();
   const previous = s.contacts.find((c) => c.phone === normalized);
   if (previous)
