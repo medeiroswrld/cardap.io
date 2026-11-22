@@ -9,6 +9,7 @@ import { COUPON_PRICE_CHANGED_TEXT } from "@/lib/coupons";
 import { ensureGuestSession, forgetGuestSession } from "@/lib/guest-session";
 import { onlineOptions } from "@/lib/fulfillment-draft";
 import { isRestaurantOpen } from "@/lib/opening-hours";
+import { CHECKOUT_INVALID_TEXT, phoneForOrder } from "@/lib/phone";
 import { clearStoredCoupon, readStoredOrigin } from "@/lib/campaign-params";
 export function ConnectedMenuProvider({
   catalog: initialCatalog,
@@ -172,9 +173,10 @@ export function ConnectedMenuProvider({
       removed_ingredients: [...(i.removedIngredients || [])].sort(),
       option_ids: (i.addOns || []).map((o) => o.id).sort(),
     }));
+    if (data.name.trim().length < 2) throw new Error("Informe seu nome.");
     const customer = {
       name: data.name.trim(),
-      phone: data.phone.replace(/\D/g, ""),
+      phone: phoneForOrder(data.phone),
       marketing_consent: data.consent,
     };
     const campaign: Record<string, unknown> = {};
@@ -241,18 +243,35 @@ export function ConnectedMenuProvider({
       localStorage.setItem(pendingKey, JSON.stringify({ fingerprint, key }));
     } catch {}
     let order: { id: string };
+    const send = () =>
+      requestJson<{ order: { id: string } }>(base + "/orders", { key, ...body });
     try {
-      ({ order } = await requestJson<{ order: { id: string } }>(
-        base + "/orders",
-        {
-          key,
-          ...body,
-        },
-      ));
+      try {
+        ({ order } = await send());
+      } catch (first) {
+        // A tab left open past the guest session (12 h): the server created nothing,
+        // so open a fresh session and send the same order once more.
+        if (!(first instanceof ApiRequestError && first.status === 401)) throw first;
+        forgetGuestSession(catalog.restaurant.id);
+        await ensureGuestSession(catalog.restaurant.id);
+        ({ order } = await send());
+      }
     } catch (error) {
       // Expired guest session: the next attempt creates a new one.
       if (error instanceof ApiRequestError && error.status === 401)
         forgetGuestSession(catalog.restaurant.id);
+      // The server rejected the form data: never show the raw code to the customer.
+      if (
+        error instanceof ApiRequestError &&
+        error.status === 400 &&
+        error.message.startsWith("INVALID_INPUT")
+      )
+        throw new ApiRequestError(
+          CHECKOUT_INVALID_TEXT,
+          error.status,
+          error.requestId,
+          "INVALID_INPUT",
+        );
       // The code (not the text) tells callers what happened; texts below are per mode.
       if (error instanceof ApiRequestError && error.code === "PRICE_CHANGED") {
         if (data.coupon)
@@ -298,7 +317,7 @@ export function ConnectedMenuProvider({
     await ensureGuestSession(catalog.restaurant.id);
     await requestJson(base + "/subscribe", {
       name,
-      phone: phone.replace(/\D/g, ""),
+      phone: phoneForOrder(phone),
       consent,
     });
     setToast(
