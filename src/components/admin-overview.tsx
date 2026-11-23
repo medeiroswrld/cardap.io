@@ -4,7 +4,15 @@ import { Search } from "lucide-react";
 import { requestJson } from "@/lib/client-api";
 import { money } from "@/lib/utils";
 import { fulfillmentLabel, statusLabel, statusTone } from "@/lib/order-flow";
-import { monthOptions, type ResultsReport } from "@/lib/results-report";
+import {
+  PERIOD_PRESETS,
+  presetRange,
+  rangeProblem,
+  shortDay,
+  todayIn,
+  type PeriodPreset,
+  type PeriodSummary,
+} from "@/lib/period";
 import type { Bills } from "@/lib/finance";
 import { matchesQuery, recentOrders } from "@/lib/overview";
 import type { Workspace } from "@/lib/connected-types";
@@ -24,26 +32,56 @@ export function AdminOverview({
   const [dueState, setDueState] = useState<{ key: string; count: number } | null>(null);
   const [query, setQuery] = useState("");
   const restaurantId = data.restaurant.id;
-  const [results, setResults] = useState<{
+  const timezone = data.restaurant.timezone;
+  const presetKey = `overview:${restaurantId}:period`;
+  const [preset, setPreset] = useState<PeriodPreset>("7d");
+  const [custom, setCustom] = useState(() => presetRange("7d", todayIn(timezone)));
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const saved = localStorage.getItem(presetKey);
+        if (saved && saved !== "personalizado" && PERIOD_PRESETS.some((p) => p.value === saved))
+          setPreset(saved as PeriodPreset);
+      } catch {}
+    });
+  }, [presetKey]);
+  function choose(next: PeriodPreset) {
+    setPreset(next);
+    try {
+      localStorage.setItem(presetKey, next);
+    } catch {}
+  }
+  const today = todayIn(timezone);
+  const range = preset === "personalizado" ? custom : presetRange(preset, today);
+  const problem = rangeProblem(range.from, range.to, today);
+  // A new delivered order changes the totals: refetch when the loaded list changes.
+  const deliveredKey = data.orders
+    .filter((o) => o.status === "entregue")
+    .map((o) => o.id)
+    .join(",");
+  const [period, setPeriod] = useState<{
     key: string;
     status: "error" | "ready";
-    dishes: ResultsReport["top_quantity"];
+    summary: PeriodSummary | null;
   } | null>(null);
+  const periodKey = `${restaurantId}|${range.from}|${range.to}`;
   useEffect(() => {
-    if (!owner) return;
+    if (problem) return;
     let cancelled = false;
-    const month = monthOptions(new Date(), data.restaurant.timezone)[0].value;
-    requestJson<ResultsReport>(`/api/restaurants/${restaurantId}/results?month=${month}`)
-      .then((r) => {
-        if (!cancelled) setResults({ key: restaurantId, status: "ready", dishes: r.top_quantity });
+    requestJson<PeriodSummary>(`/api/restaurants/${restaurantId}/period?from=${range.from}&to=${range.to}`)
+      .then((s) => {
+        if (!cancelled) setPeriod({ key: periodKey, status: "ready", summary: s });
       })
       .catch(() => {
-        if (!cancelled) setResults({ key: restaurantId, status: "error", dishes: [] });
+        if (!cancelled) setPeriod({ key: periodKey, status: "error", summary: null });
       });
     return () => {
       cancelled = true;
     };
-  }, [owner, restaurantId, data.restaurant.timezone]);
+  }, [restaurantId, range.from, range.to, periodKey, problem, deliveredKey]);
+  const current = period && period.key === periodKey ? period : null;
+  const summary = current?.summary ?? null;
+  const status = problem ? "invalid" : current ? current.status : "loading";
   useEffect(() => {
     if (!owner) return;
     let cancelled = false;
@@ -57,13 +95,11 @@ export function AdminOverview({
     };
   }, [owner, restaurantId]);
   const dueThisWeek = dueState && dueState.key === restaurantId ? dueState.count : 0;
-  const status = results && results.key === restaurantId ? results.status : "loading";
 
   const open = useMemo(
     () => data.orders.filter((o) => ["recebido", "em_preparo", "pronto", "saiu_para_entrega"].includes(o.status)).length,
     [data.orders],
   );
-  const delivered = useMemo(() => data.orders.filter((o) => o.status === "entregue"), [data.orders]);
   const recent = useMemo(
     () =>
       recentOrders(data.orders, 8).filter((o) =>
@@ -77,12 +113,15 @@ export function AdminOverview({
   const latest = useMemo(() => recentOrders(data.orders, 1)[0], [data.orders]);
   const dishes = useMemo(
     () =>
-      (results && results.key === restaurantId ? results.dishes : [])
+      (summary?.dishes ?? [])
         .map((d) => ({ ...d, product: data.products.find((p) => p.id === d.product_id) }))
         .filter((d) => matchesQuery(d.name, query))
         .slice(0, 5),
-    [results, restaurantId, data.products, query],
+    [summary, data.products, query],
   );
+  const shown = (value: (s: PeriodSummary) => string) => (summary ? value(summary) : "—");
+  const rangeText =
+    range.from === range.to ? `Em ${shortDay(range.from)}` : `De ${shortDay(range.from)} a ${shortDay(range.to)}`;
 
   return (
     <div className="overview">
@@ -109,19 +148,72 @@ export function AdminOverview({
             aria-label="Buscar pedido, cliente ou prato"
           />
         </label>
+        <div className="overview-period">
+          <div className="overview-period-chips" role="group" aria-label="Período">
+            {PERIOD_PRESETS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                className={preset === p.value ? "active" : ""}
+                aria-pressed={preset === p.value}
+                onClick={() => {
+                  if (p.value === "personalizado" && preset !== "personalizado") setCustom(range);
+                  choose(p.value);
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {preset === "personalizado" && (
+            <div className="overview-period-dates">
+              <label className="form-label inline-label">
+                De
+                <input
+                  type="date"
+                  value={custom.from}
+                  max={today}
+                  onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))}
+                />
+              </label>
+              <label className="form-label inline-label">
+                Até
+                <input
+                  type="date"
+                  value={custom.to}
+                  max={today}
+                  onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))}
+                />
+              </label>
+            </div>
+          )}
+        </div>
         <div className="connected-stats">
           <div className="admin-panel connected-stat"><span>Pedidos em aberto</span><strong>{open}</strong></div>
-          <div className="admin-panel connected-stat"><span>Pedidos entregues</span><strong>{delivered.length}</strong></div>
-          <div className="admin-panel connected-stat"><span>Total entregue</span><strong>{money(delivered.reduce((s, o) => s + o.total_cents, 0))}</strong></div>
+          <div className="admin-panel connected-stat"><span>Pedidos entregues</span><strong>{shown((s) => String(s.count))}</strong></div>
+          <div className="admin-panel connected-stat"><span>Faturamento</span><strong>{shown((s) => money(s.revenue_cents))}</strong></div>
         </div>
-        <p className="field-help">Resumo dos últimos {data.orders.length} pedidos carregados (limite: 200).</p>
+        {status === "invalid" ? (
+          <p role="alert" className="form-error">{problem}</p>
+        ) : status === "error" ? (
+          <p role="alert" className="form-error">Não foi possível carregar o período. Tente de novo.</p>
+        ) : (
+          <p className="field-help">
+            {rangeText}, só pedidos entregues
+            {summary && summary.count > 0 && (
+              <>
+                {" "}· ticket médio {money(summary.average_cents)} · Entrega {summary.by_fulfillment.entrega.count} ·
+                Retirada {summary.by_fulfillment.retirada.count} · Mesa {summary.by_fulfillment.mesa.count}
+              </>
+            )}
+            .
+          </p>
+        )}
         {owner && (
           <section>
             <h2 className="overview-title">Pratos mais pedidos</h2>
-            <p className="field-help">Neste mês, só pedidos entregues.</p>
-            {status === "error" ? (
-              <p className="field-help">Não foi possível carregar os pratos agora.</p>
-            ) : status === "loading" ? null : dishes.length ? (
+            <p className="field-help">No período escolhido, só pedidos entregues.</p>
+            {status === "error" || status === "invalid" ? null : status === "loading" ? null : dishes.length ? (
               <div className="overview-dishes">
                 {dishes.map((d) => (
                   <article key={d.product_id} className="admin-panel overview-dish">
@@ -133,7 +225,7 @@ export function AdminOverview({
                 ))}
               </div>
             ) : (
-              <p className="field-help">Ainda sem pedidos entregues neste mês.</p>
+              <p className="field-help">Sem pedidos entregues neste período.</p>
             )}
           </section>
         )}

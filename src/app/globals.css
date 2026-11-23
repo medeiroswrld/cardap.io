@@ -5886,6 +5886,51 @@ html[data-app="gestao"] .connected-content .search-field input {
   font: inherit;
   outline: none;
 }
+.overview-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+.overview-period-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.overview-period-chips > button {
+  min-height: 36px;
+  padding: 7px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.overview-period-chips > button:hover {
+  color: var(--text);
+}
+.overview-period-chips > button.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-contrast);
+  font-weight: 600;
+}
+.overview-period-chips > button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 50%, transparent);
+  outline-offset: 2px;
+}
+.overview-period-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.overview-period-dates .inline-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .overview-title {
   margin: 0 0 4px;
   font-size: 17px;
